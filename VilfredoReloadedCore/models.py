@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
 # This file is part of VilfredoReloadedCore.
@@ -19,30 +20,31 @@
 ###############################################################################
 
 
-"""
-Vilfredo Reloaded Core
-======================
+'''
+The database models
+'''
 
-:copyright: (c) 2013 by Daniele Pizzolli
-:license: AGPL 3, see LICENSE.txt for more details
-"""
+from sqlalchemy import Column, Integer, String
 
-import pkg_resources
-pkg_resources.declare_namespace(__name__)
+from .database import Base
 
 
-from flask import Flask
+class LoginUser(Base):
+    '''
+    Stores the user mandatory data
+    '''
 
+    __tablename__ = 'user'
 
-def config_app(app):
-    # Load setting using various methods
-    # TODO: do relative o package import
-    app.config.from_object('VilfredoReloadedCore.defaults_settings')
-    # TODO: document the VCR_VARIABLE
-    app.config.from_envvar('VRC_SETTINGS', silent=True)
+    id = Column(Integer, primary_key=True)
+    username = Column(String(255), unique=True, nullable=False)
+    email = Column(String(255), nullable=False)
+    password = Column(String(255), nullable=False)
 
-    from .database import init_engine
-    init_engine(app.config['DATABASE_URI'])
+    def __init__(self, username, email, password):
+        self.username = username
+        self.email = email
+        self.password = password
 
-app = Flask(__name__)
-config_app(app)
+    def __repr__(self):
+        return "<UID: %d, User: %s>" % (self.id, self.username)
