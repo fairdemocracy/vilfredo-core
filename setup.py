@@ -43,7 +43,7 @@ setup(
                    ' consensus-building and decision-making tool'),
     entry_points='''
         [console_scripts]
-        vr = VilfredoReloadedCore:main.main
+        vr = VilfredoReloadedCore.main:main
         ''',
     install_requires=requirements_base,
     include_package_data=True,
