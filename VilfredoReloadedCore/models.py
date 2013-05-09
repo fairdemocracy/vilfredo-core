@@ -65,7 +65,7 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     username = Column(String(64), unique=True, nullable=False)
     email = Column(String(120), unique=True)
-    password = Column(String(60))
+    password = Column(String(60), nullable=False)
     registered = Column(DateTime)
     last_seen = Column(DateTime)
     # 1:M
@@ -126,9 +126,9 @@ class Question(Base):
     id = Column(Integer, primary_key=True)
     title = Column(String(120), nullable=False)
     blurb = Column(Text, nullable=False)
-    generation = Column(Integer, default=1)
+    generation = Column(Integer, default=1, nullable=False)
     created = Column(DateTime)
-    room = Column(String(20))
+    room = Column(String(20), default='')
     phase = Column(Enum('writing', 'voting', 'archived'), default='writing')
     last_move_on = Column(DateTime)
     user_id = Column(Integer, ForeignKey('user.id'))
@@ -166,7 +166,7 @@ class Proposal(Base):
     __tablename__ = 'proposal'
 
     id = Column(Integer, primary_key=True)
-    title = Column(String(120))
+    title = Column(String(120), nullable=False)
     blurb = Column(Text, nullable=False)
     generation = Column(Integer, default=1)
     created = Column(DateTime)
