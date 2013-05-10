@@ -193,6 +193,35 @@ class Proposal(Base):
         pass
 
     @staticmethod
+    def who_dominates_who_2(p1, p2):
+        '''
+        Takes 2 SETS of ENDORSER IDs, one for each proposal,
+        and calulates which of any domiantes the other.
+
+        Returns the dominating non-empty proposal set or ---
+        -1 if both sets are the same
+        0 if both sets are different
+        '''
+        # If p1 and p2 are the same return -1
+        if (p1 == p2):
+            return -1
+        # If p1 is empty return p2
+        elif (len(p1) == 0):
+            return p2
+        # If p2 is empty return p1
+        elif (len(p2) == 0):
+            return p1
+        # Check if p1 is a subset of p2
+        elif (p1 < p2):
+            return p2
+        # Check if p2 is a subset of p1
+        elif (p2 < p1):
+            return p1
+        # p1 and p2 are different return 0
+        else:
+            return 0
+
+    @staticmethod
     def who_dominates_who(p1, p2):
         '''
         Takes 2 SETS of ENDORSER IDs, one for each proposal,
@@ -202,7 +231,9 @@ class Proposal(Base):
         -1 if both sets are the same
         0 if both sets are different
         '''
-
+        # Check if the same
+        if (p1 == p2):
+            return -1
         # Check if p1 is empty
         if (len(p1) > 0):
             # Check if p2 is empty

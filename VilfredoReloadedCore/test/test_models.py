@@ -233,10 +233,16 @@ class TestWhoDominatesWho(unittest.TestCase):
         p3 = {1, 2, 7, 8, 9, 10}
         p4 = {4, 5, 6}
         p5 = {4, 5, 6}
-        p6 = {}
-        p7 = {}
+        p6 = set()
+        p7 = set()
         self.assertEqual(models.Proposal.who_dominates_who(p2, p4), p2)
         self.assertEqual(models.Proposal.who_dominates_who(p4, p5), -1)
         self.assertEqual(models.Proposal.who_dominates_who(p2, p3), 0)
         self.assertEqual(models.Proposal.who_dominates_who(p6, p7), -1)
         self.assertEqual(models.Proposal.who_dominates_who(p1, p7), p1)
+
+        self.assertEqual(models.Proposal.who_dominates_who_2(p2, p4), p2)
+        self.assertEqual(models.Proposal.who_dominates_who_2(p4, p5), -1)
+        self.assertEqual(models.Proposal.who_dominates_who_2(p2, p3), 0)
+        self.assertEqual(models.Proposal.who_dominates_who_2(p6, p7), -1)
+        self.assertEqual(models.Proposal.who_dominates_who_2(p1, p7), p1)
