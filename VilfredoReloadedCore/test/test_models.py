@@ -32,7 +32,8 @@ except ImportError:
     # NOQA
     import unittest
 
-from .. import models
+from .. import models, views
+
 from .. database import db_session, drop_db, init_db
 
 
@@ -51,6 +52,13 @@ class UserTest(unittest.TestCase):
             models.User.username == 'test_username'
         ).first()
         self.assertEqual(user.email, user1.email)
+        self.assertTrue(user1.is_active())
+        new_username = 'test_username'
+        self.assertFalse(
+            models.User.username_available(new_username))
+        new_email = 'test_email'
+        self.assertFalse(
+            models.User.email_available(new_email))
 
 
 class QuestionTest(unittest.TestCase):
@@ -145,8 +153,10 @@ class EndorseTest(unittest.TestCase):
         john = models.User('john', 'john@example.com', 'fgfdfg')
         susan = models.User('susan', 'susan@example.com', 'bgtyhj')
         bill = models.User('bill', 'bill@example.com', 'h6ygf')
+        jack = models.User('jack', 'jack@example.com', 'kjkjkjkj')
+        harry = models.User('harry', 'harry@example.com', 'gfgrd')
 
-        db_session.add_all([john, susan, bill])
+        db_session.add_all([john, susan, bill, jack, harry])
         db_session.commit()
 
         # Create questions
@@ -159,6 +169,15 @@ class EndorseTest(unittest.TestCase):
 
         db_session.add_all([johns_q, johns_q2])
         db_session.commit()
+
+        # Fetch list of users for john's invite selection
+        user_query = \
+            models.User.query.filter(
+                models.User.id != john.id) \
+            .order_by(models.User.username).limit(20)
+        #user_list = models.User.query.limit(4).all()
+        #self.assertEquals(len(user_list), 4)
+        self.assertEquals(user_query.count(), 4)
 
         # Create invitations (user invites users)
         john.invite(susan, johns_q.id)
@@ -246,3 +265,79 @@ class TestWhoDominatesWho(unittest.TestCase):
         self.assertEqual(models.Proposal.who_dominates_who_2(p2, p3), 0)
         self.assertEqual(models.Proposal.who_dominates_who_2(p6, p7), -1)
         self.assertEqual(models.Proposal.who_dominates_who_2(p1, p7), p1)
+
+
+class LoginTestCase(unittest.TestCase):
+    def setUp(self):
+        from .. import app
+        app.config['TESTING'] = True
+        self.app = app.test_client()
+        init_db()
+
+    def tearDown(self):
+        drop_db()
+
+    def test_empty_db(self):
+        """Start with a blank database."""
+        rv = self.app.get('/')
+        self.assertTrue('No questions here so far' in rv.data, rv.data)
+
+    def test_login_logout(self):
+        rv = self.login('test_user', 'test_password')
+        self.assertTrue('You were logged in' in rv.data, rv.data)
+        rv = self.logout()
+        self.assertTrue('You were logged out' in rv.data, rv.data)
+        rv = self.login('unknown_user', 'test_password')
+        self.assertTrue('Invalid username' in rv.data, rv.data)
+        rv = self.login('test_user', 'wrong_password')
+        self.assertTrue('Invalid password' in rv.data, rv.data)
+
+    def login(self, username, password):
+        return self.app.post('/login', data=dict(
+            username=username,
+            password=password
+        ), follow_redirects=True)
+
+    def logout(self):
+        return self.app.get('/logout', follow_redirects=True)
+
+
+class RegisterTestCase(unittest.TestCase):
+    def setUp(self):
+        from .. import app
+        app.config['TESTING'] = True
+        self.app = app.test_client()
+        init_db()
+        self.add_existing_user()
+
+    def tearDown(self):
+        drop_db()
+
+    def test_register(self):
+        # Test for empty fields
+        rv = self.register('', 'test_email', 'test_password')
+        self.assertTrue('Invalid username' in rv.data, rv.data)
+        rv = self.register('test_user', 'test_email', '')
+        self.assertTrue('Invalid password' in rv.data, rv.data)
+        rv = self.register('test_user', '', 'test_password')
+        self.assertTrue('Invalid email' in rv.data, rv.data)
+        # Check DB for username and email
+        rv = self.register('user', 'test_email', 'test_password')
+        self.assertTrue('Username not available' in rv.data, rv.data)
+        rv = self.register('test_user', 'email', 'test_password')
+        self.assertTrue('Email not available' in rv.data, rv.data)
+        # Register user with correct details
+        rv = self.register('test_user', 'test_email', 'test_password')
+        self.assertTrue('You have been registered' in rv.data, rv.data)
+
+    def register(self, username, email, password):
+        return self.app.post('/register', data=dict(
+            username=username,
+            email=email,
+            password=password
+        ), follow_redirects=True)
+
+    def add_existing_user(self):
+        existing_user = models.User('user', 'email', 'test_password')
+        db_session.add(existing_user)
+        db_session.commit()

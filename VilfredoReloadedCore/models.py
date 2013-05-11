@@ -26,11 +26,11 @@ The database Bases
 
 from sqlalchemy import Column, Integer, String, ForeignKey
 
-from sqlalchemy import Enum, DateTime, Text
+from sqlalchemy import Enum, DateTime, Text, Boolean
 
 from sqlalchemy.orm import relationship
 
-from .database import Base
+from database import Base
 
 import datetime
 
@@ -68,6 +68,7 @@ class User(Base):
     password = Column(String(60), nullable=False)
     registered = Column(DateTime)
     last_seen = Column(DateTime)
+    is_active = Column(Boolean, default=True)
     # 1:M
     questions = relationship('Question', backref='author', lazy='dynamic')
     proposals = relationship('Proposal', backref='author', lazy='dynamic')
@@ -83,6 +84,26 @@ class User(Base):
     def invite(self, receiver, question_id):
         self.invites.append(Invite(receiver, question_id))
         return self
+
+    @staticmethod
+    def username_available(username):
+        return User.query.filter_by(username=username).first() is None
+
+    @staticmethod
+    def email_available(email):
+        return User.query.filter_by(email=email).first() is None
+
+    def is_authenticated(self):
+        return True
+
+    def is_active(self):
+        return self.is_active
+
+    def is_anonymous(self):
+        return False
+
+    def get_id(self):
+        return unicode(self.id)
 
     def __init__(self, username, email, password):
         self.username = username
