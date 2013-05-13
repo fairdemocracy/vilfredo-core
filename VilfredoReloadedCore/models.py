@@ -26,11 +26,11 @@ The database Bases
 
 from sqlalchemy import Column, Integer, String, ForeignKey
 
-from sqlalchemy import Enum, DateTime, Text, Boolean
+from sqlalchemy import Enum, DateTime, Text, Boolean, and_
 
 from sqlalchemy.orm import relationship
 
-from database import Base
+from database import Base, db_session
 
 import datetime
 
@@ -71,7 +71,8 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     # 1:M
     questions = relationship('Question', backref='author', lazy='dynamic')
-    proposals = relationship('Proposal', backref='author', lazy='dynamic')
+    proposals = relationship('Proposal', backref='author', lazy='dynamic',
+                             cascade="all, delete-orphan")
     endorsements = relationship('Endorsement',
                                 backref='endorser', lazy='dynamic')
     # updates 1:M
@@ -104,6 +105,24 @@ class User(Base):
 
     def get_id(self):
         return unicode(self.id)
+
+    def get_proposals(self, question, generation=None):
+        generation = generation or question.generation
+        return self.proposals.filter(and_(
+            Proposal.question == question,
+            Proposal.generation == generation)
+        ).all()
+
+    def delete_proposal(self, prop):
+        proposal = self.proposals.filter(
+            Proposal.id == prop.id,
+        ).first()
+        if (proposal is not None
+                and proposal.question.phase == 'writing'
+                and
+                proposal.question.generation == proposal.generation_created):
+            self.proposals.remove(proposal)
+        return self
 
     def __init__(self, username, email, password):
         self.username = username
@@ -173,6 +192,59 @@ class Question(Base):
             self.phase = phase
         return self
 
+    def current_proposals_ids(self):
+        if (self.proposals.count() == 0):
+            return set()
+        else:
+            prop_ids = set()
+            for p in self.proposals:
+                prop_ids.add(p.id)
+            return prop_ids
+
+    def get_proposals(self, generation=None):
+        generation = generation or self.generation
+        return self.proposals.filter(
+            Proposal.generation == generation
+        ).all()
+
+    def calculate_pareto_front(self, generation=None):
+        '''
+        Returns a SET containing the paret front proposal ids
+        '''
+        proposals = self.get_proposals(generation)
+
+        if (len(proposals) == 0):
+            return set()
+        else:
+            dominated = set()
+            props = dict()
+
+            for p in proposals:
+                props[p.id] = p.set_of_endorser_ids()
+
+            pids = props.keys()
+            done = list()
+            for p1 in pids:
+                done.append(p1)
+                for p2 in pids:
+                    if (p2 in done):
+                        continue
+
+                    who_dominates = Proposal.\
+                        who_dominates_who_2(props[p1], props[p2])
+                    if (who_dominates == 0 or who_dominates == -1):
+                        continue
+                    elif (who_dominates == props[p1]):
+                        dominated.add(p2)
+                    elif (who_dominates == props[p2]):
+                        dominated.add(p1)
+
+            pareto = set()
+            if (len(dominated) > 0):
+                pareto = set(pids).difference(dominated)
+
+            return pareto
+
     def __repr__(self):
         return "<User('%s','%s', '%s')>" % (self.title,
                                             self.blurb,
@@ -190,7 +262,9 @@ class Proposal(Base):
     title = Column(String(120), nullable=False)
     blurb = Column(Text, nullable=False)
     generation = Column(Integer, default=1)
+    generation_created = Column(Integer, default=1)
     created = Column(DateTime)
+    updated = Column(DateTime)
     user_id = Column(Integer, ForeignKey('user.id'))
     question_id = Column(Integer, ForeignKey('question.id'))
     dominated_by = Column(Integer, default=0)
@@ -203,15 +277,88 @@ class Proposal(Base):
         self.question = question
         self.title = title
         self.blurb = blurb
-        self.generation = 1
+        self.generation = question.generation
+        self.generation_created = question.generation
         self.created = datetime.datetime.utcnow()
+
+    def update(self, user, title, blurb):
+        '''
+        Only available to the author during the question WRITING PHASE
+        of the generation the proposal was first propsosed (created)
+        '''
+        if (user.id == self.user_id
+                and self.question.phase == 'writing'
+                and self.question.generation == self.generation_created):
+            if (len(title) > 0 and len(blurb) > 0):
+                self.title = title
+                self.blurb = blurb
+                self.updated = datetime.datetime.utcnow()
+                return True
+        else:
+            return False
+
+    def delete(self, user):
+        '''
+        Only available to the author during the question WRITING PHASE
+        of the generation the proposal was first propsosed (created)
+        '''
+        if (user == self.user_id
+                and self.question.phase == 'writing'
+                and self.question.generation == self.generation_created):
+                    db_session.delete(self)
+                    return True
+        else:
+            return False
 
     def endorse(self, endorser):
         self.endorsements.append(Endorsement(endorser, self))
         return self
 
     def remove_endorsement(self, endorser):
-        pass
+        endorsement = self.endorsements.filter(and_(
+            Endorsement.user_id == endorser.id,
+            Endorsement.proposal_id == self.id,
+            Endorsement.generation == self.generation)
+        ).first()
+        if (endorsement is not None):
+            self.endorsements.remove(endorsement)
+        return self
+
+    def is_endorsed_by(self, user, generation=None):
+        '''
+        Returns True if the user has endorsed in the current generation
+            - Defaults to current generation
+        '''
+        generation = generation or self.generation
+
+        return self.endorsements.filter(and_(
+            Endorsement.user_id == user.id,
+            Endorsement.proposal_id == self.id,
+            Endorsement.generation == generation)
+        ).count() == 1
+
+    def endorsers(self, generation=None):
+        '''
+        Returns a LIST of the current endorsers
+            - Defaults to current generation
+        '''
+        generation = generation or self.generation
+
+        current_endorsements = self.endorsements.filter(and_(
+            Endorsement.proposal_id == self.id,
+            Endorsement.generation == generation)
+        ).all()
+        endorsers = set()
+        for e in current_endorsements:
+            endorsers.add(e.endorser)
+        return endorsers
+
+    def set_of_endorser_ids(self, generation=None):
+        endorsers = self.endorsers(generation)
+        endorser_ids = set()
+        for endorser in endorsers:
+            endorser_ids.add(endorser.id)
+        return endorser_ids
 
     @staticmethod
     def who_dominates_who_2(p1, p2):
@@ -232,10 +379,10 @@ class Proposal(Base):
         # If p2 is empty return p1
         elif (len(p2) == 0):
             return p1
-        # Check if p1 is a subset of p2
+        # Check if p1 is a propoer subset of p2
         elif (p1 < p2):
             return p2
-        # Check if p2 is a subset of p1
+        # Check if p2 is a proper subset of p1
         elif (p2 < p1):
             return p1
         # p1 and p2 are different return 0
@@ -300,8 +447,8 @@ class Endorsement(Base):
     __tablename__ = 'endorsement'
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('user.id'), nullable=False)
-    proposal_id = Column(Integer, ForeignKey('proposal.id'), nullable=False)
+    user_id = Column(Integer, ForeignKey('user.id'))
+    proposal_id = Column(Integer, ForeignKey('proposal.id'))
     endorsement_date = Column(DateTime)
     generation = Column(Integer, nullable=False)
 
