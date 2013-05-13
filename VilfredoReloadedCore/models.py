@@ -83,8 +83,8 @@ class User(Base):
     invites = relationship("Invite", primaryjoin="User.id==Invite.sender_id",
                            backref="sender", lazy='dynamic')
 
-    def invite(self, receiver, question_id):
-        self.invites.append(Invite(receiver, question_id))
+    def invite(self, receiver, question):
+        self.invites.append(Invite(receiver, question.id))
         return self
 
     @staticmethod

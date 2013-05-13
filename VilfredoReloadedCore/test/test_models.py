@@ -109,7 +109,6 @@ class SubscriptionTest(unittest.TestCase):
         db_session.add(question)
         db_session.commit()
 
-        #user.subscribed_questions.append(models.Update(user, question))
         user.subscribe_to(question)
         db_session.commit()
 
@@ -236,9 +235,9 @@ class EndorseTest(unittest.TestCase):
         self.assertEquals(user_query.count(), 4)
 
         # Create invitations (user invites users)
-        john.invite(susan, johns_q.id)
-        john.invite(bill, johns_q.id)
-        john.invite(bill, johns_q2.id)
+        john.invite(susan, johns_q)
+        john.invite(bill, johns_q)
+        john.invite(bill, johns_q2)
         db_session.commit()
         for inv in john.invites:
             print "Invitation for question ", inv.question_id,
@@ -265,9 +264,7 @@ class EndorseTest(unittest.TestCase):
         print "Current proposal ids", johns_q.current_proposals_ids()
 
         # Subscribing users to questions
-        #bill.subscribed_questions.append(models.Update(bill, johns_q))
         bill.subscribe_to(johns_q)
-        #susan.subscribed_questions.append(models.Update(susan, johns_q))
         susan.subscribe_to(johns_q)
         db_session.commit()
 
