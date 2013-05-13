@@ -77,7 +77,8 @@ class User(Base):
                                 backref='endorser', lazy='dynamic')
     # updates 1:M
     subscribed_questions = relationship("Update", backref='subscriber',
-                                        lazy='dynamic')
+                                        lazy='dynamic',
+                                        cascade="all, delete-orphan")
     # invites M:M
     invites = relationship("Invite", primaryjoin="User.id==Invite.sender_id",
                            backref="sender", lazy='dynamic')
@@ -114,15 +115,35 @@ class User(Base):
         ).all()
 
     def delete_proposal(self, prop):
-        proposal = self.proposals.filter(
+        proposal = self.proposals.filter(and_(
             Proposal.id == prop.id,
-        ).first()
+            Proposal.user_id == self.id
+        )).first()
         if (proposal is not None
                 and proposal.question.phase == 'writing'
                 and
                 proposal.question.generation == proposal.generation_created):
             self.proposals.remove(proposal)
         return self
+
+    def subscribe_to(self, question):
+        if (question is not None):
+            self.subscribed_questions.append(Update(self, question))
+        return self
+
+    def unsubscribe_from(self, question):
+        if (question is not None):
+            subscription = self.subscribed_questions.filter(and_(
+                Update.question_id == question.id,
+                Update.user_id == self.id)).first()
+            if (subscription is not None):
+                self.subscribed_questions.remove(subscription)
+        return self
+
+    def is_subscribed_to(self, question):
+        if (question is not None):
+            return self.subscribed_questions.filter(
+                Update.question_id == question.id).count() == 1
 
     def __init__(self, username, email, password):
         self.username = username

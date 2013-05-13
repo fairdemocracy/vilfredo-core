@@ -109,13 +109,19 @@ class SubscriptionTest(unittest.TestCase):
         db_session.add(question)
         db_session.commit()
 
-        user.subscribed_questions.append(models.Update(user, question))
+        #user.subscribed_questions.append(models.Update(user, question))
+        user.subscribe_to(question)
         db_session.commit()
 
         update = models.Update.query.filter(
             models.Update.user_id == user.id
         ).first()
         self.assertEqual(update.question_id, question.id)
+
+        self.assertTrue(user.is_subscribed_to(question))
+        user.unsubscribe_from(question)
+        db_session.commit()
+        self.assertFalse(user.is_subscribed_to(question))
 
 
 class ProposalTest(unittest.TestCase):
@@ -259,8 +265,10 @@ class EndorseTest(unittest.TestCase):
         print "Current proposal ids", johns_q.current_proposals_ids()
 
         # Subscribing users to questions
-        bill.subscribed_questions.append(models.Update(bill, johns_q))
-        susan.subscribed_questions.append(models.Update(susan, johns_q))
+        #bill.subscribed_questions.append(models.Update(bill, johns_q))
+        bill.subscribe_to(johns_q)
+        #susan.subscribed_questions.append(models.Update(susan, johns_q))
+        susan.subscribe_to(johns_q)
         db_session.commit()
 
         # Let the endorsements commence
