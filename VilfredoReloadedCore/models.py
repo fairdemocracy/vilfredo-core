@@ -84,8 +84,11 @@ class User(Base):
                            backref="sender", lazy='dynamic')
 
     def invite(self, receiver, question):
-        self.invites.append(Invite(receiver, question.id))
-        return self
+        # Only author can invite to own question and cannot invite himself
+        if (self.id == question.author.id and self.id != receiver.id):
+            self.invites.append(Invite(receiver, question.id))
+            return True
+        return False
 
     @staticmethod
     def username_available(username):
