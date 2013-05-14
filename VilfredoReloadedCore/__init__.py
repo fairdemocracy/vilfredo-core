@@ -25,6 +25,25 @@ Vilfredo Reloaded Core
 
 :copyright: (c) 2013 by Daniele Pizzolli
 :license: AGPL 3, see LICENSE.txt for more details
+
+
+Module documentation
+--------------------
+
+.. automodule:: VilfredoReloadedCore.defaults_settings
+  :members:
+
+.. automodule:: VilfredoReloadedCore.database
+  :members:
+
+.. automodule:: VilfredoReloadedCore.models
+  :members:
+
+.. automodule:: VilfredoReloadedCore.views
+  :members:
+
+.. automodule:: VilfredoReloadedCore.main
+  :members:
 """
 
 import pkg_resources
