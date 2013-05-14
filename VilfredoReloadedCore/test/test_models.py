@@ -198,8 +198,6 @@ class ProposalTest(unittest.TestCase):
 class EndorseTest(unittest.TestCase):
     def setUp(self):
         init_db()
-        app.config['TESTING'] = True
-        mail.suppress = True
 
     def tearDown(self):
         db_session.remove()
