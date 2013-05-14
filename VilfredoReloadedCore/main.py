@@ -19,9 +19,16 @@
 #
 ###############################################################################
 
+'''
+Main
+====
+
+Convenience module to run vilfredo-reloaded-core
+'''
 
 from . import app
 
 
 def main():
+    '''Run vilfredo using built-in webserver on port 8080'''
     app.run(host='0.0.0.0', port=8080)
