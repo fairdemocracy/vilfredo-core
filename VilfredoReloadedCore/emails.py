@@ -30,12 +30,6 @@ from . import app, mail
 
 from decorators import async
 
-#
-#import smtplib
-
-# Import the email modules we'll need
-#from email.mime.text import MIMEText
-
 
 @async
 def send_async_email(msg):
