@@ -34,7 +34,7 @@ setup(
     author = 'Daniele Pizzolli',
     author_email='daniele@ahref.eu',
     packages=['VilfredoReloadedCore', 'VilfredoReloadedCore.test'],
-    namespace_packages=['VilfredoReloadedCore'],
+    # namespace_packages=['VilfredoReloadedCore'],
     keywords = 'Vilfredo Pareto, Decision Making, e-democracy',
     url='http://gitlab.ahref.eu/vilfredo/VilfredoReloadedCore',
     license='GNU AFFERO GENERAL PUBLIC LICENSE (AGPL) Version 3',
@@ -45,15 +45,11 @@ setup(
         [console_scripts]
         vr = VilfredoReloadedCore.main:main
         ''',
-    install_requires=requirements_base,
+    # To skip problems of local eggs we make fat requirements:
+    # http://stackoverflow.com/questions/1843424/setup-py-test-egg-install-location
+    install_requires=requirements_base + requirements_test,
     include_package_data=True,
-    tests_require=requirements_test,
     test_suite='nose.collector',
-    # test_suite='runtests.runtests',
-    setup_requires=[
-        'nose>=1.0',
-        'flake8',
-    ],
     classifiers=[
         'Environment :: Web Environment',
         'Intended Audience :: Developers',

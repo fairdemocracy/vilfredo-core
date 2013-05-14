@@ -1,5 +1,6 @@
 *.pyc
 /*.egg
+/.coverage
 /VilfredoReloadedCore.egg-info
 /dist/
 /docs/build/

@@ -87,12 +87,14 @@ best practices defined by the ``python`` community.
     python setup.py test
     python setup.py flake8
 
+An improved test runner is:
 
+.. code:: sh
 
+    nosetests -c nose.cfg
 
-
-
-
+This will open a ``ipdb`` shell in case of errors and failures and provide a
+coverage report.
 
 
 Installed under Mac osx 10.8.3, using Sourcetree
