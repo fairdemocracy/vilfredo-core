@@ -9,8 +9,9 @@ Welcome to vilfredo-reloaded-core's documentation!
 Contents:
 
 .. toctree::
-   :maxdepth: 2
+  :maxdepth: 2
 
+  modules
 
 
 Indices and tables
