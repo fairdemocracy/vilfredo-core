@@ -1,4 +1,5 @@
 *.pyc
 /*.egg
 /VilfredoReloadedCore.egg-info
+/dist/
 /docs/build/
