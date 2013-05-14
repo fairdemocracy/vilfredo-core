@@ -32,7 +32,7 @@ except ImportError:
     # NOQA
     import unittest
 
-from .. import models, app
+from .. import models, app, emails, mail
 
 from .. import views  # NOQA
 
@@ -198,6 +198,8 @@ class ProposalTest(unittest.TestCase):
 class EndorseTest(unittest.TestCase):
     def setUp(self):
         init_db()
+        app.config['TESTING'] = True
+        mail.suppress = True
 
     def tearDown(self):
         db_session.remove()
@@ -247,6 +249,12 @@ class EndorseTest(unittest.TestCase):
         print "Bills invitations"
         for inv in bill.invitations:
             print inv.question_id, " from author ", inv.sender.username
+
+        # Email invited users
+        with mail.record_messages() as outbox:
+            emails.email_question_invite(john, susan, johns_q)
+            emails.email_question_invite(john, bill, johns_q)
+            self.assertEqual(len(outbox), 2)
 
         # Creating proposals
         bills_prop1 = models.Proposal(

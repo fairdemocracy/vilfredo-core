@@ -52,6 +52,8 @@ pkg_resources.declare_namespace(__name__)
 
 from flask import Flask
 
+from flask.ext.mail import Mail
+
 
 def config_app(app):
     # Load setting using various methods
@@ -65,3 +67,4 @@ def config_app(app):
 
 app = Flask(__name__)
 config_app(app)
+mail = Mail(app)
