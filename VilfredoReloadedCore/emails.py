@@ -42,11 +42,6 @@ def send_email(subject, sender, recipients, text_body, html_body):
     msg.body = text_body
     msg.html = html_body
     send_async_email(msg)
-    """
-    mail.send_message(subject=subject,
-                      body=text_body,
-                      recipients=recipients)
-    """
 
 
 def email_question_invite(sender, receiver, question):
