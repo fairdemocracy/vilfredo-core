@@ -156,9 +156,8 @@ class User(Base):
         self.last_seen = datetime.datetime.utcnow()
 
     def __repr__(self):
-        return "<Vilfredo User('%s','%s', '%s')>" % (self.username,
-                                                     self.email,
-                                                     self.password)
+        return "<User('%s','%s')>" % (self.username,
+                                      self.email)
 
 
 class Invite(Base):
@@ -191,20 +190,62 @@ class Question(Base):
     title = Column(String(120), nullable=False)
     blurb = Column(Text, nullable=False)
     generation = Column(Integer, default=1, nullable=False)
-    created = Column(DateTime)
-    room = Column(String(20), default='')
+    room = Column(String(20))
     phase = Column(Enum('writing', 'voting', 'archived'), default='writing')
+    created = Column(DateTime)
     last_move_on = Column(DateTime)
+    minimum_time = Column(Integer)
+    maximum_time = Column(Integer)
     user_id = Column(Integer, ForeignKey('user.id'))
     # 1:M
     proposals = relationship('Proposal', backref='question', lazy='dynamic')
+    history = relationship('QuestionHistory', lazy='dynamic')
 
-    def __init__(self, author, title, blurb, room=None):
+    def __init__(self, author, title, blurb,
+                 minimum_time=86400, maximum_time=604800, room=None):
         self.author = author
         self.title = title
         self.blurb = blurb
         self.room = room or ''
         self.created = datetime.datetime.utcnow()
+        self.last_move_on = datetime.datetime.utcnow()
+        self.phase = 'writing'
+        self.minimum_time = minimum_time
+        self.maximum_time = maximum_time
+
+    def save_history(self):
+        proposals = self.get_proposals()
+        for proposal in proposals:
+            self.history.append(QuestionHistory(proposal))
+        return self
+
+    def move_to_writing(self):
+        if (self.phase not in ['voting', 'archived']
+                or not self.minimum_time_passed()):
+            return False
+        return True
+
+    def minimum_time_passed(self):
+        return (datetime.datetime.utcnow() - self.last_move_on)\
+            .total_seconds() > self.minimum_time
+
+    def maximum_time_passed(self):
+        return (datetime.datetime.utcnow() - self.last_move_on)\
+            .total_seconds() > self.maximum_time
+
+    @staticmethod
+    def time_passed_dhm(utc_date_time):
+        td = datetime.datetime.utcnow() - utc_date_time
+        return {'days': td.days,
+                'hours': td.seconds//3600,
+                'minutes': (td.seconds//60) % 60}
+
+    @staticmethod
+    def time_passed_as_string(utc_date_time):
+        time_passed = Question.time_passed_dhm(utc_date_time)
+        return "%s days %s hrs %s mins" % (time_passed['days'],
+                                           time_passed['hours'],
+                                           time_passed['minutes'])
 
     def change_phase(self, phase=None):
         if (phase is None):
@@ -225,17 +266,27 @@ class Question(Base):
                 prop_ids.add(p.id)
             return prop_ids
 
+    '''
     def get_proposals(self, generation=None):
         generation = generation or self.generation
+        if (generation > self.generation or generation < 1):
+            return False
+
         return self.proposals.filter(
             Proposal.generation == generation
         ).all()
+    '''
 
-    def calculate_pareto_front(self, generation=None):
+    def get_proposals(self):
+        return self.proposals.filter(
+            Proposal.generation == self.generation
+        ).all()
+
+    def pareto_front(self, generation=None):
         '''
         Returns a SET containing the paret front proposal ids
         '''
-        proposals = self.get_proposals(generation)
+        proposals = self.get_proposals()
 
         if (len(proposals) == 0):
             return set()
@@ -270,9 +321,49 @@ class Question(Base):
             return pareto
 
     def __repr__(self):
-        return "<User('%s','%s', '%s')>" % (self.title,
-                                            self.blurb,
-                                            self.author.username)
+        return "<Question('%s','%s', '%s')>" % (self.title,
+                                                self.author.username,
+                                                self.phase)
+
+
+class QuestionHistory(Base):
+    '''
+    Represents the QuestionHistory object which holds the historical
+    proposal data for the question.
+
+    Proposal data is copied here when the question is moved on to
+    the writing stage.
+    '''
+
+    __tablename__ = 'question_history'
+
+    proposal_id = Column(Integer, primary_key=True)
+    question_id = Column(Integer, ForeignKey('question.id'), primary_key=True)
+    generation = Column(Integer, primary_key=True)
+    generation_created = Column(Integer)
+    dominated_by = Column(Integer)
+
+    def proposals(self):
+        pass
+
+    def pareto_front(self):
+        pass
+
+    def endorsers(self):
+        pass
+
+    def __init__(self, proposal):
+        self.proposal_id = proposal.id
+        self.question_id = proposal.question_id
+        self.generation = proposal.generation
+        self.generation_created = proposal.generation_created
+        self.dominated_by = proposal.dominated_by
+
+    def __repr__(self):
+        return "<Generation('%s','%s','%s', '%s')>" % (self.question_id,
+                                                       self.proposal_id,
+                                                       self.generatione,
+                                                       self.dominated_by)
 
 
 class Proposal(Base):
@@ -349,10 +440,28 @@ class Proposal(Base):
         return self
 
     def is_endorsed_by(self, user, generation=None):
-        '''
-        Returns True if the user has endorsed in the current generation
-            - Defaults to current generation
-        '''
+        """Returns True if the user has endorsed this proposal
+           in the chosen generation.
+
+        Args:
+           user (User):  The user .
+
+        Kwargs:
+           generation (int): The generation, defaults to current
+
+        Returns:
+           bool.  The return code::
+
+              True -- The user did endorse this proposal.
+              False -- The user did not endorse this proposal.
+
+
+        Returns True if the user has endorsed in the chosen generation
+
+        >>> print proposal.is_endorsed_by(john)
+        True
+
+        """
         generation = generation or self.generation
 
         return self.endorsements.filter(and_(
@@ -457,10 +566,10 @@ class Proposal(Base):
             return -1
 
     def __repr__(self):
-        return "<User('%s','%s', '%s', '%s')>" % (self.title,
-                                                  self.blurb,
-                                                  self.author.username,
-                                                  self.question_id)
+        return "<Proposal('%s','%s', '%s', '%s')>" % (self.title,
+                                                      self.blurb,
+                                                      self.author.username,
+                                                      self.question_id)
 
 
 class Endorsement(Base):

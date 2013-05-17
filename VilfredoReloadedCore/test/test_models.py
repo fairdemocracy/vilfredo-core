@@ -38,6 +38,10 @@ from .. import views  # NOQA
 
 from .. database import db_session, drop_db, init_db
 
+import datetime
+
+import time
+
 
 class UserTest(unittest.TestCase):
     def setUp(self):
@@ -64,7 +68,7 @@ class UserTest(unittest.TestCase):
             models.User.email_available(new_email))
 
 
-class QuestionTest(unittest.TestCase):
+class QuestionHistoryTest(unittest.TestCase):
     def setUp(self):
         init_db()
 
@@ -73,12 +77,37 @@ class QuestionTest(unittest.TestCase):
         db_session.remove()
 
     def test_create_question(self):
+        pass
+
+
+class QuestionTest(unittest.TestCase):
+    def setUp(self):
+        init_db()
+
+    def tearDown(self):
+        drop_db()
+        db_session.remove()
+
+    def time_passed_dhm(self, timestamp):
+        td = datetime.datetime.utcfromtimestamp(time.time()) -\
+            datetime.datetime.utcfromtimestamp(timestamp)
+        return {'days': td.days,
+                'hours': td.seconds//3600,
+                'minutes': (td.seconds//60) % 60}
+
+    def test_create_question(self):
         user = models.User('test_username_1', 'test_email_1', 'test_password')
         db_session.add(user)
         db_session.commit()
+        min_time = 60
+        max_time = 220000
         question = models.Question(
             user, 'Question Title',
-            'Question content')
+            'Question content', min_time, max_time)
+
+        question.last_move_on = datetime.datetime(2013, 5, 13, 10, 45)
+        question.created = datetime.datetime(2013, 5, 13, 9, 15)
+
         db_session.add(question)
         db_session.commit()
         question1 = models.Question.query.filter(
@@ -87,8 +116,70 @@ class QuestionTest(unittest.TestCase):
         self.assertEqual(question1.blurb, 'Question content')
         self.assertEqual(question1.author.username, user.username)
         # Check questions pareto is empty
-        self.assertEquals(question1.calculate_pareto_front(), set(),
+        self.assertEquals(question1.pareto_front(), set(),
                           "PF failed to return an empty set")
+
+        # Get time since last_move_on timestamp as days, hours, minutes
+        #time_passed = models.Question.time_passed_dhm(question1.last_move_on)
+
+        print 'Last move on',\
+            question1.last_move_on
+            #datetime.datetime.utcfromtimestamp(question1.last_move_on)
+
+        print 'Time passed since last move =',\
+            models.Question.time_passed_as_string(question1.last_move_on)
+
+        print 'Time passed since created =',\
+            models.Question.time_passed_as_string(question1.created)
+        '''
+        print 'Time passed since last move =',\
+            time_passed_as_string(time_passed)
+            time_passed['days'], 'days',\
+            time_passed['hours'], 'hrs',\
+            time_passed['minutes'], 'mins'
+        '''
+
+        #time_passed = int(time.time()) - question1.last_move_on
+        time_passed = (datetime.datetime.utcnow() - question1.last_move_on)\
+            .total_seconds()
+        print 'Min time passed =', time_passed > question1.minimum_time
+        print 'Max time passed =', time_passed > question1.maximum_time
+        #self.assertTrue(False)
+
+        q2 = models.Question(
+            user, 'Question 2',
+            'Question content 2')
+        q3 = models.Question(
+            user, 'Question 3',
+            'Question content 3')
+        q4 = models.Question(
+            user, 'Question 4',
+            'Question content 4')
+        q5 = models.Question(
+            user, 'Question 5',
+            'Question content 5')
+        # Make q4 and q5 voting
+        q4.phase = 'voting'
+        q5.phase = 'voting'
+        db_session.add_all([q2, q3, q4, q5])
+        db_session.commit()
+
+         # Fetch all questions
+        all_questions = models.Question.query.all()
+        self.assertEqual(len(all_questions), 5)
+
+        # Fetch questions in writing phase
+        questions_writing = models.Question.query.filter(
+            models.Question.phase == 'writing').all()
+        self.assertEqual(len(questions_writing), 3)
+        for qw in questions_writing:
+            self.assertEqual(qw.phase, 'writing', qw.phase)
+        # Fetch questions in voting phase
+        questions_voting = models.Question.query.filter(
+            models.Question.phase == 'voting').all()
+        self.assertEqual(len(questions_voting), 2)
+        for qv in questions_voting:
+            self.assertEqual(qv.phase, 'voting', qv.phase)
 
 
 class SubscriptionTest(unittest.TestCase):
@@ -204,6 +295,7 @@ class EndorseTest(unittest.TestCase):
         drop_db()
 
     def test_endorse_proposals(self):
+        send_emails = False
         # Create users
         john = models.User('john', 'john@example.com', 'fgfdfg')
         susan = models.User('susan', 'susan@example.com', 'bgtyhj')
@@ -248,11 +340,12 @@ class EndorseTest(unittest.TestCase):
         for inv in bill.invitations:
             print inv.question_id, " from author ", inv.sender.username
 
-        # Email invited users
-        with mail.record_messages() as outbox:
-            emails.email_question_invite(john, susan, johns_q)
-            emails.email_question_invite(john, bill, johns_q)
-            self.assertEqual(len(outbox), 2)
+        if (send_emails):
+            # Email invited users
+            with mail.record_messages() as outbox:
+                emails.email_question_invite(john, susan, johns_q)
+                emails.email_question_invite(john, bill, johns_q)
+                self.assertEqual(len(outbox), 2)
 
         # Creating proposals
         bills_prop1 = models.Proposal(
@@ -289,7 +382,7 @@ class EndorseTest(unittest.TestCase):
             susans_prop1.set_of_endorser_ids()
 
         # PF???
-        pf = johns_q.calculate_pareto_front()
+        pf = johns_q.pareto_front()
         print "Pareto Front is", pf
         self.assertEqual(pf, {2, 3}, pf)
 
@@ -327,6 +420,15 @@ class EndorseTest(unittest.TestCase):
         susans_prop1.remove_endorsement(susan)
         db_session.commit()
         self.assertFalse(susans_prop1.is_endorsed_by(susan))
+
+        johns_q.save_history()
+        db_session.commit()
+
+        history = models.QuestionHistory.query.all()
+        for entry in history:
+            print "History: Proposal", entry.proposal_id,\
+                'for question', entry.question_id
+        self.assertTrue(True)
 
 
 class TestWhoDominatesWho(unittest.TestCase):
