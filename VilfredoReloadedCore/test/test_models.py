@@ -43,6 +43,18 @@ import datetime
 import time
 
 
+class PasswordHashTest(unittest.TestCase):
+    def test_password_hash(self):
+        """Test password hasher."""
+        from werkzeug.security import check_password_hash,\
+            generate_password_hash
+        p = 'passwd'
+        h = generate_password_hash(p)
+
+        self.assertTrue(check_password_hash(h, p))
+        self.assertFalse(check_password_hash(h, p + '1'))
+
+
 class UserTest(unittest.TestCase):
     def setUp(self):
         init_db()
@@ -55,6 +67,10 @@ class UserTest(unittest.TestCase):
         user = models.User('test_username', 'test_email', 'test_password')
         db_session.add(user)
         db_session.commit()
+
+        self.assertTrue(user.check_password('test_password'))
+        self.assertFalse(user.check_password('test_password_bad'))
+
         user1 = models.User.query.filter(
             models.User.username == 'test_username'
         ).first()
@@ -116,18 +132,27 @@ class QuestionTest(unittest.TestCase):
         self.assertEqual(question1.blurb, 'Question content')
         self.assertEqual(question1.author.username, user.username)
         # Check questions pareto is empty
-        self.assertEquals(question1.pareto_front(), set(),
+        self.assertEquals(question1.calculate_pareto_front_ids(), set(),
+                          "PF failed to return an empty set")
+        # pareto_front_2
+        self.assertEquals(question1.calculate_pareto_front(), set(),
                           "PF failed to return an empty set")
 
         # Get time since last_move_on timestamp as days, hours, minutes
         #time_passed = models.Question.time_passed_dhm(question1.last_move_on)
 
-        print 'Last move on',\
-            question1.last_move_on
-            #datetime.datetime.utcfromtimestamp(question1.last_move_on)
+        '''
+        app.logger.info("Last move on %s", question1.last_move_on)
+        app.logger.info("Time passed since last move %s",
+                        models.Question.time_passed_as_string(
+                            question1.last_move_on)
+                        )'''
 
-        print 'Time passed since last move =',\
-            models.Question.time_passed_as_string(question1.last_move_on)
+        #print 'Last move on',\
+        #    question1.last_move_on
+
+        #print 'Time passed since last move =',\
+         #   models.Question.time_passed_as_string(question1.last_move_on)
 
         print 'Time passed since created =',\
             models.Question.time_passed_as_string(question1.created)
@@ -288,11 +313,13 @@ class ProposalTest(unittest.TestCase):
 
 class EndorseTest(unittest.TestCase):
     def setUp(self):
+        drop_db()
+        db_session.remove()
         init_db()
 
     def tearDown(self):
-        db_session.remove()
         drop_db()
+        db_session.remove()
 
     def test_endorse_proposals(self):
         send_emails = False
@@ -360,7 +387,7 @@ class EndorseTest(unittest.TestCase):
 
         db_session.add_all([bills_prop1, bills_prop2, susans_prop1])
         db_session.commit()
-        print "Current proposal ids", johns_q.current_proposals_ids()
+        print "Current proposal ids", johns_q.get_proposals_ids()
 
         # Subscribing users to questions
         bill.subscribe_to(johns_q)
@@ -382,13 +409,23 @@ class EndorseTest(unittest.TestCase):
             susans_prop1.set_of_endorser_ids()
 
         # PF???
-        pf = johns_q.pareto_front()
-        print "Pareto Front is", pf
+        pf = johns_q.calculate_pareto_front_ids()
+        app.logger.info("Set of Pareto Front proposal IDs is %s", pf)
         self.assertEqual(pf, {2, 3}, pf)
+        # pareto_front, and save in DB
+        pf_props = johns_q.calculate_pareto_front(save=True)
+        db_session.commit()
+        app.logger.info("Set of Pareto Front proposals is %s", pf_props)
+        # key players
+        key_players = johns_q.calculate_key_players()
+        app.logger.info("johns_q key players = %s", key_players)
+        all_users = models.User.query.all()
+        app.logger.info("Users are %s", all_users)
 
         # Get a list of the current endorsers
         current_endorsers = susans_prop1.endorsers()
         self.assertTrue(type(current_endorsers) is set)
+        app.logger.info("susans_prop1 endorsers = %s", current_endorsers)
 
         current_endorser_ids = susans_prop1.set_of_endorser_ids()
         self.assertEqual(current_endorser_ids, {susan.id, john.id})
@@ -424,11 +461,29 @@ class EndorseTest(unittest.TestCase):
         johns_q.save_history()
         db_session.commit()
 
+        history = models.QuestionHistory.query.filter(
+            models.QuestionHistory.question_id == johns_q.id
+        ).all()
         history = models.QuestionHistory.query.all()
         for entry in history:
             print "History: Proposal", entry.proposal_id,\
                 'for question', entry.question_id
-        self.assertTrue(True)
+
+        generation_1 = johns_q.get_generation(1)
+        #app.logger.info("generation_1 = %s", generation_1)
+
+        gen_1_proposals = generation_1.proposals()
+        app.logger.info("generation_1 has %s proposals", len(gen_1_proposals))
+        #app.logger.info("generation_1 proposals are %s", gen_1_proposals)
+
+        gen_1_pareto = generation_1.pareto_front()
+
+        app.logger.info("generation_1 has %s proposals in the pareto front",
+                        len(gen_1_pareto))
+        app.logger.info("generation_1 set of PF IDS is %s", gen_1_pareto)
+
+        # STOP !!!
+        #self.assertTrue(False)
 
 
 class TestWhoDominatesWho(unittest.TestCase):
@@ -452,12 +507,6 @@ class TestWhoDominatesWho(unittest.TestCase):
         self.assertEqual(models.Proposal.who_dominates_who(p2, p3), 0)
         self.assertEqual(models.Proposal.who_dominates_who(p6, p7), -1)
         self.assertEqual(models.Proposal.who_dominates_who(p1, p7), p1)
-
-        self.assertEqual(models.Proposal.who_dominates_who_2(p2, p4), p2)
-        self.assertEqual(models.Proposal.who_dominates_who_2(p4, p5), -1)
-        self.assertEqual(models.Proposal.who_dominates_who_2(p2, p3), 0)
-        self.assertEqual(models.Proposal.who_dominates_who_2(p6, p7), -1)
-        self.assertEqual(models.Proposal.who_dominates_who_2(p1, p7), p1)
 
 
 class LoginTestCase(unittest.TestCase):

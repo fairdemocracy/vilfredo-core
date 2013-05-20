@@ -34,6 +34,10 @@ from database import Base, db_session
 
 import datetime
 
+from werkzeug.security import check_password_hash, generate_password_hash
+
+from flask.ext.login import UserMixin
+
 
 class Update(Base):
     '''
@@ -55,7 +59,7 @@ class Update(Base):
         self.how = how or 'asap'
 
 
-class User(Base):
+class User(Base, UserMixin):
     '''
     Stores the user data
     '''
@@ -110,7 +114,38 @@ class User(Base):
     def get_id(self):
         return unicode(self.id)
 
+    def get_proposal_ids(self, question, generation=None):
+        '''
+        .. function:: get_proposals(question[, generation=None])
+
+        Fetch a LIST of the user's proposals.
+
+        :param question: associated question
+        :param generation: question generation
+        :type generation: integer or None
+        :rtype: list of proposals
+        '''
+        generation = generation or question.generation
+        proposals = self.proposals.filter(and_(
+            Proposal.question == question,
+            Proposal.generation == generation)
+        ).all()
+        proposal_ids = list()
+        for proposal in proposals:
+            proposal_ids.append(proposal.id)
+        return proposal_ids
+
     def get_proposals(self, question, generation=None):
+        '''
+        .. function:: get_proposals(question[, generation=None])
+
+        Fetch a LIST of the user's proposals.
+
+        :param question: associated question
+        :param generation: question generation
+        :type generation: integer or None
+        :rtype: list of proposals
+        '''
         generation = generation or question.generation
         return self.proposals.filter(and_(
             Proposal.question == question,
@@ -118,6 +153,16 @@ class User(Base):
         ).all()
 
     def delete_proposal(self, prop):
+        '''
+        .. function:: delete_proposal(prop)
+
+        Delete the user's proposal.
+        Users can only delete their new proposals during the writing phase
+        of the generation in which the proposal is created.
+
+        :param prop: the proposal object to delete
+        :rtype: bool
+        '''
         proposal = self.proposals.filter(and_(
             Proposal.id == prop.id,
             Proposal.user_id == self.id
@@ -127,7 +172,8 @@ class User(Base):
                 and
                 proposal.question.generation == proposal.generation_created):
             self.proposals.remove(proposal)
-        return self
+            return True
+        return False
 
     def subscribe_to(self, question):
         if (question is not None):
@@ -148,16 +194,23 @@ class User(Base):
             return self.subscribed_questions.filter(
                 Update.question_id == question.id).count() == 1
 
+    def set_password(self, password):
+        self.password = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password, password)
+
     def __init__(self, username, email, password):
         self.username = username
         self.email = email
-        self.password = password
+        self.set_password(password)
         self.registered = datetime.datetime.utcnow()
         self.last_seen = datetime.datetime.utcnow()
 
     def __repr__(self):
-        return "<User('%s','%s')>" % (self.username,
-                                      self.email)
+        return "<User(ID='%s', '%s','%s')>" % (self.id,
+                                               self.username,
+                                               self.email)
 
 
 class Invite(Base):
@@ -200,6 +253,7 @@ class Question(Base):
     # 1:M
     proposals = relationship('Proposal', backref='question', lazy='dynamic')
     history = relationship('QuestionHistory', lazy='dynamic')
+    key_players = relationship('KeyPlayer', lazy='dynamic')
 
     def __init__(self, author, title, blurb,
                  minimum_time=86400, maximum_time=604800, room=None):
@@ -224,6 +278,9 @@ class Question(Base):
                 or not self.minimum_time_passed()):
             return False
         return True
+
+    def get_generation(self, generation):
+        return Generation(self, generation)
 
     def minimum_time_passed(self):
         return (datetime.datetime.utcnow() - self.last_move_on)\
@@ -257,34 +314,160 @@ class Question(Base):
             self.phase = phase
         return self
 
-    def current_proposals_ids(self):
-        if (self.proposals.count() == 0):
+    def get_proposals(self):
+        return self.proposals.filter(and_(
+            Proposal.question_id == self.id,
+            Proposal.generation == self.generation
+        )).all()
+
+    def get_proposals_ids(self):
+        current_proposals = self.get_proposals()
+        prop_ids = set()
+        for p in current_proposals:
+            prop_ids.add(p.id)
+        return prop_ids
+
+    def calculate_pareto_front(self,
+                               proposals=None,
+                               exclude_user=None,
+                               save=False):
+        '''
+        .. function:: calculate_pareto_front([proposals=None,
+                                             exclude_user=None, save=False])
+
+        Calculates the pareto front of the question, and optionally
+        saves the dominations in the database.
+
+        :param proposals: list of proposals
+        :type proposals: list or boolean
+        :param exclude_user: user to exclude from the calculation
+        :type exclude_user: User
+        :param save: save the domination info in the DB
+        :type save: boolean
+        :rtype: set of proposal objects
+        '''
+        proposals = proposals or self.get_proposals()
+
+        if (len(proposals) == 0):
             return set()
         else:
-            prop_ids = set()
-            for p in self.proposals:
-                prop_ids.add(p.id)
-            return prop_ids
+            dominated = set()
+            props = dict()
 
-    '''
-    def get_proposals(self, generation=None):
-        generation = generation or self.generation
-        if (generation > self.generation or generation < 1):
-            return False
+            for p in proposals:
+                props[p.id] = p.set_of_endorser_ids()
+                if (exclude_user is not None):
+                    props[p.id].discard(exclude_user.id)
 
-        return self.proposals.filter(
-            Proposal.generation == generation
-        ).all()
-    '''
+            done = list()
+            for proposal1 in proposals:
+                done.append(proposal1)
+                for proposal2 in proposals:
+                    if (proposal2 in done):
+                        continue
 
-    def get_proposals(self):
-        return self.proposals.filter(
-            Proposal.generation == self.generation
-        ).all()
+                    who_dominates = Proposal.\
+                        who_dominates_who(props[proposal1.id],
+                                          props[proposal2.id])
 
-    def pareto_front(self, generation=None):
+                    if (who_dominates == props[proposal1.id]):
+                        dominated.add(proposal2)
+                        if (save):
+                            print 'SAVING DOMINATION: Setting PID',\
+                                proposal2.id, " dominated_by to", proposal1.id
+                            proposal2.dominated_by = proposal1.id
+                            print proposal2
+
+                    elif (who_dominates == props[proposal2.id]):
+                        dominated.add(proposal1)
+                        if (save):
+                            print 'SAVING DOMINATION: Setting PID',\
+                                proposal2.id, "dominated_by to", proposal1.id
+                            proposal1.dominated_by = proposal2.id
+                            print proposal1
+                        # Proposal 1 dominated, move to next
+                        break
+
+            pareto = set()
+            if (len(dominated) > 0):
+                pareto = set(proposals).difference(dominated)
+
+            return pareto
+
+    def get_pareto_front(self, calculate_if_missing=False):
         '''
-        Returns a SET containing the paret front proposal ids
+        .. function:: get_pareto_front([calculate_if_missing=False])
+
+        Returns the stored pareto front.
+        If no pareto has been saved the pareto is calculated then saved,
+        then the newly calculated pareto is returned.
+
+        :param calculate_if_missing: calculate and save the
+            domination if missing
+        :type calculate_if_missing: boolean
+        :rtype: set of proposal objects in the pareto or False.
+        '''
+        pareto = self.proposals.filter(and_(
+            Proposal.question_id == self.question.id,
+            Proposal.generation == self.generation,
+            Proposal.dominated_by == 0
+        )).all()
+
+        # If no pareto saved then calculate pareto, save and return it
+        if (len(pareto) == 0):
+            if (calculate_if_missing):
+                return self.calculate_pareto_front(save=True)
+            else:
+                return False
+        else:
+            return pareto
+
+    def get_current_endorsers(self):
+        current_endorsers = set()
+        all_proposals = self.get_proposals()
+        for proposal in all_proposals:
+            current_endorsers.update(set(proposal.endorsers()))
+        return current_endorsers
+
+    def calculate_key_players(self):
+        key_players = dict()
+        pareto = self.calculate_pareto_front()
+        if (len(pareto) == 0):
+            return dict()
+
+        current_endorsers = self.get_current_endorsers()
+        for user in current_endorsers:
+            users_endorsed_proposal_ids = set(user.get_proposal_ids(self))
+            new_pareto = self.calculate_pareto_front(proposals=pareto,
+                                                     exclude_user=user)
+            if (pareto != new_pareto):
+                vote_for = new_pareto.difference(users_endorsed_proposal_ids)
+                key_players[user.id] = vote_for
+
+        self.save_key_players(key_players)
+        return key_players
+
+    def save_key_players(self, key_players):
+        for user_id in key_players.keys():
+            vote_for_these = list(key_players[user_id])
+            for vote_for in vote_for_these:
+                print "VOTE_FOR", type(vote_for), vote_for
+                self.key_players.append(
+                    KeyPlayer(user_id,
+                              vote_for.id,
+                              self.id,
+                              self.generation))
+        return self
+
+    def calculate_pareto_front_ids(self):
+        '''
+        .. function:: pareto_front()
+
+        Calculates the pareto front of the question.
+
+        :param generation: question generation
+        :type generation: integer or None
+        :rtype: set of proposal IDs
         '''
         proposals = self.get_proposals()
 
@@ -299,20 +482,19 @@ class Question(Base):
 
             pids = props.keys()
             done = list()
-            for p1 in pids:
-                done.append(p1)
-                for p2 in pids:
-                    if (p2 in done):
+            for proposal1 in pids:
+                done.append(proposal1)
+                for proposal2 in pids:
+                    if (proposal2 in done):
                         continue
 
                     who_dominates = Proposal.\
-                        who_dominates_who_2(props[p1], props[p2])
-                    if (who_dominates == 0 or who_dominates == -1):
-                        continue
-                    elif (who_dominates == props[p1]):
-                        dominated.add(p2)
-                    elif (who_dominates == props[p2]):
-                        dominated.add(p1)
+                        who_dominates_who(props[proposal1], props[proposal2])
+                    if (who_dominates == props[proposal1]):
+                        dominated.add(proposal2)
+                    elif (who_dominates == props[proposal2]):
+                        dominated.add(proposal1)
+                        break
 
             pareto = set()
             if (len(dominated) > 0):
@@ -326,6 +508,76 @@ class Question(Base):
                                                 self.phase)
 
 
+class Generation():
+    question = None
+    generation = None
+
+    def proposals(self):
+        result = self.question.history.filter(and_(
+            QuestionHistory.question_id == self.question.id,
+            QuestionHistory.generation == self.generation
+        )).all()
+        proposals = set()
+        for entry in result:
+            proposals.add(entry.proposal)
+        return proposals
+
+    def pareto_front(self):
+        result = self.question.history.filter(and_(
+            QuestionHistory.question_id == self.question.id,
+            QuestionHistory.generation == self.generation,
+            QuestionHistory.dominated_by == 0
+        )).all()
+        pareto = set()
+        for entry in result:
+            pareto.add(entry.proposal)
+        return pareto
+
+    def endorsers(self):
+        pass
+
+    def key_players(self):
+        pass
+
+    def __init__(self, question, generation):
+        self.question = question
+        self.generation = generation
+
+    def __repr__(self):
+        return "<Generation(G'%s', Q'%s')>" % (self.generation,
+                                               self.question.id)
+
+    def __str__(self):
+        return "Generation %s for Question %s" % (self.generation,
+                                                  self.question.id)
+
+
+class KeyPlayer(Base):
+
+    __tablename__ = "key_player"
+
+    proposal_id = Column(Integer, ForeignKey('proposal.id'), primary_key=True)
+    user_id = Column(Integer, ForeignKey('user.id'), primary_key=True)
+    question_id = Column(Integer, ForeignKey('question.id'), primary_key=True)
+    generation = Column(Integer, primary_key=True)
+
+    proposal = relationship("Proposal")
+    user = relationship("User")
+    question = relationship("Question")
+
+    def __init__(self, user_id, proposal_id, question_id, generation):
+        self.user_id = user_id
+        self.proposal_id = proposal_id
+        self.question_id = question_id
+        self.generation = generation
+
+    def __repr__(self):
+        return "<Generation('%s','%s','%s', '%s')>" % (self.question_id,
+                                                       self.proposal_id,
+                                                       self.generation,
+                                                       self.dominated_by)
+
+
 class QuestionHistory(Base):
     '''
     Represents the QuestionHistory object which holds the historical
@@ -337,20 +589,13 @@ class QuestionHistory(Base):
 
     __tablename__ = 'question_history'
 
-    proposal_id = Column(Integer, primary_key=True)
+    proposal_id = Column(Integer, ForeignKey('proposal.id'), primary_key=True)
     question_id = Column(Integer, ForeignKey('question.id'), primary_key=True)
     generation = Column(Integer, primary_key=True)
     generation_created = Column(Integer)
     dominated_by = Column(Integer)
 
-    def proposals(self):
-        pass
-
-    def pareto_front(self):
-        pass
-
-    def endorsers(self):
-        pass
+    proposal = relationship("Proposal")
 
     def __init__(self, proposal):
         self.proposal_id = proposal.id
@@ -362,7 +607,7 @@ class QuestionHistory(Base):
     def __repr__(self):
         return "<Generation('%s','%s','%s', '%s')>" % (self.question_id,
                                                        self.proposal_id,
-                                                       self.generatione,
+                                                       self.generation,
                                                        self.dominated_by)
 
 
@@ -385,7 +630,7 @@ class Proposal(Base):
     dominated_by = Column(Integer, default=0)
     # 1:M
     endorsements = relationship('Endorsement', backref="proposal",
-                                lazy='dynamic')
+                                lazy='dynamic', cascade="all, delete-orphan")
 
     def __init__(self, author, question, title, blurb):
         self.author = author
@@ -440,28 +685,17 @@ class Proposal(Base):
         return self
 
     def is_endorsed_by(self, user, generation=None):
-        """Returns True if the user has endorsed this proposal
-           in the chosen generation.
+        '''
+        .. function:: is_endorsed_by(user[, generation=None])
 
-        Args:
-           user (User):  The user .
+        Check if the user has endorsed this proposal.
+        Takes an optional generation value to check historic endorsements.
 
-        Kwargs:
-           generation (int): The generation, defaults to current
-
-        Returns:
-           bool.  The return code::
-
-              True -- The user did endorse this proposal.
-              False -- The user did not endorse this proposal.
-
-
-        Returns True if the user has endorsed in the chosen generation
-
-        >>> print proposal.is_endorsed_by(john)
-        True
-
-        """
+        :param user: user
+        :param generation: question generation
+        :type generation: integer or None
+        :rtype: bool
+        '''
         generation = generation or self.generation
 
         return self.endorsements.filter(and_(
@@ -476,7 +710,7 @@ class Proposal(Base):
             - Defaults to current generation
         '''
         generation = generation or self.generation
-
+        current_endorsements = list()
         current_endorsements = self.endorsements.filter(and_(
             Endorsement.proposal_id == self.id,
             Endorsement.generation == generation)
@@ -487,6 +721,16 @@ class Proposal(Base):
         return endorsers
 
     def set_of_endorser_ids(self, generation=None):
+        '''
+        .. function:: set_of_endorser_ids([generation=None])
+
+        Returns the set of user IDs who endorsed this proposal in
+        this generation.
+
+        :param generation: proposal generation
+        :type generation: integer or None
+        :rtype: set of integers
+        '''
         endorsers = self.endorsers(generation)
         endorser_ids = set()
         for endorser in endorsers:
@@ -494,82 +738,49 @@ class Proposal(Base):
         return endorser_ids
 
     @staticmethod
-    def who_dominates_who_2(p1, p2):
+    def who_dominates_who(proposal1, proposal2):
         '''
-        Takes 2 SETS of ENDORSER IDs, one for each proposal,
-        and calulates which of any domiantes the other.
+        .. function:: who_dominates_who(proposal1, proposal2)
 
-        Returns the dominating non-empty proposal set or ---
-        -1 if both sets are the same
-        0 if both sets are different
+        Takes 2 SETS of ENDORSER IDs representing who endorsed each proposal
+        and calulates which proposal if any domiantes the other.
+        Returns either the dominating set, or an integer value of:
+            0 if the sets of endorsers are different
+            -1 if the sets of endorsers are the same
+
+        :param proposal1: set of voters for proposal 1
+        :param proposal2: set of voters for proposal 2
+        :param generation: question generation
+        :type proposal1: set of integers
+        :type proposal2: set of integers
+        :rtype: interger or set of integers
         '''
-        # If p1 and p2 are the same return -1
-        if (p1 == p2):
+        # If proposal1 and proposal2 are the same return -1
+        if (proposal1 == proposal2):
             return -1
-        # If p1 is empty return p2
-        elif (len(p1) == 0):
-            return p2
-        # If p2 is empty return p1
-        elif (len(p2) == 0):
-            return p1
-        # Check if p1 is a propoer subset of p2
-        elif (p1 < p2):
-            return p2
-        # Check if p2 is a proper subset of p1
-        elif (p2 < p1):
-            return p1
-        # p1 and p2 are different return 0
+        # If proposal1 is empty return proposal2
+        elif (len(proposal1) == 0):
+            return proposal2
+        # If proposal2 is empty return proposal1
+        elif (len(proposal2) == 0):
+            return proposal1
+        # Check if proposal1 is a propoer subset of proposal2
+        elif (proposal1 < proposal2):
+            return proposal2
+        # Check if proposal2 is a proper subset of proposal1
+        elif (proposal2 < proposal1):
+            return proposal1
+        # proposal1 and proposal2 are different return 0
         else:
             return 0
 
-    @staticmethod
-    def who_dominates_who(p1, p2):
-        '''
-        Takes 2 SETS of ENDORSER IDs, one for each proposal,
-        and calulates which of any domiantes the other.
-
-        Returns the dominating non-empty proposal set or ---
-        -1 if both sets are the same
-        0 if both sets are different
-        '''
-        # Check if the same
-        if (p1 == p2):
-            return -1
-        # Check if p1 is empty
-        if (len(p1) > 0):
-            # Check if p2 is empty
-            if (len(p2) > 0):
-                # Check if p1 cpntains elements not in p2
-                if (len(p1.difference(p2)) > 0):
-                    # Check if p2 cpntains elements not in p1
-                    if (len(p2.difference(p1)) > 0):
-                        # Sets are different, neither dominates
-                        return 0
-                    else:
-                        # p2 is a subset of p1 so p1 dominates
-                        return p1
-                else:
-                    if (len(p2.difference(p1)) > 0):
-                        # p1 is a subset of p2 so p2 dominates
-                        return p2
-                    else:
-                        # Both are the same so neither dominates
-                        return -1
-            else:
-                # p2 is empty and p2 is non-empty so p2 dominates
-                return p1
-        elif (len(p2) > 0):
-            # p1 is empty and p2 is non-empty so p2 dominates
-            return p2
-        else:
-            # Both are empty so neither dominates
-            return -1
-
     def __repr__(self):
-        return "<Proposal('%s','%s', '%s', '%s')>" % (self.title,
-                                                      self.blurb,
-                                                      self.author.username,
-                                                      self.question_id)
+        return "<Proposal('%s', '%s','%s', '%s', dominated_by '%s')>"\
+            % (self.id,
+               self.title,
+               self.blurb,
+               self.question_id,
+               self.dominated_by)
 
 
 class Endorsement(Base):
@@ -582,8 +793,8 @@ class Endorsement(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey('user.id'))
     proposal_id = Column(Integer, ForeignKey('proposal.id'))
-    endorsement_date = Column(DateTime)
     generation = Column(Integer, nullable=False)
+    endorsement_date = Column(DateTime)
 
     def __init__(self, endorser, proposal):
         self.endorser = endorser
