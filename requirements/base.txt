@@ -3,3 +3,4 @@ Flask == 0.9
 Flask-Babel == 0.8
 Flask-SQLAlchemy == 0.16
 Flask-Mail == 0.8.2
+Flask-Login == 0.1.3
