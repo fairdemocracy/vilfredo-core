@@ -20,3 +20,6 @@ MAIL_SUPPRESS_SEND = True
 
 # administrator list
 ADMINS = ['admin@example.com']
+
+DEVELOPMENT_LOG_FILE = 'logging_debug.conf'
+PRODUCTION_LOG_FILE = ''

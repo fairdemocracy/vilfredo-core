@@ -80,11 +80,18 @@ mail = Mail(app)
 
 # Logging
 import logging
-from logging.handlers import RotatingFileHandler
-file_handler = RotatingFileHandler('/var/tmp/vr.log', 'a',
-                                   1 * 1024 * 1024, 10)
-file_handler.setLevel(logging.INFO)
-file_handler.setFormatter(logging.Formatter(
-    '%(asctime)s %(levelname)s:%(message)s [in %(pathname)s:%(lineno)d]'))
-app.logger.addHandler(file_handler)
-app.logger.setLevel(logging.INFO)
+import logging.config
+
+import os
+basedir = os.path.abspath(os.path.dirname(__file__))
+
+# Set logging
+if (app.config['DEBUG']):
+    # Set logging for development server here
+    config_file = os.path.join(basedir, app.config['DEVELOPMENT_LOG_FILE'])
+    logging.config.fileConfig(config_file)
+    # create logger
+    logger = logging.getLogger()
+else:
+    # Set logging for production server here
+    pass
