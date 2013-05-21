@@ -91,7 +91,8 @@ if (app.config['DEBUG']):
     config_file = os.path.join(basedir, app.config['LOG_FILE'])
     logging.config.fileConfig(config_file)
     # create logger
-    logger = logging.getLogger()
+    logger = logging.getLogger('vilfredo_logger')
+    logger.propagate = False
 else:
     # Set logging for production server here
     pass
