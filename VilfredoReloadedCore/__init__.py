@@ -88,7 +88,7 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 # Set logging
 if (app.config['DEBUG']):
     # Set logging for development server here
-    config_file = os.path.join(basedir, app.config['DEVELOPMENT_LOG_FILE'])
+    config_file = os.path.join(basedir, app.config['LOG_FILE'])
     logging.config.fileConfig(config_file)
     # create logger
     logger = logging.getLogger()
