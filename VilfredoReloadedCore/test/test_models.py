@@ -139,37 +139,14 @@ class QuestionTest(unittest.TestCase):
                           "PF failed to return an empty set")
 
         # Get time since last_move_on timestamp as days, hours, minutes
-        #time_passed = models.Question.time_passed_dhm(question1.last_move_on)
+        app.logger.debug("Last move on %s\n", question1.last_move_on)
+        app.logger.debug("Time passed since last move %s\n",
+                         models.Question.time_passed_as_string(
+                             question1.last_move_on))
 
-        '''
-        app.logger.info("Last move on %s", question1.last_move_on)
-        app.logger.info("Time passed since last move %s",
-                        models.Question.time_passed_as_string(
-                            question1.last_move_on)
-                        )'''
-
-        #print 'Last move on',\
-        #    question1.last_move_on
-
-        #print 'Time passed since last move =',\
-         #   models.Question.time_passed_as_string(question1.last_move_on)
-
-        print 'Time passed since created =',\
-            models.Question.time_passed_as_string(question1.created)
-        '''
-        print 'Time passed since last move =',\
-            time_passed_as_string(time_passed)
-            time_passed['days'], 'days',\
-            time_passed['hours'], 'hrs',\
-            time_passed['minutes'], 'mins'
-        '''
-
-        #time_passed = int(time.time()) - question1.last_move_on
-        time_passed = (datetime.datetime.utcnow() - question1.last_move_on)\
-            .total_seconds()
-        print 'Min time passed =', time_passed > question1.minimum_time
-        print 'Max time passed =', time_passed > question1.maximum_time
-        #self.assertTrue(False)
+        app.logger.debug('Time passed since created = %s\n',
+                         models.Question.time_passed_as_string(
+                             question1.created))
 
         q2 = models.Question(
             user, 'Question 2',
@@ -313,8 +290,8 @@ class ProposalTest(unittest.TestCase):
 
 class EndorseTest(unittest.TestCase):
     def setUp(self):
-        drop_db()
-        db_session.remove()
+        #drop_db()
+        #db_session.remove()
         init_db()
 
     def tearDown(self):
@@ -385,7 +362,12 @@ class EndorseTest(unittest.TestCase):
             susan, johns_q, 'Susans Only Proposal',
             'My blub is cool')
 
-        db_session.add_all([bills_prop1, bills_prop2, susans_prop1])
+        harrys_prop1 = models.Proposal(
+            harry, johns_q, 'Harrys Cool Proposal',
+            'Harry wrties like a champ')
+
+        db_session.add_all([bills_prop1, bills_prop2,
+                            susans_prop1, harrys_prop1])
         db_session.commit()
         print "Current proposal ids", johns_q.get_proposals_ids()
 
@@ -399,6 +381,12 @@ class EndorseTest(unittest.TestCase):
         susans_prop1.endorse(john)
         bills_prop1.endorse(john)
         bills_prop2.endorse(bill)
+
+        harrys_prop1.endorse(jack)
+        harrys_prop1.endorse(susan)
+
+        bills_prop1.endorse(harry)
+        susans_prop1.endorse(harry)
         db_session.commit()
 
         print "Proposal ID", bills_prop1.id, "with endorses:",\
@@ -410,32 +398,35 @@ class EndorseTest(unittest.TestCase):
 
         # PF???
         pf = johns_q.calculate_pareto_front_ids()
-        app.logger.info("Set of Pareto Front proposal IDs is %s", pf)
-        self.assertEqual(pf, {2, 3}, pf)
+        app.logger.debug("Set of Pareto Front proposal IDs is %s\n", pf)
+        self.assertEqual(pf, {2, 3, 4}, pf)
         # pareto_front, and save in DB
         pf_props = johns_q.calculate_pareto_front(save=True)
         db_session.commit()
-        app.logger.info("Set of Pareto Front proposals is %s", pf_props)
+        app.logger.debug("Set of Pareto Front proposals is %s\n", pf_props)
         # key players
         key_players = johns_q.calculate_key_players()
-        app.logger.info("johns_q key players = %s", key_players)
+        app.logger.debug("johns_q key players = %s\n", key_players)
         all_users = models.User.query.all()
-        app.logger.info("Users are %s", all_users)
+        app.logger.debug("Users are %s\n", all_users)
+        db_session.commit()
+        # STOP !!!
+        #self.assertTrue(False)
 
         # Get a list of the current endorsers
         current_endorsers = susans_prop1.endorsers()
         self.assertTrue(type(current_endorsers) is set)
-        app.logger.info("susans_prop1 endorsers = %s", current_endorsers)
+        app.logger.debug("susans_prop1 endorsers = %s\n", current_endorsers)
 
         current_endorser_ids = susans_prop1.set_of_endorser_ids()
-        self.assertEqual(current_endorser_ids, {susan.id, john.id})
+        self.assertEqual(current_endorser_ids, {susan.id, john.id, harry.id})
 
         endorsements = models.Endorsement.query.filter(
             models.Endorsement.proposal_id == susans_prop1.id).count()
-        self.assertEqual(endorsements, 2)
+        self.assertEqual(endorsements, 3)
         endorsements = models.Endorsement.query.filter(
             models.Endorsement.proposal_id == bills_prop1.id).count()
-        self.assertEqual(endorsements, 1)
+        self.assertEqual(endorsements, 2)
         endorsements = models.Endorsement.query.filter(
             models.Endorsement.proposal_id == bills_prop2.id).count()
         self.assertEqual(endorsements, 1)
@@ -470,17 +461,17 @@ class EndorseTest(unittest.TestCase):
                 'for question', entry.question_id
 
         generation_1 = johns_q.get_generation(1)
-        #app.logger.info("generation_1 = %s", generation_1)
+        #app.logger.debug("generation_1 = %s\n", generation_1)
 
         gen_1_proposals = generation_1.proposals()
-        app.logger.info("generation_1 has %s proposals", len(gen_1_proposals))
-        #app.logger.info("generation_1 proposals are %s", gen_1_proposals)
+        app.logger.debug("generation_1 has %s proposals", len(gen_1_proposals))
+        #app.logger.debug("generation_1 proposals are %s\n", gen_1_proposals)
 
         gen_1_pareto = generation_1.pareto_front()
 
-        app.logger.info("generation_1 has %s proposals in the pareto front",
-                        len(gen_1_pareto))
-        app.logger.info("generation_1 set of PF IDS is %s", gen_1_pareto)
+        app.logger.debug("generation_1 has %s proposals in the pareto front",
+                         len(gen_1_pareto))
+        app.logger.debug("generation_1 set of PF IDS is %s\n", gen_1_pareto)
 
         # STOP !!!
         #self.assertTrue(False)

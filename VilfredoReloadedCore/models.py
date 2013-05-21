@@ -38,6 +38,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from flask.ext.login import UserMixin
 
+from . import app
+
 
 class Update(Base):
     '''
@@ -114,11 +116,37 @@ class User(Base, UserMixin):
     def get_id(self):
         return unicode(self.id)
 
+    def get_endorsed_proposal_ids(self, question, generation=None):
+        '''
+        .. function:: get_proposals(question[, generation=None])
+
+        Fetch a LIST of the IDs of the proposals endorsed by the
+        user for this generation of this question.
+
+        :param question: associated question
+        :param generation: question generation
+        :type generation: integer or None
+        :rtype: list of proposals
+        '''
+        generation = generation or question.generation
+
+        endorsements = self.endorsements.join(User.endorsements).\
+            join(Endorsement.proposal).filter(and_(
+                Endorsement.user_id == self.id,
+                Proposal.question_id == question.id,
+                Endorsement.generation == generation)
+            ).all()
+        proposal_ids = set()
+        for endorsement in endorsements:
+            proposal_ids.add(endorsement.proposal_id)
+        return proposal_ids
+
     def get_proposal_ids(self, question, generation=None):
         '''
         .. function:: get_proposals(question[, generation=None])
 
-        Fetch a LIST of the user's proposals.
+        Fetch a LIST of the IDs of the proposals authored by the
+        user for this question.
 
         :param question: associated question
         :param generation: question generation
@@ -139,7 +167,7 @@ class User(Base, UserMixin):
         '''
         .. function:: get_proposals(question[, generation=None])
 
-        Fetch a LIST of the user's proposals.
+        Fetch a LIST of the proposals authored by the user for this question.
 
         :param question: associated question
         :param generation: question generation
@@ -354,10 +382,22 @@ class Question(Base):
             dominated = set()
             props = dict()
 
+            if (exclude_user is not None):
+                app.logger.\
+                    debug("calculate_pareto_front called excluding user %s\n",
+                          exclude_user.id)
+
             for p in proposals:
                 props[p.id] = p.set_of_endorser_ids()
                 if (exclude_user is not None):
+                    app.logger.debug("props[p.id] = %s\n", props[p.id])
                     props[p.id].discard(exclude_user.id)
+                    app.logger.debug("props[p.id] with user discarded = %s\n",
+                                     props[p.id])
+
+            if (exclude_user is not None):
+                app.logger.debug("props with %s excluded is now %s\n",
+                                 exclude_user.id, props)
 
             done = list()
             for proposal1 in proposals:
@@ -373,24 +413,25 @@ class Question(Base):
                     if (who_dominates == props[proposal1.id]):
                         dominated.add(proposal2)
                         if (save):
-                            print 'SAVING DOMINATION: Setting PID',\
-                                proposal2.id, " dominated_by to", proposal1.id
+                            app.logger.\
+                                debug('SAVE PF: PID %s dominated_by to %s\n',
+                                      proposal2.id, proposal1.id)
                             proposal2.dominated_by = proposal1.id
-                            print proposal2
-
                     elif (who_dominates == props[proposal2.id]):
                         dominated.add(proposal1)
                         if (save):
-                            print 'SAVING DOMINATION: Setting PID',\
-                                proposal2.id, "dominated_by to", proposal1.id
+                            app.logger.\
+                                debug('SAVE PF: PID %s dominated_by to %s\n',
+                                      proposal2.id, proposal1.id)
                             proposal1.dominated_by = proposal2.id
-                            print proposal1
                         # Proposal 1 dominated, move to next
                         break
 
             pareto = set()
             if (len(dominated) > 0):
                 pareto = set(proposals).difference(dominated)
+            else:
+                pareto = proposals
 
             return pareto
 
@@ -435,23 +476,76 @@ class Question(Base):
         if (len(pareto) == 0):
             return dict()
 
+        app.logger.debug("+++++++++++ CALCULATE  KEY  PLAYERS ++++++++++\n")
+        app.logger.debug("@@@@@@@@@@ PARETO FRONT @@@@@@@@@@ %s\n", pareto)
         current_endorsers = self.get_current_endorsers()
+        app.logger.debug("++++++++++ CURRENT ENDORSERS %s\n",
+                         current_endorsers)
         for user in current_endorsers:
-            users_endorsed_proposal_ids = set(user.get_proposal_ids(self))
+            app.logger.debug("+++++++++++ Checking User +++++++++++ %s\n",
+                             user.id)
+            users_endorsed_proposal_ids = set(
+                user.get_endorsed_proposal_ids(self))
+            app.logger.debug(">>>>>>>>>> Users endorsed proposal IDs %s\n",
+                             users_endorsed_proposal_ids)
+            app.logger.debug("Calc PF exclusing %s\n", user.id)
             new_pareto = self.calculate_pareto_front(proposals=pareto,
                                                      exclude_user=user)
+            app.logger.debug(">>>>>>> NEW PARETO = %s\n", new_pareto)
             if (pareto != new_pareto):
-                vote_for = new_pareto.difference(users_endorsed_proposal_ids)
-                key_players[user.id] = vote_for
+                app.logger.debug("%s is a key player\n", user.id)
+                users_pareto_proposals = pareto.difference(new_pareto)
+                app.logger.debug(">>>>>>>>>users_pareto_proposals %s\n",
+                                 users_pareto_proposals)
+                key_players[user.id] = set()
+                for users_proposal in users_pareto_proposals:
+                    key_players[user.id].update(
+                        Question.who_dominates_this_excluding(users_proposal,
+                                                              pareto,
+                                                              user))
+                    app.logger.debug(
+                        "Pareto Props that could dominate PID %s %s\n",
+                        users_proposal.id,
+                        key_players[user.id])
+            else:
+                app.logger.debug("%s is not a key player\n", user.id)
 
         self.save_key_players(key_players)
         return key_players
+
+    @staticmethod
+    def who_dominates_this_excluding(proposal, pareto, user):
+        app.logger.debug("who_dominates_this_excluding\n")
+        app.logger.debug(">>>> Pareto %s >>>> User %s\n", pareto, user.id)
+        could_dominate = set()
+        proposal_endorsers = proposal.set_of_endorser_ids()
+        proposal_endorsers = proposal_endorsers.discard(user.id) or set()
+        app.logger.debug("Users proposal endorsers (empty?) %s\n",
+                         proposal_endorsers)
+        for prop in pareto:
+            if (prop == proposal):
+                continue
+            app.logger.debug("Testing Pareto Prop %s for domination\n",
+                             prop.id)
+            endorsers = prop.set_of_endorser_ids()
+            app.logger.debug("Remove %s from %s\n", user.id, endorsers)
+            endorsers.discard(user.id)
+            app.logger.debug("Current endorsers with user excluded %s\n",
+                             endorsers)
+            dominated = Proposal.who_dominates_who(proposal_endorsers,
+                                                   endorsers)
+            app.logger.debug("dominated %s\n", dominated)
+            if (dominated == endorsers):
+                could_dominate.add(prop)
+        return could_dominate
 
     def save_key_players(self, key_players):
         for user_id in key_players.keys():
             vote_for_these = list(key_players[user_id])
             for vote_for in vote_for_these:
-                print "VOTE_FOR", type(vote_for), vote_for
+                app.logger.debug("VOTE_FOR %s %s\n",
+                                 type(vote_for),
+                                 vote_for)
                 self.key_players.append(
                     KeyPlayer(user_id,
                               vote_for.id,
@@ -556,8 +650,8 @@ class KeyPlayer(Base):
 
     __tablename__ = "key_player"
 
-    proposal_id = Column(Integer, ForeignKey('proposal.id'), primary_key=True)
     user_id = Column(Integer, ForeignKey('user.id'), primary_key=True)
+    proposal_id = Column(Integer, ForeignKey('proposal.id'), primary_key=True)
     question_id = Column(Integer, ForeignKey('question.id'), primary_key=True)
     generation = Column(Integer, primary_key=True)
 
