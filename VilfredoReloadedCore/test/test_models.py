@@ -84,18 +84,6 @@ class UserTest(unittest.TestCase):
             models.User.email_available(new_email))
 
 
-class QuestionHistoryTest(unittest.TestCase):
-    def setUp(self):
-        init_db()
-
-    def tearDown(self):
-        drop_db()
-        db_session.remove()
-
-    def test_create_question(self):
-        pass
-
-
 class QuestionTest(unittest.TestCase):
     def setUp(self):
         init_db()
@@ -290,8 +278,8 @@ class ProposalTest(unittest.TestCase):
 
 class EndorseTest(unittest.TestCase):
     def setUp(self):
-        #drop_db()
-        #db_session.remove()
+        drop_db()
+        db_session.remove()
         init_db()
 
     def tearDown(self):
@@ -409,7 +397,93 @@ class EndorseTest(unittest.TestCase):
         app.logger.debug("johns_q key players = %s\n", key_players)
         all_users = models.User.query.all()
         app.logger.debug("Users are %s\n", all_users)
+        # Save key players to the database
         db_session.commit()
+        # Calculate endorser effects
+        endorser_effects = johns_q.calculate_endorser_effects()
+        app.logger.debug("Effect of each endorser: %s\n", endorser_effects)
+        #
+        for (endorser, effect) in endorser_effects.iteritems():
+            if (effect is None):
+                app.logger.debug("%s's votes had no effect "
+                                 "on the Pareto Front\n",
+                                 endorser.username)
+            else:
+                app.logger.debug("%s's votes did effect the Pareto Front\n",
+                                 endorser.username)
+                if (len(effect['PF_minus'])):
+                    app.logger.debug("Without %s proposals %s "
+                                     "would NOT have been on "
+                                     "the Pareto Front\n",
+                                     endorser.username,
+                                     effect['PF_minus'])
+                elif (len(effect['PF_plus'])):
+                    app.logger.debug("Without %s proposals %s "
+                                     "would have been on "
+                                     "the Pareto Front\n",
+                                     endorser.username,
+                                     effect['PF_plus'])
+
+        # Investigate Question History *****************
+        johns_q.save_history()
+        db_session.commit()
+
+        history = models.QuestionHistory.query.filter(
+            models.QuestionHistory.question_id == johns_q.id
+        ).all()
+        history = models.QuestionHistory.query.all()
+        for entry in history:
+            print "History: Proposal", entry.proposal_id,\
+                'for question', entry.question_id
+
+        generation_1 = johns_q.get_generation(1)
+        #app.logger.debug("generation_1 = %s\n", generation_1)
+
+        gen_1_proposals = generation_1.proposals
+        app.logger.debug("generation_1 has %s proposals\n",
+                         len(gen_1_proposals))
+        #app.logger.debug("generation_1 proposals are %s\n", gen_1_proposals)
+
+        gen_1_pareto = generation_1.pareto_front
+
+        app.logger.debug("Generation 1 has %s proposals in the pareto front\n",
+                         len(gen_1_pareto))
+
+        app.logger.debug("Generation 1 Pareto is %s\n", gen_1_pareto)
+
+        app.logger.debug("Generation 1 Endorsers are %s\n",
+                         generation_1.endorsers)
+
+        app.logger.debug("Generation 1 Key Players are %s\n",
+                         generation_1.key_players)
+
+        gen_1_endorser_effects = generation_1.endorser_effects
+
+        '''
+        app.logger.debug("Generation 1 Endorser Effects are %s\n",
+                         generation_1.endorser_effects)
+        '''
+        for (endorser, effect) in gen_1_endorser_effects.iteritems():
+            if (effect is None):
+                app.logger.debug("%s's votes had no effect "
+                                 "on the Pareto Front\n",
+                                 endorser.username)
+            else:
+                app.logger.debug("%s's votes did effect the Pareto Front\n",
+                                 endorser.username)
+                if (len(effect['PF_minus'])):
+                    app.logger.debug("Without %s proposals %s "
+                                     "would NOT have been on "
+                                     "the Pareto Front\n",
+                                     endorser.username,
+                                     effect['PF_minus'])
+                elif (len(effect['PF_plus'])):
+                    app.logger.debug("Without %s proposals %s "
+                                     "would have been on "
+                                     "the Pareto Front\n",
+                                     endorser.username,
+                                     effect['PF_plus'])
+
         # STOP !!!
         #self.assertTrue(False)
 
@@ -448,30 +522,6 @@ class EndorseTest(unittest.TestCase):
         susans_prop1.remove_endorsement(susan)
         db_session.commit()
         self.assertFalse(susans_prop1.is_endorsed_by(susan))
-
-        johns_q.save_history()
-        db_session.commit()
-
-        history = models.QuestionHistory.query.filter(
-            models.QuestionHistory.question_id == johns_q.id
-        ).all()
-        history = models.QuestionHistory.query.all()
-        for entry in history:
-            print "History: Proposal", entry.proposal_id,\
-                'for question', entry.question_id
-
-        generation_1 = johns_q.get_generation(1)
-        #app.logger.debug("generation_1 = %s\n", generation_1)
-
-        gen_1_proposals = generation_1.proposals()
-        app.logger.debug("generation_1 has %s proposals", len(gen_1_proposals))
-        #app.logger.debug("generation_1 proposals are %s\n", gen_1_proposals)
-
-        gen_1_pareto = generation_1.pareto_front()
-
-        app.logger.debug("generation_1 has %s proposals in the pareto front",
-                         len(gen_1_pareto))
-        app.logger.debug("generation_1 set of PF IDS is %s\n", gen_1_pareto)
 
         # STOP !!!
         #self.assertTrue(False)

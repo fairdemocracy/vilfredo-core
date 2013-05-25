@@ -92,7 +92,7 @@ class User(Base, UserMixin):
     def invite(self, receiver, question):
         # Only author can invite to own question and cannot invite himself
         if (self.id == question.author.id and self.id != receiver.id):
-            self.invites.append(Invite(receiver, question.id))
+            self.invites.append(Invite(self, receiver, question.id))
             return True
         return False
 
@@ -255,8 +255,9 @@ class Invite(Base):
     receiver = relationship("User", primaryjoin="Invite.receiver_id==User.id",
                             backref="invitations", lazy='static')
 
-    def __init__(self, receiver, question_id):
-        self.receiver = receiver
+    def __init__(self, sender, receiver, question_id):
+        self.sender_id = sender.id
+        self.receiver_id = receiver.id
         self.question_id = question_id
 
 
@@ -358,6 +359,7 @@ class Question(Base):
     def calculate_pareto_front(self,
                                proposals=None,
                                exclude_user=None,
+                               generation=None,
                                save=False):
         '''
         .. function:: calculate_pareto_front([proposals=None,
@@ -374,6 +376,7 @@ class Question(Base):
         :type save: boolean
         :rtype: set of proposal objects
         '''
+        generation = generation or self.generation
         proposals = proposals or self.get_proposals()
 
         if (len(proposals) == 0):
@@ -388,11 +391,13 @@ class Question(Base):
                           exclude_user.id)
 
             for p in proposals:
-                props[p.id] = p.set_of_endorser_ids()
+                props[p.id] = p.set_of_endorser_ids(generation)
                 if (exclude_user is not None):
                     app.logger.debug("props[p.id] = %s\n", props[p.id])
                     props[p.id].discard(exclude_user.id)
-                    app.logger.debug("props[p.id] with user discarded = %s\n",
+                    app.logger.debug("props[p.id] with user %s "
+                                     "discarded = %s\n",
+                                     exclude_user.id,
                                      props[p.id])
 
             if (exclude_user is not None):
@@ -431,7 +436,7 @@ class Question(Base):
             if (len(dominated) > 0):
                 pareto = set(proposals).difference(dominated)
             else:
-                pareto = proposals
+                pareto = set(proposals)
 
             return pareto
 
@@ -446,7 +451,7 @@ class Question(Base):
         :param calculate_if_missing: calculate and save the
             domination if missing
         :type calculate_if_missing: boolean
-        :rtype: set of proposal objects in the pareto or False.
+        :rtype: set or boolean.
         '''
         pareto = self.proposals.filter(and_(
             Proposal.question_id == self.question.id,
@@ -470,7 +475,44 @@ class Question(Base):
             current_endorsers.update(set(proposal.endorsers()))
         return current_endorsers
 
+    def calculate_endorser_effects(self):
+        '''
+        .. function:: calculate_endorser_effects()
+
+        Calculates the effects each endorser has on the pareto.
+        What would be the effects if he didn't vote?
+        What proposals has he forced into the pareto?
+
+        :rtype: dict
+        '''
+        all_endorsers = self.get_current_endorsers()
+        app.logger.debug("All Endorsers: %s\n", all_endorsers)
+        pareto = self.calculate_pareto_front()
+        endorser_effects = dict()
+        for endorser in all_endorsers:
+            PF_excluding_endorser = self.calculate_pareto_front(
+                exclude_user=endorser)
+            PF_plus = PF_excluding_endorser - pareto
+            PF_minus = pareto - PF_excluding_endorser
+            if (len(PF_plus) or len(PF_minus)):
+                endorser_effects[endorser] = {
+                    'PF_excluding': PF_excluding_endorser,
+                    'PF_plus': PF_plus,
+                    'PF_minus': PF_minus}
+            else:
+                endorser_effects[endorser] = None
+        return endorser_effects
+
     def calculate_key_players(self):
+        '''
+        .. function:: calculate_key_players()
+
+        Calculates the effects each endorser has on the pareto.
+        What would be the effects if he didn't vote?
+        What proposals has he forced into the pareto?
+
+        :rtype: dict
+        '''
         key_players = dict()
         pareto = self.calculate_pareto_front()
         if (len(pareto) == 0):
@@ -603,39 +645,113 @@ class Question(Base):
 
 
 class Generation():
-    question = None
-    generation = None
+    _question = None
+    _generation = None
+    _pareto_front = None
+    _key_players = None
+    _endorsers = None
+    _endorser_effects = None
+    _proposals = None
 
+    @property
+    def question(self):
+        return self._question
+
+    @property
+    def generation(self):
+        return self._generation
+
+    @property
     def proposals(self):
-        result = self.question.history.filter(and_(
-            QuestionHistory.question_id == self.question.id,
-            QuestionHistory.generation == self.generation
-        )).all()
-        proposals = set()
-        for entry in result:
-            proposals.add(entry.proposal)
-        return proposals
+        if (self._proposals is not None):
+            return self._proposals
+        else:
+            result = self.question.history.filter(and_(
+                QuestionHistory.question_id == self.question.id,
+                QuestionHistory.generation == self.generation
+            )).all()
+            self._proposals = set()
+            for entry in result:
+                self._proposals.add(entry.proposal)
+            return self._proposals
 
+    @property
     def pareto_front(self):
-        result = self.question.history.filter(and_(
-            QuestionHistory.question_id == self.question.id,
-            QuestionHistory.generation == self.generation,
-            QuestionHistory.dominated_by == 0
-        )).all()
-        pareto = set()
-        for entry in result:
-            pareto.add(entry.proposal)
-        return pareto
+        if (self._pareto_front is not None):
+            return self._pareto_front
+        else:
+            pareto_history = self.question.history.filter(and_(
+                QuestionHistory.question_id == self.question.id,
+                QuestionHistory.generation == self.generation,
+                QuestionHistory.dominated_by == 0
+            )).all()
+            self._pareto_front = set()
+            for entry in pareto_history:
+                self._pareto_front.add(entry.proposal)
+            return self._pareto_front
 
+    @property
     def endorsers(self):
-        pass
+        proposals = self.proposals
+        self._endorsers = set()
+        for proposal in proposals:
+            self._endorsers.update(proposal.endorsers(self.generation))
+        return self._endorsers
 
+    @property
     def key_players(self):
-        pass
+        if (self._key_players is not None):
+            return self._key_players
+        else:
+            key_player_history = self.question.key_players.\
+                order_by(KeyPlayer.user_id).filter(and_(
+                    KeyPlayer.question_id == self.question.id,
+                    KeyPlayer.generation == self.generation,
+                )).all()
+            self._key_players = dict()
+            for entry in key_player_history:
+                if (entry.user_id not in self._key_players):
+                    self._key_players[entry.user_id] = set()
+                self._key_players[entry.user_id].add(entry.proposal)
+            return self._key_players
+
+    @property
+    def endorser_effects(self):
+        '''
+        .. function:: endorser_effects()
+
+        Calculates the effects each endorser has on the pareto.
+        What would be the effects if he didn't vote?
+        What proposals has he forced into the pareto?
+
+        :rtype: dict
+        '''
+        if (self._endorser_effects is not None):
+            return self._endorser_effects
+        else:
+            all_endorsers = self.endorsers
+            app.logger.debug("All Endorsers: %s\n", all_endorsers)
+            pareto = self.pareto_front
+            self._endorser_effects = dict()
+            for endorser in all_endorsers:
+                PF_excluding_endorser = self.question.calculate_pareto_front(
+                    proposals=self.proposals,
+                    generation=self.generation,
+                    exclude_user=endorser)
+                PF_plus = PF_excluding_endorser - pareto
+                PF_minus = pareto - PF_excluding_endorser
+                if (len(PF_plus) or len(PF_minus)):
+                    self._endorser_effects[endorser] = {
+                        'PF_excluding': PF_excluding_endorser,
+                        'PF_plus': PF_plus,
+                        'PF_minus': PF_minus}
+                else:
+                    self._endorser_effects[endorser] = None
+            return self._endorser_effects
 
     def __init__(self, question, generation):
-        self.question = question
-        self.generation = generation
+        self._question = question
+        self._generation = generation
 
     def __repr__(self):
         return "<Generation(G'%s', Q'%s')>" % (self.generation,
@@ -657,7 +773,6 @@ class KeyPlayer(Base):
 
     proposal = relationship("Proposal")
     user = relationship("User")
-    question = relationship("Question")
 
     def __init__(self, user_id, proposal_id, question_id, generation):
         self.user_id = user_id
@@ -666,10 +781,10 @@ class KeyPlayer(Base):
         self.generation = generation
 
     def __repr__(self):
-        return "<Generation('%s','%s','%s', '%s')>" % (self.question_id,
-                                                       self.proposal_id,
-                                                       self.generation,
-                                                       self.dominated_by)
+        return "<KeyPlayer('%s','%s','%s', '%s')>" % (self.user_id,
+                                                      self.proposal_id,
+                                                      self.generation,
+                                                      self.question_id)
 
 
 class QuestionHistory(Base):
@@ -718,7 +833,6 @@ class Proposal(Base):
     generation = Column(Integer, default=1)
     generation_created = Column(Integer, default=1)
     created = Column(DateTime)
-    updated = Column(DateTime)
     user_id = Column(Integer, ForeignKey('user.id'))
     question_id = Column(Integer, ForeignKey('question.id'))
     dominated_by = Column(Integer, default=0)
