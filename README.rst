@@ -127,3 +127,95 @@ An improved test runner is:
 
 This will open a ``ipdb`` shell in case of errors and failures and provide a
 coverage report.
+
+
+Installing under Mac osx 10.8.3, using Sourcetree
+-------------------------------------------------
+
+
+start by installing homebrew. Make sure the version of brew you have is up to date
+
+.. code:: sh
+
+    brew up 
+
+then install python and clean up
+
+.. code:: sh
+
+    pip install python
+    brew cleanup
+
+install virtualenv
+
+.. code:: sh
+
+    pip install virtualenv
+
+once virtualenv is installed, create a directory where you want to store your virtual environments:
+
+.. code:: sh
+
+    mkdir test-virtualenv
+
+then go there:
+
+.. code:: sh
+
+    ls test-virtualenv
+    cd test-virtualenv/
+
+now inside there start a new virtual environment:
+.. code:: sh
+
+    virtualenv test-vilfredo
+
+Then activate it
+
+.. code:: sh
+
+    . test-vilfredo/bin/activate
+
+When at the end you will want to deactivate the virtualenv type:
+.. code:: sh
+
+	deactivate
+
+Using Source Tree:
+------------------
+
+Open sourcetree and clone the project:
+
+.. code:: sh
+
+	git@git.ahref.eu:vilfredo/vilfredo-reloaded-core.git
+
+choosing the directory. I used Desktop/projects/vilfredo-reloaded-core/
+
+if not go to the directory where you want to clone it and type:
+
+.. code:: sh
+
+    git  clone git@git.ahref.eu:vilfredo/vilfredo-reloaded-core.git
+
+then go to the directory and check that the project is there
+
+.. code:: sh
+
+    cd Desktop/projects/vilfredo-reloaded-core/
+    python setup.py develop
+
+once you have run the develop and installed everything. You run it by typing vr in the shell.
+this will also open a server to where you can point your browser. To break type CONTROL+C
+
+Now you want to check that everything is ok. And you do this by running:
+
+.. code:: sh
+
+    python setup.py test
+
+And then you run flake8 that checks your code and gives you error for any element that is not written in a standard way:
+
+.. code:: sh
+
+	python setup.py flake8
