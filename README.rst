@@ -4,7 +4,39 @@
 vilfredo-reloaded-core
 ======================
 
-vilfredo-reloaded is a consensus-building and decision-making tool.
+Vilfredo (Reloaded)
+===================
+
+
+Vilfredo (Reloaded) is a collaborative consensus-building and decision-making tool for generating 
+universally supported solutions to open questions (questions which cannot be answered with
+a simple 'yes' or 'no'). 
+
+It is entirely egalitarian in that all participants are actively encouraged
+to submit, amend and endorse as many proposals as they wish, and by including as many interested parties 
+as possible in the decision making process the likelihood is that solutions reached will
+have a much greater chance of addressing all possible concerns and stand a better chance of being
+successfully implemented due to their wide support.
+
+The system is inherently simple to use. A question is asked and interested parties are invited to
+participate. There follows a number of rounds made up of two phases: writing and voting, which lasts
+until some kind of consensus is reached. The imposed cycle brings order to the deliberations. During
+the writing phase proposals are written or rewritten, then during the voting phase the participant 
+has the opportunity to vote and revote as many times as he wishes on those proposals.
+
+Participants are guided throughout the process by helpful 
+hints from the system and is presented with an interactive voting map (one of Vilfredo's most novel features)
+which allows them to visualise the current status of the deliberation: who currently votes for what, 
+who agrees with whom and which proposals are currently winning. This map updates as the voting changes so
+participants can immediately see the effects of their votes on the entire system.
+
+Following the voting phase the winning proposals are selected to be included in the next round. These
+winning proposals are selected in such a way that every participant has at least one proposal they support
+included.
+
+Eventually either a full or a partial consensus is reached (sometime a full consensus is impossible - this is
+the nature of free open discussions), and it is up to the group to decide when a deliberation should end.
+
 
 This package is the core of the application.
 
@@ -95,79 +127,3 @@ An improved test runner is:
 
 This will open a ``ipdb`` shell in case of errors and failures and provide a
 coverage report.
-
-
-Installed under Mac osx 10.8.3, using Sourcetree
-------------------------------------------------
-
-
-start by installing homebrew (I already had it in), makes sure the version of brew you have is up to date
-    brew up 
-then install python and clean up
-    pip install python
-    brew cleanup
-
-install virtualenv
-
-    pip install virtualenv
-
-once virtualenv is installed, create a directory where you want to store your virtual environments:
-
-    mkdir test-virtualenv
-
-then go there:
-
-    ls test-virtualenv
-    cd test-virtualenv/
-
-now inside there start a new virtual environment:
-
-    virtualenv test-vilfredo
-
-Then activate it
-
-    . test-vilfredo/bin/activate
-
-(When at the end you will want to deactivate the virtualenv write:
-        deactivate
-)
-
-using Source Tree:
-
-    Open sourcetree and clone the project:
-
-        git@git.ahref.eu:vilfredo/vilfredo-reloaded-core.git
-
-    chosing the directory. I used Desktop/projects/vilfredo-reloaded-core/
-
-(if not go to the directory where you want to clone it and type:
-
-    git  clone git@git.ahref.eu:vilfredo/vilfredo-reloaded-core.git
-
--I think-)
-
-then go to the directory and check that the project is there
-
-    cd Desktop/projects/vilfredo-reloaded-core/
-
-    ls
-
-    python setup.py develop
-
-You might receive errors if you do not have sqlalchemy and flask installed. In which case
-        pip install flask
-        pip install sqlalchemy
-    and then again
-        python setup.py develop 
-
-once you have run the develop and installed everything. You run it
-    vr
-this will also open a server to where you can point your browser. To break CONTROL+C
-
-Now you want to check that everything is ok. And you do this by running:
-    python setup.py test
-
-And then you run flake8 that checks your code and gives you error for any element that is not written in a standard way:
-    python setup.py flake8
-
-
