@@ -39,13 +39,26 @@ db_session = scoped_session(
 Base = declarative_base()
 Base.query = db_session.query_property()
 
+'''
+# Listener to switch on foreign key checking in SQLite
+def _fk_pragma_on_connect(dbapi_con, con_record):
+    dbapi_con.execute('pragma foreign_keys=ON')
+'''
 
 def init_engine(uri, **kwargs):
     # Non so easy to explain: see:
     # http://flask.pocoo.org/snippets/22/
     global engine
     kwargs.setdefault('convert_unicode', True)
+    # Get debug info from database connection
+    kwargs.setdefault('echo', 'debug')
     engine = create_engine(uri, **kwargs)
+
+    '''
+    # Add SQLite foreign key checking
+    from sqlalchemy import event
+    event.listen(engine, 'connect', _fk_pragma_on_connect)
+    '''
     return engine
 
 

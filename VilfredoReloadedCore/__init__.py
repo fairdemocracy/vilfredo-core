@@ -86,13 +86,17 @@ import os
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 # Set logging
-if (app.config['DEBUG']):
-    # Set logging for development server here
-    config_file = os.path.join(basedir, app.config['LOG_FILE'])
-    logging.config.fileConfig(config_file)
-    # create logger
-    logger = logging.getLogger('vilfredo_logger')
-    logger.propagate = False
-else:
-    # Set logging for production server here
-    pass
+config_file = os.path.join(basedir, app.config['LOG_CONFIG_FILE'])
+
+'''
+# Passing mode='w' to file handler not causing overwrite
+if (os.path.isfile('/var/tmp/vr.log')):
+    try:
+        os.remove('/var/tmp/vr.log')
+    except IOError:
+        print 'Failed to delete log file /var/tmp/vr.log'
+'''
+logging.config.fileConfig(config_file)
+# create logger
+logger = logging.getLogger('vilfredo_logger')
+logger.propagate = False

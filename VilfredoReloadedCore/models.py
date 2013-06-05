@@ -26,7 +26,7 @@ The database Bases
 
 from sqlalchemy import Column, Integer, String, ForeignKey
 
-from sqlalchemy import Enum, DateTime, Text, Boolean, and_
+from sqlalchemy import Enum, DateTime, Text, and_
 
 from sqlalchemy.orm import relationship
 
@@ -48,16 +48,21 @@ class Update(Base):
 
     __tablename__ = 'update'
 
-    user_id = Column(Integer, ForeignKey('user.id'), primary_key=True)
+    user_id = Column(Integer, ForeignKey('user.id'),
+                     primary_key=True, autoincrement=False)
     how = Column(Enum('daily', 'weekly', 'asap'))
     last_update = Column(DateTime)
     # M:1
-    question_id = Column(Integer, ForeignKey('question.id'), primary_key=True)
-    subscribed_to = relationship("Question", backref="subscriber_update")
+    question_id = Column(Integer, ForeignKey('question.id'),
+                         primary_key=True, autoincrement=False)
+
+    subscribed_to = relationship("Question", backref="subscriber_update",
+                                 cascade="all, delete-orphan",
+                                 single_parent=True)
 
     def __init__(self, subscriber, subscribed_to, how=None):
-        self.subscriber = subscriber
-        self.subscribed_to = subscribed_to
+        self.user_id = subscriber.id
+        self.question_id = subscribed_to.id
         self.how = how or 'asap'
 
 
@@ -70,27 +75,45 @@ class User(Base, UserMixin):
 
     id = Column(Integer, primary_key=True)
     username = Column(String(64), unique=True, nullable=False)
-    email = Column(String(120), unique=True)
+    email = Column(String(120))
     password = Column(String(60), nullable=False)
     registered = Column(DateTime)
     last_seen = Column(DateTime)
-    is_active = Column(Boolean, default=True)
     # 1:M
-    questions = relationship('Question', backref='author', lazy='dynamic')
+    questions = relationship('Question', backref='author', lazy='dynamic',
+                             cascade="all, delete-orphan")
+
     proposals = relationship('Proposal', backref='author', lazy='dynamic',
                              cascade="all, delete-orphan")
+
     endorsements = relationship('Endorsement',
-                                backref='endorser', lazy='dynamic')
+                                backref='endorser', lazy='dynamic',
+                                cascade="all, delete-orphan")
+
     # updates 1:M
     subscribed_questions = relationship("Update", backref='subscriber',
                                         lazy='dynamic',
                                         cascade="all, delete-orphan")
+
     # invites M:M
     invites = relationship("Invite", primaryjoin="User.id==Invite.sender_id",
-                           backref="sender", lazy='dynamic')
+                           backref="sender", lazy='dynamic',
+                           cascade="all, delete-orphan")
 
     def invite(self, receiver, question):
         # Only author can invite to own question and cannot invite himself
+        '''
+        .. function:: invite(receiver, question)
+
+        Create an invitation to request the receiver participate
+        in the question.
+
+        :param receiver: the user to be invited
+        :type receiver: User
+        :param question: the author's question
+        :type question: Question
+        :rtype: boolean
+        '''
         if (self.id == question.author.id and self.id != receiver.id):
             self.invites.append(Invite(self, receiver, question.id))
             return True
@@ -98,10 +121,28 @@ class User(Base, UserMixin):
 
     @staticmethod
     def username_available(username):
+        '''
+        .. function:: username_available(username)
+
+        Checks if an email username is available.
+
+        :param email: username
+        :type email: string
+        :rtype: boolean
+        '''
         return User.query.filter_by(username=username).first() is None
 
     @staticmethod
     def email_available(email):
+        '''
+        .. function:: email_available(email)
+
+        Checks if an email address is available.
+
+        :param email: email address
+        :type email: string
+        :rtype: boolean
+        '''
         return User.query.filter_by(email=email).first() is None
 
     def is_authenticated(self):
@@ -203,12 +244,30 @@ class User(Base, UserMixin):
             return True
         return False
 
-    def subscribe_to(self, question):
+    def subscribe_to(self, question, how=None):
+        '''
+        .. function:: subscribe_to(question[, how])
+
+        Subscribe the user to the question.
+
+        :param question: the question to subscribe to.
+        :type question: Question
+        :param how: the author's question
+        :type question: enum 'daily', 'weekly', 'asap'
+        '''
         if (question is not None):
-            self.subscribed_questions.append(Update(self, question))
+            self.subscribed_questions.append(Update(self, question, how))
         return self
 
     def unsubscribe_from(self, question):
+        '''
+        .. function:: unsubscribe_from(question)
+
+        Unsubscribe the user from the question.
+
+        :param question: the question to subscribe to.
+        :type question: Question
+        '''
         if (question is not None):
             subscription = self.subscribed_questions.filter(and_(
                 Update.question_id == question.id,
@@ -218,14 +277,41 @@ class User(Base, UserMixin):
         return self
 
     def is_subscribed_to(self, question):
+        '''
+        .. function:: is_subscribed_to(question)
+
+        Checks if the user issubscribed to the question.
+
+        :param question: the question to subscribe to.
+        :type question: Question
+        :rtype: boolean
+        '''
         if (question is not None):
             return self.subscribed_questions.filter(
                 Update.question_id == question.id).count() == 1
 
     def set_password(self, password):
+        '''
+        .. function:: set_password(password)
+
+        Hashes the password and stores it in the database.
+
+        :param password: the user's password.
+        :type password: string
+        '''
         self.password = generate_password_hash(password)
 
     def check_password(self, password):
+        '''
+        .. function:: check_password(password)
+
+        Checks the user's password against the hashed string stored
+        in the database.
+
+        :param password: the user's password to check.
+        :type password: string
+        :rtype: boolean
+        '''
         return check_password_hash(self.password, password)
 
     def __init__(self, username, email, password):
@@ -236,9 +322,8 @@ class User(Base, UserMixin):
         self.last_seen = datetime.datetime.utcnow()
 
     def __repr__(self):
-        return "<User(ID='%s', '%s','%s')>" % (self.id,
-                                               self.username,
-                                               self.email)
+        return "<User(ID='%s', '%s')>" % (self.id,
+                                          self.username)
 
 
 class Invite(Base):
@@ -248,12 +333,16 @@ class Invite(Base):
 
     __tablename__ = 'invite'
 
-    sender_id = Column(Integer, ForeignKey('user.id'), primary_key=True)
-    receiver_id = Column(Integer, ForeignKey('user.id'), primary_key=True)
-    question_id = Column(Integer, primary_key=True)
+    sender_id = Column(Integer, ForeignKey('user.id'),
+                       primary_key=True, autoincrement=False)
+    receiver_id = Column(Integer, ForeignKey('user.id'),
+                         primary_key=True, autoincrement=False)
+    question_id = Column(Integer, primary_key=True, autoincrement=False)
 
     receiver = relationship("User", primaryjoin="Invite.receiver_id==User.id",
-                            backref="invitations", lazy='static')
+                            backref="invitations",
+                            lazy='static', single_parent=True,
+                            cascade="all, delete-orphan")
 
     def __init__(self, sender, receiver, question_id):
         self.sender_id = sender.id
@@ -263,7 +352,8 @@ class Invite(Base):
 
 class Question(Base):
     '''
-    Stores question data
+    Stores data and handles functionality and relations for
+    the question object.
     '''
 
     __tablename__ = 'question'
@@ -280,13 +370,35 @@ class Question(Base):
     maximum_time = Column(Integer)
     user_id = Column(Integer, ForeignKey('user.id'))
     # 1:M
-    proposals = relationship('Proposal', backref='question', lazy='dynamic')
-    history = relationship('QuestionHistory', lazy='dynamic')
-    key_players = relationship('KeyPlayer', lazy='dynamic')
+    proposals = relationship('Proposal', backref='question', lazy='dynamic',
+                             cascade="all, delete-orphan")
+    history = relationship('QuestionHistory', lazy='dynamic',
+                           cascade="all, delete-orphan")
+    key_players = relationship('KeyPlayer', lazy='dynamic',
+                               cascade="all, delete-orphan")
 
     def __init__(self, author, title, blurb,
                  minimum_time=86400, maximum_time=604800, room=None):
-        self.author = author
+        '''
+        .. function:: __init__(author, title, blurb
+                [, minimum_time=86400, maximum_time=604800, room=None])
+
+        Creates a Question object.
+
+        :param author: author of the question
+        :type author: User
+        :param title: author of the question
+        :type title: string
+        :param blurb: author of the question
+        :type blurb: string
+        :param minimum_time: author of the question
+        :type minimum_time: integer
+        :param maximum_time: author of the question
+        :type maximum_time: integer
+        :param room: room associated with the question
+        :type room: string
+        '''
+        self.user_id = author.id
         self.title = title
         self.blurb = blurb
         self.room = room or ''
@@ -297,30 +409,75 @@ class Question(Base):
         self.maximum_time = maximum_time
 
     def save_history(self):
+        '''
+        .. function:: save_history()
+
+        Saves the current state of the question to the question_history table.
+
+        :rtype: boolean
+        '''
         proposals = self.get_proposals()
         for proposal in proposals:
             self.history.append(QuestionHistory(proposal))
         return self
 
     def move_to_writing(self):
+        '''
+        .. function:: move_to_writing()
+
+        Moves the question to the writing phase if the minimum time has
+        passed and and the question is currently voting or archived.
+
+        :rtype: boolean
+        '''
         if (self.phase not in ['voting', 'archived']
                 or not self.minimum_time_passed()):
             return False
         return True
 
     def get_generation(self, generation):
+        '''
+        .. function:: get_generation(generation)
+
+        Returns a Generation object for the question.
+
+        :rtype: Generation object
+        '''
         return Generation(self, generation)
 
     def minimum_time_passed(self):
+        '''
+        .. function:: minimum_time_passed()
+
+        Returns True if the minimum time has passed for the question.
+
+        :rtype: boolean
+        '''
         return (datetime.datetime.utcnow() - self.last_move_on)\
             .total_seconds() > self.minimum_time
 
     def maximum_time_passed(self):
+        '''
+        .. function:: maximum_time_passed()
+
+        Returns True if the maximum time has passed for the question.
+
+        :rtype: boolean
+        '''
         return (datetime.datetime.utcnow() - self.last_move_on)\
             .total_seconds() > self.maximum_time
 
     @staticmethod
     def time_passed_dhm(utc_date_time):
+        '''
+        .. function:: time_passed_dhm(utc_date_time)
+
+        Returns the time passed in days, hours and minutes since utc_date_time.
+
+        :param utc_date_time: a time in the past.
+        :type utc_date_time: DateTime
+        :rtype: dict
+        '''
         td = datetime.datetime.utcnow() - utc_date_time
         return {'days': td.days,
                 'hours': td.seconds//3600,
@@ -328,12 +485,31 @@ class Question(Base):
 
     @staticmethod
     def time_passed_as_string(utc_date_time):
+        '''
+        .. function:: time_passed_as_string(utc_date_time)
+
+        Returns a formatted string of the time passed in days, hours
+        and minutes since utc_date_time.
+
+        :param utc_date_time: a time in the past.
+        :type utc_date_time: DateTime
+        :rtype: string
+        '''
         time_passed = Question.time_passed_dhm(utc_date_time)
         return "%s days %s hrs %s mins" % (time_passed['days'],
                                            time_passed['hours'],
                                            time_passed['minutes'])
 
     def change_phase(self, phase=None):
+        '''
+        .. function:: change_phase([phase])
+
+        Returns a formatted string of the time passed in days, hours
+        and minutes since utc_date_time.
+
+        :param phase: the phase to set the question to.
+        :type phase: string
+        '''
         if (phase is None):
             if (self.phase == 'writing'):
                 self.phase = 'voting'
@@ -344,12 +520,28 @@ class Question(Base):
         return self
 
     def get_proposals(self):
+        '''
+        .. function:: get_proposals()
+
+        Returns a list of proposals for the current generation of
+        the question.
+
+        :rtype: list
+        '''
         return self.proposals.filter(and_(
             Proposal.question_id == self.id,
             Proposal.generation == self.generation
         )).all()
 
     def get_proposals_ids(self):
+        '''
+        .. function:: get_proposals_ids()
+
+        Returns a set of proposal IDs for the current generation of
+        the question.
+
+        :rtype: set
+        '''
         current_proposals = self.get_proposals()
         prop_ids = set()
         for p in current_proposals:
@@ -469,6 +661,14 @@ class Question(Base):
             return pareto
 
     def get_current_endorsers(self):
+        '''
+        .. function:: get_current_endorsers()
+
+        Returns a set of endorsers for the current generation of
+        the question.
+
+        :rtype: set of User objects
+        '''
         current_endorsers = set()
         all_proposals = self.get_proposals()
         for proposal in all_proposals:
@@ -530,7 +730,7 @@ class Question(Base):
                 user.get_endorsed_proposal_ids(self))
             app.logger.debug(">>>>>>>>>> Users endorsed proposal IDs %s\n",
                              users_endorsed_proposal_ids)
-            app.logger.debug("Calc PF exclusing %s\n", user.id)
+            app.logger.debug("Calc PF excluding %s\n", user.id)
             new_pareto = self.calculate_pareto_front(proposals=pareto,
                                                      exclude_user=user)
             app.logger.debug(">>>>>>> NEW PARETO = %s\n", new_pareto)
@@ -556,21 +756,39 @@ class Question(Base):
         return key_players
 
     @staticmethod
-    def who_dominates_this_excluding(proposal, pareto, user):
+    def who_dominates_this_excluding(proposal, pareto, user, generation=None):
+        '''
+        .. function:: who_dominates_this_excluding(proposal, pareto,
+                                                   user[, generation=None])
+
+        Calculates the set of proposals within the pareto which could dominate
+        the proposal if the endorsements of the user were excluded from the
+        calculation.
+
+        :param proposal: calculate and save the
+        :type proposal: Proposal object
+        :param pareto: the pareto front
+        :type pareto: set
+        :param user: the user to exclude
+        :type user: User object
+        :param generation: the generation
+        :type generation: integer or None
+        :rtype: set of Proposals
+        '''
         app.logger.debug("who_dominates_this_excluding\n")
         app.logger.debug(">>>> Pareto %s >>>> User %s\n", pareto, user.id)
         could_dominate = set()
-        proposal_endorsers = proposal.set_of_endorser_ids()
-        proposal_endorsers = proposal_endorsers.discard(user.id) or set()
-        app.logger.debug("Users proposal endorsers (empty?) %s\n",
+        proposal_endorsers = proposal.set_of_endorser_ids(generation)
+        proposal_endorsers.discard(user.id)
+        app.logger.debug("Users proposal %s endorsers %s\n",
+                         proposal.id,
                          proposal_endorsers)
         for prop in pareto:
             if (prop == proposal):
                 continue
             app.logger.debug("Testing Pareto Prop %s for domination\n",
                              prop.id)
-            endorsers = prop.set_of_endorser_ids()
-            app.logger.debug("Remove %s from %s\n", user.id, endorsers)
+            endorsers = prop.set_of_endorser_ids(generation)
             endorsers.discard(user.id)
             app.logger.debug("Current endorsers with user excluded %s\n",
                              endorsers)
@@ -582,6 +800,11 @@ class Question(Base):
         return could_dominate
 
     def save_key_players(self, key_players):
+        '''
+        .. function:: save_key_players(key_players)
+
+        Saves the key player data to the database.
+        '''
         for user_id in key_players.keys():
             vote_for_these = list(key_players[user_id])
             for vote_for in vote_for_these:
@@ -597,12 +820,10 @@ class Question(Base):
 
     def calculate_pareto_front_ids(self):
         '''
-        .. function:: pareto_front()
+        .. function:: calculate_pareto_front_ids()
 
-        Calculates the pareto front of the question.
+        Calculates the proposal IDs of the pareto front of the question.
 
-        :param generation: question generation
-        :type generation: integer or None
         :rtype: set of proposal IDs
         '''
         proposals = self.get_proposals()
@@ -639,9 +860,9 @@ class Question(Base):
             return pareto
 
     def __repr__(self):
-        return "<Question('%s','%s', '%s')>" % (self.title,
-                                                self.author.username,
-                                                self.phase)
+        return "<Question('%s',auth: '%s', '%s')>" % (self.title,
+                                                      self.author.username,
+                                                      self.phase)
 
 
 class Generation():
@@ -663,6 +884,13 @@ class Generation():
 
     @property
     def proposals(self):
+        '''
+        Proposals
+
+        The list of the proposals for this generation.
+
+        :rtype: list of Proposals
+        '''
         if (self._proposals is not None):
             return self._proposals
         else:
@@ -677,6 +905,13 @@ class Generation():
 
     @property
     def pareto_front(self):
+        '''
+        Pareto front
+
+        The pareto front for this generation.
+
+        :rtype: list of Proposals
+        '''
         if (self._pareto_front is not None):
             return self._pareto_front
         else:
@@ -692,6 +927,13 @@ class Generation():
 
     @property
     def endorsers(self):
+        '''
+        Endorsers
+
+        The list of endorsers for this generation.
+
+        :rtype: list of Users
+        '''
         proposals = self.proposals
         self._endorsers = set()
         for proposal in proposals:
@@ -700,6 +942,14 @@ class Generation():
 
     @property
     def key_players(self):
+        '''
+        key_players
+
+        The list of endorsers identified as being key players for
+        this generation.
+
+        :rtype: list of Users
+        '''
         if (self._key_players is not None):
             return self._key_players
         else:
@@ -715,6 +965,110 @@ class Generation():
                 self._key_players[entry.user_id].add(entry.proposal)
             return self._key_players
 
+    def calculate_proposal_relations(self):
+        '''
+        .. function:: calculate_proposal_relations()
+
+        Calculates the complete map of dominations. For each proposal
+        it calculates which proposals dominate and which are dominated.
+
+        :rtype: dict
+        '''
+        proposal_relations = dict()
+        props = dict()
+        all_proposals = self.proposals
+        for p in all_proposals:
+            props[p.id] = p.set_of_endorser_ids(self.generation)
+
+        for proposal1 in all_proposals:
+            dominating = set()
+            dominated = set()
+            proposal_relations[proposal1] = dict()
+
+            for proposal2 in all_proposals:
+                if (proposal1 == proposal2):
+                    continue
+                who_dominates = Proposal.\
+                    who_dominates_who(props[proposal1.id],
+                                      props[proposal2.id])
+                '''
+                app.logger.debug("Comparing props %s %s and %s %s\n",
+                                 proposal1.id, props[proposal1.id],
+                                 proposal2.id, props[proposal2.id])
+                app.logger.debug("   ===> WDW Result = %s\n",
+                                 who_dominates)
+                '''
+                if (who_dominates == props[proposal1.id]):
+                    dominating.add(proposal2)
+                elif (who_dominates == props[proposal2.id]):
+                    dominated.add(proposal2)
+
+            proposal_relations[proposal1]['dominating'] = dominating
+            proposal_relations[proposal1]['dominated'] = dominated
+
+        return proposal_relations
+
+    def calculate_key_players(self):
+        '''
+        .. function:: calculate_key_players()
+
+        Calculates the effects each endorser has on the pareto.
+        What would be the effects if he didn't vote?
+        What proposals has he forced into the pareto?
+
+        :rtype: dict
+        '''
+        key_players = dict()
+
+        app.logger.debug("+++++++++++ calculate_key_players() +++++++++++")
+
+        all_endorsers = self.endorsers
+        pareto = self.pareto_front
+        if (len(pareto) == 0):
+            return dict()
+
+        for user in all_endorsers:
+            app.logger.debug("+++++++++++ Checking User +++++++++++ %s\n",
+                             user.id)
+
+            users_endorsed_proposal_ids = set(
+                user.get_endorsed_proposal_ids(self.question, self.generation))
+
+            app.logger.debug(">>>>>>>>>> Users endorsed proposal IDs %s\n",
+                             users_endorsed_proposal_ids)
+            app.logger.debug("Calc PF excluding %s\n", user.id)
+
+            new_pareto = self.question.calculate_pareto_front(
+                proposals=pareto,
+                generation=self.generation,
+                exclude_user=user)
+            app.logger.debug(">>>>>>> NEW PARETO = %s\n", new_pareto)
+
+            if (pareto != new_pareto):
+                app.logger.debug("%s is a key player\n", user.id)
+
+                users_pareto_proposals = pareto.difference(new_pareto)
+
+                app.logger.debug(">>>>>>>>>users_pareto_proposals %s\n",
+                                 users_pareto_proposals)
+
+                key_players[user.id] = set()
+                for users_proposal in users_pareto_proposals:
+                    key_players[user.id].update(
+                        Question.who_dominates_this_excluding(users_proposal,
+                                                              pareto,
+                                                              user,
+                                                              self.generation))
+                    app.logger.debug(
+                        "Pareto Props that could dominate PID %s %s\n",
+                        users_proposal.id,
+                        key_players[user.id])
+            else:
+                app.logger.debug("%s is not a key player\n", user.id)
+
+        #self.question.save_key_players(key_players)
+        return key_players
+
     @property
     def endorser_effects(self):
         '''
@@ -723,6 +1077,8 @@ class Generation():
         Calculates the effects each endorser has on the pareto.
         What would be the effects if he didn't vote?
         What proposals has he forced into the pareto?
+
+        To do: Will propbably store these calculations in a table
 
         :rtype: dict
         '''
@@ -763,16 +1119,23 @@ class Generation():
 
 
 class KeyPlayer(Base):
-
+    '''
+    Stores key player information for each geenration
+    '''
     __tablename__ = "key_player"
 
-    user_id = Column(Integer, ForeignKey('user.id'), primary_key=True)
-    proposal_id = Column(Integer, ForeignKey('proposal.id'), primary_key=True)
-    question_id = Column(Integer, ForeignKey('question.id'), primary_key=True)
-    generation = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('user.id'),
+                     primary_key=True, autoincrement=False)
+    proposal_id = Column(Integer, ForeignKey('proposal.id'),
+                         primary_key=True, autoincrement=False)
+    question_id = Column(Integer, ForeignKey('question.id'),
+                         primary_key=True, autoincrement=False)
+    generation = Column(Integer, primary_key=True, autoincrement=False)
 
-    proposal = relationship("Proposal")
-    user = relationship("User")
+    proposal = relationship("Proposal", cascade="all, delete-orphan",
+                            single_parent=True)
+    user = relationship("User", cascade="all, delete-orphan",
+                        single_parent=True)
 
     def __init__(self, user_id, proposal_id, question_id, generation):
         self.user_id = user_id
@@ -798,13 +1161,13 @@ class QuestionHistory(Base):
 
     __tablename__ = 'question_history'
 
-    proposal_id = Column(Integer, ForeignKey('proposal.id'), primary_key=True)
-    question_id = Column(Integer, ForeignKey('question.id'), primary_key=True)
-    generation = Column(Integer, primary_key=True)
+    proposal_id = Column(Integer, ForeignKey('proposal.id'),
+                         primary_key=True, autoincrement=False)
+    question_id = Column(Integer, ForeignKey('question.id'),
+                         primary_key=True, autoincrement=False)
+    generation = Column(Integer, primary_key=True, autoincrement=False)
     generation_created = Column(Integer)
     dominated_by = Column(Integer)
-
-    proposal = relationship("Proposal")
 
     def __init__(self, proposal):
         self.proposal_id = proposal.id
@@ -815,8 +1178,8 @@ class QuestionHistory(Base):
 
     def __repr__(self):
         return "<Generation('%s','%s','%s', '%s')>" % (self.question_id,
-                                                       self.proposal_id,
                                                        self.generation,
+                                                       self.proposal_id,
                                                        self.dominated_by)
 
 
@@ -830,6 +1193,7 @@ class Proposal(Base):
     id = Column(Integer, primary_key=True)
     title = Column(String(120), nullable=False)
     blurb = Column(Text, nullable=False)
+    abstract = Column(Text)
     generation = Column(Integer, default=1)
     generation_created = Column(Integer, default=1)
     created = Column(DateTime)
@@ -840,19 +1204,34 @@ class Proposal(Base):
     endorsements = relationship('Endorsement', backref="proposal",
                                 lazy='dynamic', cascade="all, delete-orphan")
 
-    def __init__(self, author, question, title, blurb):
-        self.author = author
-        self.question = question
+    history = relationship('QuestionHistory', backref="proposal",
+                           lazy='dynamic', cascade="all, delete-orphan")
+
+    def __init__(self, author, question, title, blurb, abstract=None):
+        self.user_id = author.id
+        self.question_id = question.id
         self.title = title
         self.blurb = blurb
         self.generation = question.generation
         self.generation_created = question.generation
         self.created = datetime.datetime.utcnow()
+        self.abstract = abstract
 
     def update(self, user, title, blurb):
         '''
-        Only available to the author during the question WRITING PHASE
-        of the generation the proposal was first propsosed (created)
+        .. function:: update(user, title, blurb)
+
+        Update the title and content of this proposal. Only available to the
+        author during the question WRITING PHASE of the generation the proposal
+        was first propsosed (created).
+
+        :param user: user
+        :type user: User object
+        :param title: updated proposal title
+        :type title: string
+        :param blurb: updated proposal content
+        :type blurb: string
+        :rtype: boolean
         '''
         if (user.id == self.user_id
                 and self.question.phase == 'writing'
@@ -867,8 +1246,15 @@ class Proposal(Base):
 
     def delete(self, user):
         '''
-        Only available to the author during the question WRITING PHASE
-        of the generation the proposal was first propsosed (created)
+        .. function:: delete(user)
+
+        Delete this proposal. Only available to the author during the
+        question WRITING PHASE of the generation the proposal was first
+        propsosed (created).
+
+        :param user: user
+        :type user: User object
+        :rtype: boolean
         '''
         if (user == self.user_id
                 and self.question.phase == 'writing'
@@ -879,10 +1265,26 @@ class Proposal(Base):
             return False
 
     def endorse(self, endorser):
+        '''
+        .. function:: endorse(endorser)
+
+        Add a user's endorsement to this proposal.
+
+        :param endorser: user
+        :type endorser: User object
+        '''
         self.endorsements.append(Endorsement(endorser, self))
         return self
 
     def remove_endorsement(self, endorser):
+        '''
+        .. function:: remove_endorsement(endorser)
+
+        Remove a user's endorsement from this proposal.
+
+        :param endorser: user
+        :type endorser: User object
+        '''
         endorsement = self.endorsements.filter(and_(
             Endorsement.user_id == endorser.id,
             Endorsement.proposal_id == self.id,
@@ -914,8 +1316,14 @@ class Proposal(Base):
 
     def endorsers(self, generation=None):
         '''
-        Returns a LIST of the current endorsers
+        .. function:: endorsers([generation=None])
+
+        Returns a set of the current endorsers
             - Defaults to current generation
+
+        :param generation: question generation
+        :type generation: integer or None
+        :rtype: set of Users
         '''
         generation = generation or self.generation
         current_endorsements = list()
@@ -957,10 +1365,11 @@ class Proposal(Base):
             -1 if the sets of endorsers are the same
 
         :param proposal1: set of voters for proposal 1
-        :param proposal2: set of voters for proposal 2
-        :param generation: question generation
         :type proposal1: set of integers
+        :param proposal2: set of voters for proposal 2
         :type proposal2: set of integers
+        :param generation: question generation
+        :type generation: integer
         :rtype: interger or set of integers
         '''
         # If proposal1 and proposal2 are the same return -1
@@ -983,12 +1392,9 @@ class Proposal(Base):
             return 0
 
     def __repr__(self):
-        return "<Proposal('%s', '%s','%s', '%s', dominated_by '%s')>"\
+        return "<Proposal('%s', Q:'%s')>"\
             % (self.id,
-               self.title,
-               self.blurb,
-               self.question_id,
-               self.dominated_by)
+               self.question_id)
 
 
 class Endorsement(Base):
@@ -1005,7 +1411,7 @@ class Endorsement(Base):
     endorsement_date = Column(DateTime)
 
     def __init__(self, endorser, proposal):
-        self.endorser = endorser
-        self.proposal = proposal
+        self.user_id = endorser.id
+        self.proposal_id = proposal.id
         self.generation = proposal.generation
         self.endorsement_date = datetime.datetime.utcnow()

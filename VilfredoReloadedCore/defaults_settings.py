@@ -3,7 +3,12 @@
 # default configuration settings
 
 # WARNNG: must be changed in production!
-DATABASE_URI = 'sqlite:////var/tmp/vr.db'
+
+# DATABASE_URI = 'sqlite:////var/tmp/vr.db'
+development_db = 'sqlite:////var/tmp/vr.db'
+
+#DATABASE_URI = 'sqlite:////var/tmp/vr.db'
+DATABASE_URI = development_db
 
 # WARNNG: must be changed to False in production!
 DEBUG = True
@@ -21,4 +26,8 @@ MAIL_SUPPRESS_SEND = True
 # administrator list
 ADMINS = ['admin@example.com']
 
-LOG_FILE = 'logging_debug.conf'
+# name of logger configuration file
+LOG_CONFIG_FILE = 'logging_debug.conf'
+
+import os
+BASE = os.path.abspath(os.path.dirname(__file__))

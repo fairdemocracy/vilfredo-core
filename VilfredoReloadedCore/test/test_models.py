@@ -287,6 +287,8 @@ class EndorseTest(unittest.TestCase):
         db_session.remove()
 
     def test_endorse_proposals(self):
+        # STOP !!!
+        #self.assertTrue(False)
         send_emails = False
         # Create users
         john = models.User('john', 'john@example.com', 'fgfdfg')
@@ -308,6 +310,18 @@ class EndorseTest(unittest.TestCase):
 
         db_session.add_all([johns_q, johns_q2])
         db_session.commit()
+
+        '''
+        #TEST Foreign Key Constraints is working in SQLite
+        ins = models.Question.__table__.insert().values(
+            id = 99,
+            title = 'Wrong',
+            blurb = 'Wrong',
+            generation = 1,
+            user_id = 99)  # invalid foreign key id
+
+        db_session.execute(ins)
+        '''
 
         # Fetch list of users for john's invite selection
         user_query = \
@@ -457,6 +471,11 @@ class EndorseTest(unittest.TestCase):
         app.logger.debug("Generation 1 Key Players are %s\n",
                          generation_1.key_players)
 
+        # Recalculate key players for this geenration
+        app.logger.debug(
+            "Generation 1 Key Players **** Recalculated **** are %s\n",
+            generation_1.calculate_key_players())
+
         gen_1_endorser_effects = generation_1.endorser_effects
 
         '''
@@ -522,7 +541,6 @@ class EndorseTest(unittest.TestCase):
         susans_prop1.remove_endorsement(susan)
         db_session.commit()
         self.assertFalse(susans_prop1.is_endorsed_by(susan))
-
         # STOP !!!
         #self.assertTrue(False)
 
