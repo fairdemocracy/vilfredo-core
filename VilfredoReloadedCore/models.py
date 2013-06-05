@@ -75,7 +75,7 @@ class User(Base, UserMixin):
 
     id = Column(Integer, primary_key=True)
     username = Column(String(64), unique=True, nullable=False)
-    email = Column(String(120))
+    email = Column(String(120), unique=True)
     password = Column(String(60), nullable=False)
     registered = Column(DateTime)
     last_seen = Column(DateTime)
