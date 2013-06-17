@@ -268,17 +268,24 @@ class ProposalTest(unittest.TestCase):
         fetch_prop = models.Proposal.query.get(proposal_id)
         self.assertEqual(fetch_prop.title, 'Edited Title', fetch_prop.title)
 
+        # STOP !!!
+        # self.assertTrue(False)
+
         user.delete_proposal(users_proposal)
         db_session.commit()
+
+        # Sself.assertTrue(False)
 
         print "Fetch USER'S proposals for this generation of this question"
         fetch_prop = models.Proposal.query.get(proposal_id)
         self.assertTrue(fetch_prop is None, fetch_prop)
 
+        # STOP !!!
+        # self.assertTrue(False)
+
 
 class EndorseTest(unittest.TestCase):
     def setUp(self):
-        drop_db()
         db_session.remove()
         init_db()
 
@@ -371,7 +378,7 @@ class EndorseTest(unittest.TestCase):
         db_session.add_all([bills_prop1, bills_prop2,
                             susans_prop1, harrys_prop1])
         db_session.commit()
-        print "Current proposal ids", johns_q.get_proposals_ids()
+        print "Current proposal ids", johns_q.get_proposal_ids()
 
         # Subscribing users to questions
         bill.subscribe_to(johns_q)
@@ -438,10 +445,6 @@ class EndorseTest(unittest.TestCase):
                                      endorser.username,
                                      effect['PF_plus'])
 
-        # Investigate Question History *****************
-        johns_q.save_history()
-        db_session.commit()
-
         history = models.QuestionHistory.query.filter(
             models.QuestionHistory.question_id == johns_q.id
         ).all()
@@ -450,6 +453,7 @@ class EndorseTest(unittest.TestCase):
             print "History: Proposal", entry.proposal_id,\
                 'for question', entry.question_id
 
+        # '''
         generation_1 = johns_q.get_generation(1)
         #app.logger.debug("generation_1 = %s\n", generation_1)
 
@@ -478,10 +482,9 @@ class EndorseTest(unittest.TestCase):
 
         gen_1_endorser_effects = generation_1.endorser_effects
 
-        '''
         app.logger.debug("Generation 1 Endorser Effects are %s\n",
                          generation_1.endorser_effects)
-        '''
+
         for (endorser, effect) in gen_1_endorser_effects.iteritems():
             if (effect is None):
                 app.logger.debug("%s's votes had no effect "
@@ -503,8 +506,9 @@ class EndorseTest(unittest.TestCase):
                                      endorser.username,
                                      effect['PF_plus'])
 
+        # '''
         # STOP !!!
-        #self.assertTrue(False)
+        # self.assertTrue(False)
 
         # Get a list of the current endorsers
         current_endorsers = susans_prop1.endorsers()

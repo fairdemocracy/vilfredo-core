@@ -7,7 +7,6 @@
 # DATABASE_URI = 'sqlite:////var/tmp/vr.db'
 development_db = 'sqlite:////var/tmp/vr.db'
 
-#DATABASE_URI = 'sqlite:////var/tmp/vr.db'
 DATABASE_URI = development_db
 
 # WARNNG: must be changed to False in production!
