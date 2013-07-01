@@ -237,7 +237,7 @@ class ProposalTest(unittest.TestCase):
 
         print "Fetch proposals for this generation"
         current_proposals = question.get_proposals()
-        self.assertTrue(type(current_proposals) is list)
+        self.assertTrue(type(current_proposals) is set)
         self.assertEquals(len(current_proposals), 1)
 
         print "Fetch USER'S proposals for this generation of this question"
@@ -406,6 +406,9 @@ class EndorseTest(unittest.TestCase):
             susans_prop1.set_of_endorser_ids()
 
         # PF???
+        pf_props = johns_q.calculate_pareto_front()
+        app.logger.debug("Pareto Front = %s\n",
+                         pf_props)
         pf = johns_q.calculate_pareto_front_ids()
         app.logger.debug("Set of Pareto Front proposal IDs is %s\n", pf)
         self.assertEqual(pf, {2, 3, 4}, pf)

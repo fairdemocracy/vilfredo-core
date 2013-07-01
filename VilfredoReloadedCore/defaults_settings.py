@@ -30,3 +30,6 @@ LOG_CONFIG_FILE = 'logging_debug.conf'
 
 import os
 BASE = os.path.abspath(os.path.dirname(__file__))
+
+# Probably don't need this
+SITE_DOMAIN = 'localhost'

@@ -28,17 +28,21 @@ from sqlalchemy import Column, Integer, String, ForeignKey
 
 from sqlalchemy import Enum, DateTime, Text, and_, event
 
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 
 from database import Base, db_session
 
 import datetime
+
+import copy
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from flask.ext.login import UserMixin
 
 from . import app
+
+from HTMLParser import HTMLParser
 
 
 class Update(Base):
@@ -161,14 +165,14 @@ class User(Base, UserMixin):
         '''
         .. function:: get_endorsed_proposal_ids(question[, generation=None])
 
-        Fetch a LIST of the IDs of the proposals endorsed by the
+        Fetch a set of the IDs of the proposals endorsed by the
         user for this generation of this question.
 
         :param question: associated question
         :type question: Question
         :param generation: question generation
         :type generation: integer or None
-        :rtype: list of proposals
+        :rtype: set
         '''
         generation = generation or question.generation
 
@@ -495,7 +499,7 @@ class Question(Base):
 
         Returns a Generation object for the question.
 
-        :rtype: Generation object
+        :rtype: Generation
         '''
         return Generation(self, generation)
 
@@ -619,19 +623,20 @@ class Question(Base):
         '''
         .. function:: get_proposals()
 
-        Returns a list of proposals for the current generation of
+        Returns a set of proposals for the current generation of
         the question.
 
         :param generation: question generation.
         :type generation: integer
-        :rtype: list
+        :rtype: set
         '''
         generation = generation or self.generation
 
-        return db_session.query(Proposal).join(QuestionHistory).\
+        proposals = db_session.query(Proposal).join(QuestionHistory).\
             filter(QuestionHistory.question_id == self.id).\
             filter(QuestionHistory.generation == generation).\
             all()
+        return set(proposals)
 
     def get_proposal_ids(self, generation=None):
         '''
@@ -838,7 +843,9 @@ class Question(Base):
                                save=False):
         '''
         .. function:: calculate_pareto_front([proposals=None,
-                                             exclude_user=None, save=False])
+                                             exclude_user=None,
+                                             generation=None,
+                                             save=False])
 
         Calculates the pareto front of the question, and optionally
         saves the dominations in the database.
@@ -918,9 +925,31 @@ class Question(Base):
 
             return pareto
 
+    def calculate_pareto_front_ids(self, generation=None):
+        '''
+        .. function:: calculate_pareto_front_ids([generation=None])
+
+        Returns the IDs of the stored pareto front.
+        If no pareto has been saved the pareto is calculated then saved,
+        then the set of IDs of the newly calculated pareto is returned.
+
+        :param generation: question generation.
+        :type generation: integer
+        :rtype: set or boolean.
+        '''
+        generation = generation or self.generation
+        pareto = self.calculate_pareto_front(generation=generation)
+        # pareto = self.get_pareto_front(calculate_if_missing=True,
+        #                                generation=generation)
+        pareto_ids = set()
+        for proposal in pareto:
+            pareto_ids.add(proposal.id)
+        return pareto_ids
+
     def get_pareto_front(self, calculate_if_missing=False, generation=None):
         '''
-        .. function:: get_pareto_front([calculate_if_missing=False])
+        .. function:: get_pareto_front([calculate_if_missing=False,
+                                        generation=None])
 
         Returns the stored pareto front.
         If no pareto has been saved the pareto is calculated then saved,
@@ -929,6 +958,8 @@ class Question(Base):
         :param calculate_if_missing: calculate and save the
             domination if missing
         :type calculate_if_missing: boolean
+        :param generation: question generation.
+        :type generation: integer
         :rtype: set or boolean.
         '''
         generation = generation or self.generation
@@ -957,7 +988,9 @@ class Question(Base):
         Returns a set of endorsers for the current generation of
         the question.
 
-        :rtype: set of User objects
+        :param generation: question generation.
+        :type generation: integer
+        :rtype: set
         '''
         generation = generation or self.generation
 
@@ -969,12 +1002,14 @@ class Question(Base):
 
     def calculate_endorser_effects(self, generation=None):
         '''
-        .. function:: calculate_endorser_effects()
+        .. function:: calculate_endorser_effects([generation=None])
 
         Calculates the effects each endorser has on the pareto.
         What would be the effects if he didn't vote?
         What proposals has he forced into the pareto?
 
+        :param generation: question generation.
+        :type generation: integer
         :rtype: dict
         '''
         generation = generation or self.generation
@@ -1000,12 +1035,14 @@ class Question(Base):
 
     def calculate_key_players(self, generation=None):
         '''
-        .. function:: calculate_key_players()
+        .. function:: calculate_key_players([generation=None])
 
         Calculates the effects each endorser has on the pareto.
         What would be the effects if he didn't vote?
         What proposals has he forced into the pareto?
 
+        :param generation: question generation.
+        :type generation: integer
         :rtype: dict
         '''
         generation = generation or self.generation
@@ -1023,8 +1060,8 @@ class Question(Base):
         for user in current_endorsers:
             app.logger.debug("+++++++++++ Checking User +++++++++++ %s\n",
                              user.id)
-            users_endorsed_proposal_ids = set(
-                user.get_endorsed_proposal_ids(self, generation))
+            users_endorsed_proposal_ids =\
+                user.get_endorsed_proposal_ids(self, generation)
             app.logger.debug(">>>>>>>>>> Users endorsed proposal IDs %s\n",
                              users_endorsed_proposal_ids)
             app.logger.debug("Calc PF excluding %s\n", user.id)
@@ -1060,7 +1097,7 @@ class Question(Base):
     def who_dominates_this_excluding(proposal, pareto, user, generation=None):
         '''
         .. function:: who_dominates_this_excluding(proposal, pareto,
-                                                   user, generation)
+                                                   user[, generation])
 
         Calculates the set of proposals within the pareto which could dominate
         the proposal if the endorsements of the user were excluded from the
@@ -1070,10 +1107,10 @@ class Question(Base):
         :type proposal: Proposal object
         :param pareto: the pareto front
         :type pareto: set
-        :param user: the user to exclude
-        :type user: User object
+        :param user: the user to exclude from the calculation
+        :type user: User
         :param generation: the generation
-        :type generation: integer
+        :type generation: integer or None
         :rtype: set of Proposals
         '''
 
@@ -1106,6 +1143,9 @@ class Question(Base):
         .. function:: save_key_players(key_players)
 
         Saves the key player data to the database.
+
+        :param key_players: the key players
+        :type key_players: dict
         '''
         for user_id in key_players.keys():
             vote_for_these = list(key_players[user_id])
@@ -1120,13 +1160,1092 @@ class Question(Base):
                               self.generation))
         return self
 
-    def calculate_pareto_front_ids(self, generation=None):
+    def invert_dict(d):
+        inv = dict()
+        for k, v in d.iteritems():
+            keys = inv.setdefault(v, set())
+            keys.append(k)
+        return inv
+
+    def make_graphviz_map(self,
+                          proposals=None,
+                          generation=None,
+                          internal_links=False,
+                          proposal_level_type="layers",
+                          user_level_type="layers",
+                          address_image='',
+                          highlight_user1=None,
+                          highlight_proposal1=None):
+        '''
+        .. function:: make_graphviz_map([proposals=None,
+                                        generation=None,
+                                        internal_links=False,
+                                        proposal_level_type="layers",
+                                        user_level_type="layers",
+                                        address_image='',
+                                        highlight_user1=None,
+                                        highlight_proposal1=None])
+
+        Generates the string to create a voting graph from Graphviz.
+
+        :param proposals: set of proposals
+        :type generation: set or None
+        :param generation: the generation
+        :type generation: integer or None
+        :param internal_links:
+        :type internal_links: boolean or None
+        :param proposal_level_type: required layout of user nodes
+        :type proposal_level_type: string
+        :param user_level_type: required layout of user nodes
+        :type user_level_type: string
+        :param address_image: url of the map
+        :type address_image: string
+        :param highlight_user1: Proposal to highlight
+        :type highlight_user1: string
+        :param highlight_proposal1: User to highlight
+        :type highlight_proposal1: string
+        :rtype: string
+        '''
         generation = generation or self.generation
-        pareto = self.calculate_pareto_front(generation=generation)
-        pareto_ids = set()
+
+        # get set of all proposals
+        proposals = proposals or self.get_proposals(generation)
+        app.logger.debug("all proposals %s\n",
+                         proposals)
+
+        # get pareto
+        pareto = self.calculate_pareto_front(proposals=proposals,
+                                             generation=generation)
+        app.logger.debug("pareto %s\n",
+                         pareto)
+
+        # get set of all endorsers
+        # endorsers = self.get_endorsers(generation)
+        endorsers = set()
+        for proposal in proposals:
+            endorsers.update(proposal.endorsers(generation))
+        app.logger.debug("endorsers %s\n",
+                         endorsers)
+
+        # get dict of all proposals => endorsers
+        proposal_endorsers = dict()
+        for proposal in proposals:
+            proposal_endorsers[proposal] =\
+                proposal.endorsers(generation)
+        app.logger.debug("proposal_endorsers %s\n",
+                         proposal_endorsers)
+
+        # get dict of all endorsers => proposals
+        endorser_proposals = dict()
+        for endorser in endorsers:
+            endorser_proposals[endorser] =\
+                endorser.get_endorsed_proposal_ids(self, generation)
+        app.logger.debug("endorser_proposals %s\n",
+                         endorser_proposals)
+
+        # get dict of pareto proposals => endorsers
+        pareto_endorsers = dict()
         for proposal in pareto:
-            pareto_ids.add(proposal.id)
-        return pareto_ids
+            pareto_endorsers[proposal.id] = proposal.endorsers(generation)
+        app.logger.debug("pareto proposals => endorsers %s\n",
+                         pareto_endorsers)
+
+        proposal_relations = self.calculate_proposal_relations(generation)
+        app.logger.debug("proposal_relations %s\n",
+                         proposal_relations)
+
+        proposals_below = dict()
+        proposals_above = dict()
+        for (proposal, relation) in proposal_relations.iteritems():
+            proposals_below[proposal] = relation['dominating']
+            proposals_above[proposal] = relation['dominated']
+        app.logger.debug("proposals_below %s\n",
+                         proposals_below)
+        app.logger.debug("proposals_above %s\n",
+                         proposals_above)
+
+        proposals_covered = self.get_covered(proposals_below, proposals)
+        app.logger.debug("proposals_covered %s\n",
+                         proposals_covered)
+
+        # Endorser relations
+        endorser_relations = self.calculate_endorser_relations(generation)
+        app.logger.debug("endorser_relations %s\n",
+                         endorser_relations)
+
+        endorsers_below = dict()
+        endorsers_above = dict()
+        for (endorser, relation) in endorser_relations.iteritems():
+            endorsers_below[endorser] = relation['dominating']
+            endorsers_above[endorser] = relation['dominated']
+        app.logger.debug("endorsers_below %s\n",
+                         endorsers_below)
+        app.logger.debug("endorsers_above %s\n",
+                         endorsers_above)
+
+        endorsers_covered = self.get_covered(endorsers_below, endorsers)
+        app.logger.debug("endorsers_covered %s\n",
+                         endorsers_covered)
+
+        endorsers_covering = self.get_covered(endorsers_above, endorsers)
+        app.logger.debug("endorsers_covering %s\n",
+                         endorsers_covering)
+
+        if (proposal_level_type == "num_votes"):
+            proposal_levels = self.find_levels_based_on_size(
+                proposal_endorsers)
+        # elif (proposal_level_type == "layers"):
+        else:
+            proposal_levels = self.find_levels(proposals_covered, proposals)
+
+        app.logger.debug("proposal_levels %s\n",
+                         proposal_levels)
+
+        if (user_level_type == "num_votes"):
+            user_levels = self.find_levels_based_on_size(endorser_proposals)
+                # reverse()
+        elif (user_level_type == "layers"):
+            user_levels = self.find_levels(endorsers_covering, endorsers)
+        # elif (user_level_type == "flat"):
+        else:
+            user_levels = list()
+            user_levels[0] = endorsers
+
+        app.logger.debug("user_levels %s\n",
+                         user_levels)
+
+        combined_proposals = self.combine_proposals(
+            proposal_endorsers, proposals)
+
+        app.logger.debug("proposal_endorsers A %s\n",
+                         proposal_endorsers)
+
+        bundled_proposals = set()
+        for (proposal, relations) in combined_proposals.iteritems():
+            bundled_proposals.update(relations)
+            relations.add(proposal)
+
+        app.logger.debug("combined_proposals %s\n",
+                         combined_proposals)
+        app.logger.debug("bundled_proposals %s\n",
+                         bundled_proposals)
+
+        combined_users = self.combine_users(
+            proposal_endorsers, endorsers, generation)
+
+        bundled_users = set()
+        for (endorser, relations) in combined_users.iteritems():
+            bundled_users.update(relations)
+            relations.append(endorser)
+
+        app.logger.debug("combined_users %s\n",
+                         combined_users)
+        app.logger.debug("bundled_users %s\n",
+                         bundled_users)
+
+        proposal_levels_keys = proposal_levels.keys()
+        user_levels_keys = user_levels.keys()
+
+        if (proposal_level_type == "num_votes"):
+            full_size_note = max(proposal_levels_keys)
+        else:
+            # default to "layers"
+            full_size_note = 0
+
+        all_graphs_note = max(user_levels_keys)
+
+        # Begin creation of Graphviz string
+        title = self.string_safe(self.title)
+        buffer = 'digraph "%s" {\n' % (title)
+
+        for l in proposal_levels_keys:
+            if (l == full_size_note):
+                buffer += ' "pl' + str(full_size_note) +\
+                    '" [label="Full\\nSize" shape=circle style=filled ' +\
+                    'color=Black peripheries=1 fillcolor=palegoldenrod ' +\
+                    'tooltip="Look at this image in full size"' +\
+                    ' fontsize=10 URL="' + address_image +\
+                    '" target="_top" width=.75 height=.75 ]; \n'
+            else:
+                buffer += ' "pl' + str(l) +\
+                    '" [shape=point fontcolor=white ' +\
+                    'color=white fontsize=1]; \n'
+
+        for l in user_levels_keys:
+            if (l == all_graphs_note):
+                all_graph_url = 'http://view_gen.html'
+                buffer += ' "ul' + str(all_graphs_note) +\
+                          '" [label="All\\nGraphs" ' +\
+                          'shape=circle style=filled color=Black ' +\
+                          'peripheries=1  ' +\
+                          'fillcolor=palegoldenrod ' +\
+                          'tooltip="Look at all the ' +\
+                          'alternative views of this information" ' +\
+                          'fontsize=9 URL="' +\
+                          all_graph_url + '" target="_top" width=.75 ' +\
+                          'height=.75 ]; \n'
+            else:
+                buffer += ' "ul' + str(l) + '" [shape=point ' +\
+                    'fontcolor=white ' +\
+                    'color=white fontsize=1]; \n'
+
+        for l in proposal_levels_keys:
+            if (l != proposal_levels_keys[0]):
+                buffer += ' -> '
+            buffer += '"pl' + str(l) + '" '
+
+        for l in user_levels_keys:
+            buffer += ' -> '
+            buffer += '"ul' + str(l) + '" '
+
+        buffer += " [color=white] \n "
+
+        for l in proposal_levels_keys:
+            buffer += '{rank=same; "pl' + str(l) + '" '
+            for p in proposal_levels[l]:
+                if (p in bundled_proposals):
+                    continue
+                buffer += " " + str(p.id) + " "
+            buffer += "}\n"
+
+        for l in user_levels_keys:
+            buffer += '{rank=same; "ul' + str(l) + '" '
+            for u in user_levels[l]:
+                if (u in bundled_users):
+                    continue
+                buffer += '"' + u.username + '" '
+            buffer += "}\n"
+
+        for kc2u in combined_users:
+            details_table = '  '
+            color = "black"
+            fillcolor = "lightpink3"
+            peripheries = 0
+
+            if (highlight_proposal1 and
+                    kc2u in proposal_endorsers[highlight_proposal1]):
+                color = "red"
+                peripheries = 1
+
+            # Bundles which have highlighted user inside do not
+            # have a line around
+            if (highlight_user1 == kc2u):
+                color = "black"
+                peripheries = 0
+
+            details_table = ' BGCOLOR="lightpink3" '
+            details = ' fillcolor=white style=filled color=' +\
+                color + ' peripheries=' + str(peripheries) + ' '
+
+            buffer += self.write_bundled_users(
+                kc2u.username,
+                combined_users[kc2u],
+                self.room, details,
+                details_table)
+
+        for e in endorsers:
+            if (e in bundled_users or e in combined_users):
+                continue
+
+            color = "lightpink3"
+            fillcolor = "lightpink3"
+            peripheries = 0
+
+            if (highlight_proposal1 and
+                    e in proposal_endorsers[highlight_proposal1]):
+                color = "red"
+                peripheries = 1
+
+            if (highlight_user1 == e):
+                color = "red"
+                peripheries = 1
+
+            # Add id to user node
+            buffer += '"' + e.username + '" [id=u' + str(e.id) +\
+                ' shape=egg fillcolor=' +\
+                fillcolor +\
+                ' style=filled color=' + color + ' peripheries=' +\
+                str(peripheries) + ' style=filled  fontsize=11]'
+            buffer += "\n"
+
+        keys = combined_proposals.keys()
+        for kc2p in keys:
+
+            details_table = '  '
+
+            if (kc2p in pareto):
+                color = "black"
+                peripheries = 0
+                endo = proposal_endorsers[kc2p]
+
+                if (highlight_user1 and highlight_user1 in endo):
+                    color = "red"
+                    peripheries = 1
+
+                if (highlight_proposal1):
+                    if (kc2p in proposals_below[highlight_proposal1] or
+                            kc2p in proposals_above[highlight_proposal1]):
+                        color = "red"
+                        peripheries = 1
+
+                if (len(endo) == len(endorsers)):
+                    details_table = ' BGCOLOR="gold" '
+                else:
+                    details_table = ' BGCOLOR="lightblue" '
+
+                details = ' fillcolor=white style=filled color=' + color +\
+                    ' peripheries=' + str(peripheries) + ' '
+            else:
+                color = "black"
+                peripheries = 0
+
+                if (highlight_user1 and
+                        highlight_user1 in proposal_endorsers[kc2p]):
+                    color = "red"
+                    peripheries = 1
+
+                if (highlight_proposal1):
+                    if (kc2p in proposals_below[highlight_proposal1] or
+                            kc2p in proposals_above[highlight_proposal1]):
+                        color = "red"
+                        peripheries = 1
+
+                details = ' fillcolor=white color=' + color +\
+                    ' peripheries=' + str(peripheries) + ' '
+
+            buffer += self.write_bundled_proposals(
+                kc2p.id, combined_proposals[kc2p], self.room,
+                details,
+                details_table,
+                internal_links,
+                highlight_proposal1)
+
+        all_combined_proposals = set()
+        for s in combined_proposals.values():
+            all_combined_proposals.update(s)
+
+        for p in proposals:
+
+            app.logger.debug("Skip prop if in a bundle...")
+
+            app.logger.debug("continue if %s in %s or in %s\n",
+                             p,
+                             bundled_proposals,
+                             all_combined_proposals)
+
+            if (p in bundled_proposals):
+                app.logger.debug(
+                    "Prop %s is in bundled_proposals - skip...", p)
+                continue
+
+            if (p in all_combined_proposals):
+                app.logger.debug(
+                    "Prop %s is in all_combined_proposals - skip...", p)
+                continue
+
+            color = "black"
+            peripheries = 1
+
+            if (highlight_user1 and highlight_user1 in proposal_endorsers[p]):
+                color = "red"
+                peripheries = 2
+
+            if (highlight_proposal1):
+                if (highlight_proposal1 == p):
+                    color = "red"
+                    peripheries = 3
+
+                if (p in proposals_below[highlight_proposal1]
+                        or p in proposals_above[highlight_proposal1]):
+                    color = "red"
+                    peripheries = 2
+
+            if (p in pareto):
+                endo = p.endorsers()
+
+                if (len(endo) == len(endorsers)):
+                    fillcolor = '"gold"'
+                else:
+                    fillcolor = '"lightblue" '
+
+                if (not internal_links):
+                    urlquery = self.create_proposal_url(p, self.room)
+                    tooltip = self.create_proposal_tooltip(p)
+                    buffer += str(p.id) +\
+                        ' [id=p' + str(p.id) + ' label=' + str(p.id) +\
+                        ' shape=box fillcolor=' + fillcolor +\
+                        ' style=filled color=' + color + ' peripheries=' +\
+                        str(peripheries) + ' tooltip="' + tooltip +\
+                        '"  fontsize=11 URL="' + app.config['SITE_DOMAIN'] +\
+                        '/viewproposal.py/' + urlquery + '" target="_top"]'
+                else:
+                    urlquery = self.create_internal_proposal_url(p)
+                    buffer += str(p.id) +\
+                        ' [id=p' + str(p.id) + ' label=' + str(p.id) +\
+                        ' shape=box fillcolor=' + fillcolor +\
+                        ' style=filled color=' + color + ' peripheries=' +\
+                        str(peripheries) + ' tooltip="' +\
+                        self.create_proposal_tooltip(p) +\
+                        '"  fontsize=11 URL="' +\
+                        internal_links + urlquery + '" target="_top"]'
+                buffer += "\n"
+
+            else:
+                if (not internal_links):
+                    urlquery = self.create_proposal_url(p, self.room)
+                    internal_proposal_url =\
+                        self.create_internal_proposal_url(p)
+                    buffer += str(p.id) +\
+                        ' [id=p' + str(p.id) + ' label=' + str(p.id) +\
+                        ' shape=box color=' + color + ' peripheries=' +\
+                        str(peripheries) + ' tooltip="' +\
+                        internal_proposal_url +\
+                        '"  fontsize=11 URL="' + app.config['SITE_DOMAIN'] +\
+                        '/viewproposal.py/' + urlquery +\
+                        '" target="_top"]'
+                else:
+                    urlquery = self.create_internal_proposal_url(p)
+                    buffer += str(p.id) +\
+                        ' [id=p' + str(p.id) + ' label=' + str(p.id) +\
+                        ' shape=box color=' +\
+                        color + ' peripheries=' + str(peripheries) +\
+                        ' tooltip="' +\
+                        self.create_proposal_tooltip(p) +\
+                        '"  fontsize=11 URL="' +\
+                        internal_links + urlquery + '" target="_top"]'
+                buffer += "\n"
+
+        for p in proposals:
+            pcolor = "black"
+            if (p in bundled_proposals):
+                continue
+
+            if (highlight_proposal1 and
+                    (highlight_proposal1 == p or
+                     p in proposals_below[highlight_proposal1])):
+                pcolor = "red"
+
+            pcs = proposals_covered[p]
+            for pc in pcs:
+                color = pcolor
+                if (pc in bundled_proposals):
+                    continue
+
+                if (highlight_user1 in proposal_endorsers[pc]):
+                    color = "red"
+
+                # An empty array is trivially dominated by everything.
+                #
+                # But that is so trivial that it simplifies the graph
+                # if we just do not show those lines.
+                if (len(proposal_endorsers[pc]) == 0):
+                    color = "white"
+
+                if (highlight_proposal1 and
+                        (highlight_proposal1 == pc or
+                         pc in proposals_above[highlight_proposal1])):
+                    color = "red"
+
+                '''
+                left_prop_id = ''
+                if (pc in combined_proposals):
+                    for prop in combined_proposals[pc]:
+                        if (left_prop_id):
+                            left_prop_id += '_'
+                        left_prop_id += 'p' + str(prop.id)
+                else:
+                    left_prop_id += 'p' + str(pc.id)
+
+                right_prop_id = ''
+                if (p in combined_proposals):
+                    for prop in combined_proposals[p]:
+                        if (right_prop_id):
+                            right_prop_id += '_'
+                        right_prop_id += 'p' + str(prop.id)
+                else:
+                    right_prop_id += 'p' + str(p.id)
+                '''
+
+                left_prop_id = self.calculate_propsal_node_id(
+                    pc,
+                    combined_proposals)
+                right_prop_id = self.calculate_propsal_node_id(
+                    p,
+                    combined_proposals)
+                edge_id = 'id="' + left_prop_id + '__' + right_prop_id + '"'
+
+                buffer += ' ' + str(pc.id) + ' -> ' + str(p.id) +\
+                    ' [' + edge_id + ' class="edge" color="' + color + '"]'
+                buffer += " \n"
+
+        for e in endorsers:
+            ecolor = "blue"
+            if (e in bundled_users):
+                continue
+
+            ecs = endorsers_covered[e]
+
+            if (highlight_user1 and
+                    (highlight_user1 == e or
+                     highlight_user1 in endorsers_above[e])):
+                ecolor = "red"
+
+            for ec in ecs:
+                color = ecolor
+                if (ec in bundled_users):
+                    continue
+
+                if (highlight_proposal1 in endorser_proposals[ec]):
+                    color = "red"
+
+                edge_id = 'id="u' + str(e.id) + '__' + 'u' + str(ec.id) + '"'
+                buffer += '"' + e.username + '" -> "' + ec.username + '"' +\
+                    ' [' + edge_id + ' class="edge" color="' + color + '"]'
+                buffer += " \n"
+
+        new_proposals = dict()
+        for e in endorsers:
+            new_proposals[e] = self.new_proposals_to_an_endorser(
+                endorser_proposals,
+                e,
+                endorsers_covered)
+
+        for p in proposals:
+
+            if (p in bundled_proposals):
+                continue
+
+            endorsers_to_this = self.new_endorsers_to_a_proposal(
+                proposal_endorsers,
+                p,
+                proposals_covered)
+
+            app.logger.debug("Proposal p ==> %s\n", p)
+
+            app.logger.debug("endorsers_to_this ==> %s\n", endorsers_to_this)
+
+            app.logger.debug("new_proposals ==> %s\n", new_proposals)
+
+            for e in endorsers_to_this:
+
+                app.logger.debug("Endorser e ==> %s\n", e)
+
+                if (e in bundled_users):
+                    app.logger.debug("e in bundled_users: continue...\n")
+                    continue
+
+                if (p.id not in new_proposals[e]):
+                    app.logger.debug("%s not in %s: continue...\n",
+                                     p, new_proposals[e])
+                    continue
+
+                color = "blue"
+
+                if (highlight_user1 and
+                        (highlight_user1 == e or
+                         highlight_user1 in endorsers_above[e])):
+                    color = "red"
+
+                keys = combined_users.keys()
+                if (e in keys):
+                    if (highlight_user1 in combined_users[e]):
+                        color = "red"
+
+                if (highlight_proposal1 and
+                        (highlight_proposal1 == p or
+                         p in proposals_below[highlight_proposal1])):
+                    color = "red"
+
+                propnode_id = self.calculate_propsal_node_id(
+                    p,
+                    combined_proposals)
+                edge_id = 'id="u' + str(e.id) + '__' + propnode_id + '"'
+                buffer += ' "' + e.username + '" -> ' + str(p.id) +\
+                    ' [' + edge_id + ' class="edge" color="' + color + '"]'
+                buffer += " \n"
+
+        buffer += "\n}"
+        return buffer
+
+    def calculate_propsal_node_id(self, proposal, combined_proposals):
+        '''
+        .. function:: calculate_propsal_node_id(proposal, combined_proposals)
+
+        Calculates the node ID for a proposal or proposal group node.
+
+        :param proposal: the proposal or index of a proposal group
+        :type proposal: Proposal
+        :param combined_proposals: proposals grouped into single nodes
+        :type combined_proposals: dict
+        :rtype: string
+        '''
+        prop_id = ''
+        if (proposal in combined_proposals):
+            for prop in combined_proposals[proposal]:
+                if (prop_id):
+                    prop_id += '_'
+                prop_id += 'p' + str(prop.id)
+        else:
+            prop_id += 'p' + str(proposal.id)
+
+        return prop_id
+
+    def calculate_user_node_id(self, user, combined_users):
+        '''
+        .. function:: calculate_user_node_id(user, combined_users)
+
+        Calculates the node ID for a user or user group node.
+
+        :param user: the user or index of a user group
+        :type user: User
+        :param combined_users: users grouped into single nodes
+        :type combined_users: dict
+        :rtype: string
+        '''
+        user_id = ''
+        if (user in combined_users):
+            for usr in combined_users[user]:
+                if (user_id):
+                    user_id += '_'
+                user_id += 'u' + str(usr.id)
+        else:
+            user_id += 'u' + str(user.id)
+
+        return user_id
+
+    def new_proposals_to_an_endorser(self,
+                                     endorser_proposals,
+                                     endorser,
+                                     endorsers_covered):
+        below = endorsers_covered[endorser]
+        voters_known = set()
+
+        for b in below:
+            voters_known.update(endorser_proposals[b])
+
+        new_proposals = endorser_proposals[endorser] - voters_known
+
+        app.logger.debug("new_proposals_to_an_endorser....\n")
+        app.logger.debug("endorser INSIDE ==> %s\n", endorser)
+        app.logger.debug("endorser_proposals INSIDE ==> %s\n",
+                         endorser_proposals)
+        app.logger.debug("endorsers_covered INSIDE ==> %s\n",
+                         endorsers_covered)
+        app.logger.debug("new_proposals INSIDE ==> %s\n", new_proposals)
+
+        return new_proposals
+
+    def new_endorsers_to_a_proposal(self,
+                                    proposal_endorsers,
+                                    proposal,
+                                    proposals_covered):
+
+        '''
+        app.logger.debug("new_endorsers_to_a_proposal....\n")
+        app.logger.debug("proposal INSIDE ==> %s\n", proposal)
+        app.logger.debug("proposal_endorsers INSIDE ==> %s\n",
+                         proposal_endorsers)
+        app.logger.debug("proposals_covered INSIDE ==> %s\n",
+                         proposals_covered)
+        '''
+
+        below = proposals_covered[proposal]
+        # app.logger.debug("below INSIDE ==> %s\n", below)
+
+        voters_known = set()
+        for b in below:
+            '''
+            app.logger.debug("proposal_endorsers[b] INSIDE ==> %s\n",
+                proposal_endorsers[b])
+            '''
+            voters_known.update(proposal_endorsers[b])
+
+        # app.logger.debug("voters_known INSIDE ==> %s\n", voters_known)
+
+        new_endorsers = proposal_endorsers[proposal] - voters_known
+
+        # app.logger.debug("new_endorsers INSIDE ==> %s\n", new_endorsers)
+
+        return new_endorsers
+
+    def write_bundled_proposals(self, bundle_name, bundle_content,
+                                room, details, details_table,
+                                internal_links, highlight_proposal1=None):
+
+        app.logger.debug("write_bundled_proposals.....\n")
+        app.logger.debug("bundle_name => %s\n", bundle_name)
+        app.logger.debug("bundle_content => %s\n", bundle_content)
+        app.logger.debug("details_table => %s\n", details_table)
+        app.logger.debug("details => %s\n", details)
+
+        bundle_size = len(bundle_content)
+
+        node_id = ''
+        for p in bundle_content:
+            if (node_id):
+                node_id += '_'
+            node_id += 'p' + str(p.id)
+
+        bundle = str(bundle_name) + ' [id=' + node_id + ' shape=plaintext ' +\
+            details +\
+            ' fontsize=11 label=<<TABLE BORDER="0" ' +\
+            details_table + ' CELLBORDER="1" CELLSPACING="0" ' +\
+            'CELLPADDING="4"><TR><TD COLSPAN="' +\
+            str(bundle_size) + '"></TD></TR><TR>'
+
+        for p in bundle_content:
+            urlquery = self.create_proposal_url(p, room)
+            # This is weird, in all the rest of the map an & is an &
+            # but here he wants them as a &amp
+            urlquery.replace('&', '&amp')
+
+            tooltip = self.create_proposal_tooltip(p)
+            # This is weird, in all the rest of the map an & is an &
+            # but here he wants them as a &amp
+            tooltip.replace('&', '&amp')
+            to_add = ''
+            if (highlight_proposal1 == p):
+                to_add = ' BGCOLOR="red" '
+
+            if (not internal_links):
+                bundle += '<TD ' + to_add + ' HREF="HTTP://' +\
+                    app.config['SITE_DOMAIN'] +\
+                    '/viewproposal.py/' +\
+                    urlquery + '" tooltip="' + tooltip + '" target="_top">' +\
+                    str(p.id) + '</TD>'
+            else:
+                urlquery = self.create_internal_proposal_url(p)
+                # This is weird, in all the rest of the map an & is an &
+                # but here he wants them as a &amp
+                internal_links.replace('&', '&amp')
+                bundle += '<TD ' + to_add + ' HREF="HTTP://' +\
+                    internal_links + urlquery +\
+                    '" tooltip="' + tooltip + '" target="_top">' +\
+                    str(p.id) + '</TD>'
+
+        bundle += '</TR><TR><TD COLSPAN="' + str(bundle_size) +\
+            '"></TD></TR></TABLE>>]'
+        bundle += "\n"
+        return bundle
+
+    def write_bundled_users(self, bundle_name, bundle_content, room,
+                            details, details_table, highlight_user1=None):
+
+        node_id = ''
+        for user in bundle_content:
+            if (node_id):
+                node_id += '_'
+            node_id += 'p' + str(user.id)
+
+        # ' [shape=plaintext ' +\
+        bundle = '"' + bundle_name + '" ' +\
+            ' [id=' + node_id + ' shape=plaintext ' +\
+            details + ' fontsize=11 label=<<TABLE BORDER="0" ' +\
+            details_table +\
+            ' CELLBORDER="0" CELLSPACING="0" CELLPADDING="4">'
+
+        if (highlight_user1 and highlight_user1 in bundle_content):
+            u = highlight_user1
+            urlquery = str(u.id)
+            tooltip = u.username
+            # In all the rest of the map an & is an &
+            # but here he wants them as a &amp
+            # tooltip = str_replace ( "&" , "&amp" , tooltip )
+            to_add = ''
+            # We write the highlighted user before and on a different color
+            to_add = ' BGCOLOR="red" '
+            bundle += '<TR><TD ' + to_add + ' HREF="' +\
+                app.config['SITE_DOMAIN'] +\
+                '/user+php?u=' +\
+                urlquery + '" tooltip="' + tooltip + '" target="_top">' +\
+                u.username + '</TD></TR>'
+
+        for u in bundle_content:
+            # This has already been written
+            if (highlight_user1 and highlight_user1 == u):
+                continue
+
+            urlquery = ' HREF="' + str(u.id)
+            tooltip = u.username
+            bundle += '<TR><TD ' + ' HREF="' + app.config['SITE_DOMAIN'] +\
+                '/user/u=' + urlquery +\
+                '" tooltip="' + tooltip + '" target="_top">' +\
+                u.username + '</TD></TR>'
+
+        bundle += '</TABLE>>]'
+        bundle += "\n"
+        return bundle
+
+    def strip_tags(self, html):
+        s = MLStripper()
+        s.feed(html)
+        return s.get_data()
+
+    def string_safe(self, s):
+        import string
+        s = self.strip_tags(s)
+        s = string.replace(s, '"', "'")
+        s = string.replace(s, '\n', " ")
+        s = string.replace(s, '&nbsp;', " ")
+        s = string.replace(s, '\r', " ")
+        s = string.replace(s, '\r\n', " ")
+        return s
+
+    def create_proposal_tooltip(self, proposal):
+        if (len(proposal.abstract) > 0):
+            tooltip = self.string_safe(proposal.abstract)
+        else:
+            tooltip = self.string_safe(proposal.blurb)
+        return tooltip[:800]
+
+    def create_internal_proposal_url(self, proposal):
+        return "#proposal" + str(proposal.id)
+
+    def create_proposal_url(self, proposal, room):
+        return str(proposal.id) + '/' + room
+
+    def get_covered(self, elements_below, elements):
+        '''
+        .. function:: get_covered(elements_below, elements)
+
+        Returns all elements with a list of
+        elements below them on the graph.
+
+        :param elements_below: what elements lie below each element.
+        :type elements_below: dict
+        :param elements: set of all elements on the graph.
+        :type elements: set
+        :rtype: dict
+        '''
+        covered = dict()
+        for element in elements:
+            covered_elements = set()
+            below = elements_below[element]
+            for element1 in below:
+                for element2 in below:
+                    next_element = False
+                    under_element2 = elements_below[element2]
+                    if (element1 in under_element2):
+                        next_element = True
+                        break
+                if (next_element):
+                    continue
+                covered_elements.add(element1)
+            covered[element] = covered_elements
+        return covered
+
+    def find_levels(self, elements_covered, elements):
+        '''
+        .. function:: find_levels(elements_covered, elements)
+
+        Sorts the elements into lavels based on which elements cover
+        other elements.
+
+        :param elements_covered: what elements lie below each element.
+        :type elements_covered: dict
+        :param elements: set of all elements on the graph.
+        :type elements: set
+        :rtype: dict
+        '''
+        # app.logger.debug("find_levels called...\n")
+
+        elements_to_test = copy.copy(elements)
+        # app.logger.debug("elements_to_test = %s\n", elements_to_test)
+        levels = dict()
+        level = 0
+        elements_added = set()
+        while (len(elements_added) < len(elements)):
+            levels[level] = set()
+            for element1 in elements_to_test:
+                next_element = False
+                for element2 in elements_to_test:
+                    if (element1 in elements_covered[element2]):
+                        next_element = True
+                        break
+                if (next_element):
+                    continue
+                levels[level].add(element1)
+                elements_added.add(element1)
+            elements_to_test = elements - elements_added
+            # app.logger.debug("elements_to_test = %s\n", elements_to_test)
+            level += 1
+        return levels
+
+    def find_levels_based_on_size(self, A_to_B):
+        '''
+        .. function:: find_levels_based_on_size(A_to_B)
+
+        Returns a list of IDs of element type A sorted into levels based
+        on the number of elements of type B they are related to.
+
+        Used to sort proposal and user nodes into levels.
+
+        :param A_to_B: Elements of type B related to each element of type A.
+        :type A_to_B: dict
+        :rtype: dict
+        '''
+        app.logger.debug("find_levels_based_on_size called with %s\n",
+                         A_to_B)
+        level_from_length = dict()
+        for (element_A, related) in A_to_B.iteritems():
+            level = len(related)
+            if (level not in level_from_length):
+                level_from_length[level] = set()
+            level_from_length[level].add(element_A)
+
+        levels = dict()
+        keys = sorted(level_from_length.keys())
+        for key in keys:
+            levels[key] = level_from_length[key]
+        return levels
+
+    def combine_proposals(self, proposal_endorsers, proposals=None):
+        '''
+        .. function:: combine_proposals(proposal_endorsers[, proposals=None])
+
+        Returns a dictionary of all elements with a list of
+        elements above them on the graph.
+
+        :param proposal_endorsers: what elements lie below each element.
+        :type proposal_endorsers: dict
+        :param proposals: set of all elements
+        :type proposals: set
+        :rtype: dict
+        '''
+
+        app.logger.debug("combine_proposals called....\n")
+        app.logger.debug("proposal_endorsers %s\n",
+                         proposal_endorsers)
+        app.logger.debug("proposals %s\n",
+                         proposals)
+
+        if (proposals == 0):
+            proposals = proposal_endorsers.keys()
+        else:
+            proposals = list(proposals)
+
+        proposals = sorted(proposals, key=lambda prop: prop.id)
+        app.logger.debug("proposals as sorted list %s\n",
+                         proposals)
+
+        combined_to_proposals = dict()
+        proposals_to_combined = dict()
+
+        for proposal in proposals:
+            proposals_to_combined[proposal] = proposal
+
+        app.logger.debug("proposals_to_combined %s\n",
+                         proposals_to_combined)
+
+        for proposal1 in proposals:
+            if (proposals_to_combined[proposal1] != proposal1):
+                continue
+
+            for proposal2 in proposals:
+                if (proposal1.id >= proposal2.id or
+                        proposals_to_combined[proposal2] != proposal2):
+                    continue
+
+                endorsers1 = proposal_endorsers[proposal1]
+                endorsers2 = proposal_endorsers[proposal2]
+
+                app.logger.debug("Comparing Endorsers\n")
+                app.logger.debug("endorsers1 %s\n",
+                                 endorsers1)
+                app.logger.debug("endorsers2 %s\n",
+                                 endorsers2)
+
+                compare_endorsers = (
+                    endorsers1 | endorsers2) - (endorsers1 & endorsers2)
+                app.logger.debug("compare_endorsers %s\n",
+                                 compare_endorsers)
+
+                app.logger.debug("proposals_to_combined %s\n",
+                                 proposals_to_combined)
+
+                '''
+                if (endorsers1 == endorsers2):
+                    proposals_to_combined[proposal2] =\
+                        proposals_to_combined[proposal1]
+                    combined_to_proposals[proposals_to_combined[proposal1]] =\
+                        list()
+                '''
+                if (len((endorsers1 | endorsers2) -
+                        (endorsers1 & endorsers2)) == 0):
+                    proposals_to_combined[proposal2] =\
+                        proposals_to_combined[proposal1]
+                    combined_to_proposals[proposals_to_combined[proposal1]] =\
+                        set()
+
+        for proposal1 in proposals:
+            if (proposals_to_combined[proposal1] != proposal1):
+                combined_to_proposals[proposals_to_combined[proposal1]].\
+                    add(proposal1)
+
+        return combined_to_proposals
+
+    def combine_users(self, proposal_endorsers, endorsers, generation):
+        '''
+        .. function:: combine_users(elements_covered, elements)
+
+        Returns a dictionary of all elements with a list of
+        elements above them on the graph.
+
+        :param elements_covered: what elements lie below each element.
+        :type elements_covered: dict
+        :param elements: set of all elements on the graph.
+        :type elements: set
+        :rtype: dict
+        '''
+        app.logger.debug("combine_users called...\n")
+
+        endorsers = list(endorsers)
+        endorsers = sorted(endorsers, key=lambda end: end.id)
+        app.logger.debug("endorsers as sorted list %s\n",
+                         endorsers)
+
+        combined_to_endorsers = dict()
+        endorsers_to_combined = dict()
+
+        for endorser in endorsers:
+            endorsers_to_combined[endorser] = endorser
+
+        for endorser1 in endorsers:
+            if (endorsers_to_combined[endorser1] != endorser1):
+                continue
+
+            for endorser2 in endorsers:
+                if (endorser1.id >= endorser2.id or
+                        endorsers_to_combined[endorser2] != endorser2):
+                    continue
+
+                app.logger.debug("Comparing Endorsments for users %s and %s\n",
+                                 endorser1.username, endorser2.username)
+                app.logger.debug(
+                    "endorser1 endorsed %s\n",
+                    endorser1.get_endorsed_proposal_ids(self, generation))
+                app.logger.debug(
+                    "endorser2 endorsed %s\n",
+                    endorser2.get_endorsed_proposal_ids(self, generation))
+
+                if (endorser1.get_endorsed_proposal_ids(self, generation) ==
+                        endorser2.get_endorsed_proposal_ids(self, generation)):
+                    '''
+                    If U is already part of a bundle it will point to its
+                    lowest member, if not we point endorser2 to endorser1
+                    (which is lower)
+                    '''
+                    endorsers_to_combined[endorser2] =\
+                        endorsers_to_combined[endorser1]
+                    combined_to_endorsers[endorsers_to_combined[endorser1]] =\
+                        list()
+
+        for endorser1 in endorsers:
+            if(endorsers_to_combined[endorser1] != endorser1):
+                combined_to_endorsers[endorsers_to_combined[endorser1]].\
+                    append(endorser1)
+
+        return combined_to_endorsers
 
     def __repr__(self):
         return "<Question('%s',auth: '%s', '%s')>" % (self.title,
@@ -1334,8 +2453,8 @@ class Generation():
             app.logger.debug("+++++++++++ Checking User +++++++++++ %s\n",
                              user.id)
 
-            users_endorsed_proposal_ids = set(
-                user.get_endorsed_proposal_ids(self.question, self.generation))
+            users_endorsed_proposal_ids =\
+                user.get_endorsed_proposal_ids(self.question, self.generation)
 
             app.logger.debug(">>>>>>>>>> Users endorsed proposal IDs %s\n",
                              users_endorsed_proposal_ids)
@@ -1507,7 +2626,8 @@ class Proposal(Base):
     endorsements = relationship('Endorsement', backref="proposal",
                                 lazy='dynamic', cascade="all, delete-orphan")
 
-    history = relationship('QuestionHistory', backref="proposal",
+    history = relationship('QuestionHistory',
+                           backref=backref("proposal", lazy="joined"),
                            lazy='joined', cascade="all, delete-orphan")
 
     def __init__(self, author, question, title, blurb, abstract=None):
@@ -1529,8 +2649,8 @@ class Proposal(Base):
         .. function:: update(user, title, blurb)
 
         Update the title and content of this proposal. Only available to the
-        author during the question WRITING PHASE of the generation the proposal
-        was first propsosed (created).
+        author during the question WRITING PHASE of the generation the
+        proposal was first propsosed (created).
 
         :param user: user
         :type user: User object
@@ -1630,7 +2750,7 @@ class Proposal(Base):
 
         :param generation: question generation
         :type generation: integer or None
-        :rtype: set of Users
+        :rtype: set
         '''
         generation = generation or self.question.generation
         current_endorsements = list()
@@ -1730,3 +2850,15 @@ def after_insert(mapper, connection, target):
         values(proposal_id=target.id, question_id=target.question.id,
                generation=target.question.generation)
     )
+
+
+class MLStripper(HTMLParser):
+    def __init__(self):
+        self.reset()
+        self.fed = []
+
+    def handle_data(self, d):
+        self.fed.append(d)
+
+    def get_data(self):
+        return ''.join(self.fed)
