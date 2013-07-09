@@ -45,6 +45,13 @@ from . import app
 from HTMLParser import HTMLParser
 
 
+def enum(**enums):
+    return type('Enum', (), enums)
+
+
+GraphLevelType = enum(layers=1, num_votes=2, flat=3)
+
+
 class Update(Base):
     '''
     Stores user question subscription data
@@ -1111,7 +1118,7 @@ class Question(Base):
         :type user: User
         :param generation: the generation
         :type generation: integer or None
-        :rtype: set of Proposals
+        :rtype: set
         '''
 
         app.logger.debug("who_dominates_this_excluding\n")
@@ -1171,20 +1178,21 @@ class Question(Base):
                           proposals=None,
                           generation=None,
                           internal_links=False,
-                          proposal_level_type="layers",
-                          user_level_type="layers",
+                          proposal_level_type=GraphLevelType.layers,
+                          user_level_type=GraphLevelType.layers,
                           address_image='',
                           highlight_user1=None,
                           highlight_proposal1=None):
         '''
-        .. function:: make_graphviz_map([proposals=None,
-                                        generation=None,
-                                        internal_links=False,
-                                        proposal_level_type="layers",
-                                        user_level_type="layers",
-                                        address_image='',
-                                        highlight_user1=None,
-                                        highlight_proposal1=None])
+        .. function:: make_graphviz_map(
+            [proposals=None,
+            generation=None,
+            internal_links=False,
+            proposal_level_type=GraphLevelType.layers,
+            user_level_type=GraphLevelType.layerss,
+            address_image='',
+            highlight_user1=None,
+            highlight_proposal1=None])
 
         Generates the string to create a voting graph from Graphviz.
 
@@ -1195,9 +1203,9 @@ class Question(Base):
         :param internal_links:
         :type internal_links: boolean or None
         :param proposal_level_type: required layout of user nodes
-        :type proposal_level_type: string
+        :type proposal_level_type: GraphLevelType
         :param user_level_type: required layout of user nodes
-        :type user_level_type: string
+        :type user_level_type: GraphLevelType
         :param address_image: url of the map
         :type address_image: string
         :param highlight_user1: Proposal to highlight
@@ -1291,20 +1299,22 @@ class Question(Base):
         app.logger.debug("endorsers_covering %s\n",
                          endorsers_covering)
 
-        if (proposal_level_type == "num_votes"):
+        if (proposal_level_type == GraphLevelType. num_votes):
             proposal_levels = self.find_levels_based_on_size(
                 proposal_endorsers)
-        # elif (proposal_level_type == "layers"):
-        else:
+        elif (proposal_level_type == GraphLevelType.layers):
             proposal_levels = self.find_levels(proposals_covered, proposals)
+        else:
+            proposal_levels = list()
+            proposal_levels[0] = proposals
 
         app.logger.debug("proposal_levels %s\n",
                          proposal_levels)
 
-        if (user_level_type == "num_votes"):
+        if (user_level_type == GraphLevelType. num_votes):
             user_levels = self.find_levels_based_on_size(endorser_proposals)
                 # reverse()
-        elif (user_level_type == "layers"):
+        elif (user_level_type == GraphLevelType.layers):
             user_levels = self.find_levels(endorsers_covering, endorsers)
         # elif (user_level_type == "flat"):
         else:
@@ -1356,65 +1366,65 @@ class Question(Base):
 
         # Begin creation of Graphviz string
         title = self.string_safe(self.title)
-        buffer = 'digraph "%s" {\n' % (title)
+        voting_graph = 'digraph "%s" {\n' % (title)
 
         for l in proposal_levels_keys:
             if (l == full_size_note):
-                buffer += ' "pl' + str(full_size_note) +\
+                voting_graph += ' "pl' + str(full_size_note) +\
                     '" [label="Full\\nSize" shape=circle style=filled ' +\
                     'color=Black peripheries=1 fillcolor=palegoldenrod ' +\
                     'tooltip="Look at this image in full size"' +\
                     ' fontsize=10 URL="' + address_image +\
                     '" target="_top" width=.75 height=.75 ]; \n'
             else:
-                buffer += ' "pl' + str(l) +\
+                voting_graph += ' "pl' + str(l) +\
                     '" [shape=point fontcolor=white ' +\
                     'color=white fontsize=1]; \n'
 
         for l in user_levels_keys:
             if (l == all_graphs_note):
                 all_graph_url = 'http://view_gen.html'
-                buffer += ' "ul' + str(all_graphs_note) +\
-                          '" [label="All\\nGraphs" ' +\
-                          'shape=circle style=filled color=Black ' +\
-                          'peripheries=1  ' +\
-                          'fillcolor=palegoldenrod ' +\
-                          'tooltip="Look at all the ' +\
-                          'alternative views of this information" ' +\
-                          'fontsize=9 URL="' +\
-                          all_graph_url + '" target="_top" width=.75 ' +\
-                          'height=.75 ]; \n'
+                voting_graph += ' "ul' + str(all_graphs_note) +\
+                    '" [label="All\\nGraphs" ' +\
+                    'shape=circle style=filled color=Black ' +\
+                    'peripheries=1  ' +\
+                    'fillcolor=palegoldenrod ' +\
+                    'tooltip="Look at all the ' +\
+                    'alternative views of this information" ' +\
+                    'fontsize=9 URL="' +\
+                    all_graph_url + '" target="_top" width=.75 ' +\
+                    'height=.75 ]; \n'
             else:
-                buffer += ' "ul' + str(l) + '" [shape=point ' +\
+                voting_graph += ' "ul' + str(l) + '" [shape=point ' +\
                     'fontcolor=white ' +\
                     'color=white fontsize=1]; \n'
 
         for l in proposal_levels_keys:
             if (l != proposal_levels_keys[0]):
-                buffer += ' -> '
-            buffer += '"pl' + str(l) + '" '
+                voting_graph += ' -> '
+            voting_graph += '"pl' + str(l) + '" '
 
         for l in user_levels_keys:
-            buffer += ' -> '
-            buffer += '"ul' + str(l) + '" '
+            voting_graph += ' -> '
+            voting_graph += '"ul' + str(l) + '" '
 
-        buffer += " [color=white] \n "
+        voting_graph += " [color=white] \n "
 
         for l in proposal_levels_keys:
-            buffer += '{rank=same; "pl' + str(l) + '" '
+            voting_graph += '{rank=same; "pl' + str(l) + '" '
             for p in proposal_levels[l]:
                 if (p in bundled_proposals):
                     continue
-                buffer += " " + str(p.id) + " "
-            buffer += "}\n"
+                voting_graph += " " + str(p.id) + " "
+            voting_graph += "}\n"
 
         for l in user_levels_keys:
-            buffer += '{rank=same; "ul' + str(l) + '" '
+            voting_graph += '{rank=same; "ul' + str(l) + '" '
             for u in user_levels[l]:
                 if (u in bundled_users):
                     continue
-                buffer += '"' + u.username + '" '
-            buffer += "}\n"
+                voting_graph += '"' + u.username + '" '
+            voting_graph += "}\n"
 
         for kc2u in combined_users:
             details_table = '  '
@@ -1437,7 +1447,7 @@ class Question(Base):
             details = ' fillcolor=white style=filled color=' +\
                 color + ' peripheries=' + str(peripheries) + ' '
 
-            buffer += self.write_bundled_users(
+            voting_graph += self.write_bundled_users(
                 kc2u.username,
                 combined_users[kc2u],
                 self.room, details,
@@ -1461,12 +1471,12 @@ class Question(Base):
                 peripheries = 1
 
             # Add id to user node
-            buffer += '"' + e.username + '" [id=u' + str(e.id) +\
+            voting_graph += '"' + e.username + '" [id=u' + str(e.id) +\
                 ' shape=egg fillcolor=' +\
                 fillcolor +\
                 ' style=filled color=' + color + ' peripheries=' +\
                 str(peripheries) + ' style=filled  fontsize=11]'
-            buffer += "\n"
+            voting_graph += "\n"
 
         keys = combined_proposals.keys()
         for kc2p in keys:
@@ -1513,7 +1523,7 @@ class Question(Base):
                 details = ' fillcolor=white color=' + color +\
                     ' peripheries=' + str(peripheries) + ' '
 
-            buffer += self.write_bundled_proposals(
+            voting_graph += self.write_bundled_proposals(
                 kc2p.id, combined_proposals[kc2p], self.room,
                 details,
                 details_table,
@@ -1571,7 +1581,7 @@ class Question(Base):
                 if (not internal_links):
                     urlquery = self.create_proposal_url(p, self.room)
                     tooltip = self.create_proposal_tooltip(p)
-                    buffer += str(p.id) +\
+                    voting_graph += str(p.id) +\
                         ' [id=p' + str(p.id) + ' label=' + str(p.id) +\
                         ' shape=box fillcolor=' + fillcolor +\
                         ' style=filled color=' + color + ' peripheries=' +\
@@ -1580,7 +1590,7 @@ class Question(Base):
                         '/viewproposal.py/' + urlquery + '" target="_top"]'
                 else:
                     urlquery = self.create_internal_proposal_url(p)
-                    buffer += str(p.id) +\
+                    voting_graph += str(p.id) +\
                         ' [id=p' + str(p.id) + ' label=' + str(p.id) +\
                         ' shape=box fillcolor=' + fillcolor +\
                         ' style=filled color=' + color + ' peripheries=' +\
@@ -1588,14 +1598,14 @@ class Question(Base):
                         self.create_proposal_tooltip(p) +\
                         '"  fontsize=11 URL="' +\
                         internal_links + urlquery + '" target="_top"]'
-                buffer += "\n"
+                voting_graph += "\n"
 
             else:
                 if (not internal_links):
                     urlquery = self.create_proposal_url(p, self.room)
                     internal_proposal_url =\
                         self.create_internal_proposal_url(p)
-                    buffer += str(p.id) +\
+                    voting_graph += str(p.id) +\
                         ' [id=p' + str(p.id) + ' label=' + str(p.id) +\
                         ' shape=box color=' + color + ' peripheries=' +\
                         str(peripheries) + ' tooltip="' +\
@@ -1605,7 +1615,7 @@ class Question(Base):
                         '" target="_top"]'
                 else:
                     urlquery = self.create_internal_proposal_url(p)
-                    buffer += str(p.id) +\
+                    voting_graph += str(p.id) +\
                         ' [id=p' + str(p.id) + ' label=' + str(p.id) +\
                         ' shape=box color=' +\
                         color + ' peripheries=' + str(peripheries) +\
@@ -1613,7 +1623,7 @@ class Question(Base):
                         self.create_proposal_tooltip(p) +\
                         '"  fontsize=11 URL="' +\
                         internal_links + urlquery + '" target="_top"]'
-                buffer += "\n"
+                voting_graph += "\n"
 
         for p in proposals:
             pcolor = "black"
@@ -1672,11 +1682,13 @@ class Question(Base):
                 right_prop_id = self.calculate_propsal_node_id(
                     p,
                     combined_proposals)
-                edge_id = 'id="' + left_prop_id + '__' + right_prop_id + '"'
 
-                buffer += ' ' + str(pc.id) + ' -> ' + str(p.id) +\
+                edge_id = 'id="' + left_prop_id + '&#45;' + '&#45;' +\
+                    right_prop_id + '"'
+
+                voting_graph += ' ' + str(pc.id) + ' -> ' + str(p.id) +\
                     ' [' + edge_id + ' class="edge" color="' + color + '"]'
-                buffer += " \n"
+                voting_graph += " \n"
 
         for e in endorsers:
             ecolor = "blue"
@@ -1698,10 +1710,13 @@ class Question(Base):
                 if (highlight_proposal1 in endorser_proposals[ec]):
                     color = "red"
 
-                edge_id = 'id="u' + str(e.id) + '__' + 'u' + str(ec.id) + '"'
-                buffer += '"' + e.username + '" -> "' + ec.username + '"' +\
+                edge_id = 'id="u' + str(e.id) + '&#45;' + '&#45;' +\
+                    'u' + str(ec.id) + '"'
+
+                voting_graph += '"' + e.username + '" -> "' + ec.username +\
+                    '"' +\
                     ' [' + edge_id + ' class="edge" color="' + color + '"]'
-                buffer += " \n"
+                voting_graph += " \n"
 
         new_proposals = dict()
         for e in endorsers:
@@ -1759,13 +1774,15 @@ class Question(Base):
                 propnode_id = self.calculate_propsal_node_id(
                     p,
                     combined_proposals)
-                edge_id = 'id="u' + str(e.id) + '__' + propnode_id + '"'
-                buffer += ' "' + e.username + '" -> ' + str(p.id) +\
-                    ' [' + edge_id + ' class="edge" color="' + color + '"]'
-                buffer += " \n"
+                edge_id = 'id="u' + str(e.id) + '&#45;' + '&#45;' +\
+                    propnode_id + '"'
 
-        buffer += "\n}"
-        return buffer
+                voting_graph += ' "' + e.username + '" -> ' + str(p.id) +\
+                    ' [' + edge_id + ' class="edge" color="' + color + '"]'
+                voting_graph += " \n"
+
+        voting_graph += "\n}"
+        return voting_graph
 
     def calculate_propsal_node_id(self, proposal, combined_proposals):
         '''
@@ -1817,6 +1834,19 @@ class Question(Base):
                                      endorser_proposals,
                                      endorser,
                                      endorsers_covered):
+        '''
+        .. function:: new_proposals_to_an_endorser(endorser_proposals,
+                                                   endorser,
+                                                   endorsers_covered)
+
+        Delete this proposal. Only available to the author during the
+        question WRITING PHASE of the generation the proposal was first
+        propsosed (created).
+
+        :param user: user
+        :type user: User
+        :rtype: boolean
+        '''
         below = endorsers_covered[endorser]
         voters_known = set()
 
@@ -2277,7 +2307,7 @@ class Generation():
 
         The list of the proposals for this generation.
 
-        :rtype: list of Proposals
+        :rtype: list
         '''
         if (self._proposals is not None):
             return self._proposals
@@ -2298,7 +2328,7 @@ class Generation():
 
         The list of the proposals for this generation.
 
-        :rtype: list of Proposals
+        :rtype: list
         '''
         proposals = self.proposals
         proposal_ids = set()
@@ -2324,7 +2354,7 @@ class Generation():
 
         The pareto front for this generation.
 
-        :rtype: list of Proposals
+        :rtype: set
         '''
         if (self._pareto_front is not None):
             return self._pareto_front
@@ -2573,6 +2603,29 @@ class KeyPlayer(Base):
                                                       self.question_id)
 
 
+class VotingComments(Base):
+    '''
+    Holds comments made during voting when disagreeing with a proposal or
+    not understanding one enough.
+    '''
+
+    __tablename__ = 'voting_comments'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer)
+    proposal_id = Column(Integer)
+    created = Column(DateTime)
+    comment = Column(Text, nullable=False)
+    comment_type = Column(Enum('confused', 'disagree'), nullable=False)
+
+    def __init__(self, user, proposal, comment, comment_type):
+        self.user_id = user.id
+        self.proposal_id = proposal.id
+        self.created = datetime.datetime.utcnow()
+        self.comment = comment
+        self.comment_type = comment_type
+
+
 class QuestionHistory(Base):
     '''
     Represents the QuestionHistory object which holds the historical
@@ -2680,7 +2733,7 @@ class Proposal(Base):
         propsosed (created).
 
         :param user: user
-        :type user: User object
+        :type user: User
         :rtype: boolean
         '''
         if (user == self.user_id
