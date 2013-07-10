@@ -100,3 +100,7 @@ logging.config.fileConfig(config_file)
 # create logger
 logger = logging.getLogger('vilfredo_logger')
 logger.propagate = False
+
+# Apply the logger.handlers to the flask application
+for lh in logger.handlers:
+    app.logger.addHandler(lh)
