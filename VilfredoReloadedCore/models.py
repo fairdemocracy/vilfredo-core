@@ -721,8 +721,9 @@ class Question(Base):
         Takes 2 SETS and calulates which element if any
         domiantes the other.
         Returns either the dominating set, or an integer value of:
-            0 if the sets of endorsers are different
-            -1 if the sets of endorsers are the same
+
+            - 0 if the sets of endorsers are different
+            - -1 if the sets of endorsers are the same
 
         :param element1: element 1
         :type element1: set of integers
@@ -1869,7 +1870,7 @@ class Question(Base):
                                     proposal_endorsers,
                                     proposal,
                                     proposals_covered):
-
+        '''
         '''
         app.logger.debug("new_endorsers_to_a_proposal....\n")
         app.logger.debug("proposal INSIDE ==> %s\n", proposal)
@@ -1877,7 +1878,7 @@ class Question(Base):
                          proposal_endorsers)
         app.logger.debug("proposals_covered INSIDE ==> %s\n",
                          proposals_covered)
-        '''
+
 
         below = proposals_covered[proposal]
         # app.logger.debug("below INSIDE ==> %s\n", below)
@@ -2842,8 +2843,9 @@ class Proposal(Base):
         Takes 2 SETS of ENDORSER IDs representing who endorsed each proposal
         and calulates which proposal if any domiantes the other.
         Returns either the dominating set, or an integer value of:
-            0 if the sets of endorsers are different
-            -1 if the sets of endorsers are the same
+
+            - 0 if the sets of endorsers are different
+            - -1 if the sets of endorsers are the same
 
         :param proposal1: set of voters for proposal 1
         :type proposal1: set of integers
