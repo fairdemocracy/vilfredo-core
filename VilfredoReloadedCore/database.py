@@ -22,44 +22,47 @@
 This file contains code related to the database
 '''
 
-from sqlalchemy import create_engine, MetaData
-from sqlalchemy.orm import create_session, scoped_session
-from sqlalchemy.ext.declarative import declarative_base
+# from sqlalchemy import create_engine, MetaData
+# from sqlalchemy.orm import create_session, scoped_session
+# from sqlalchemy.ext.declarative import declarative_base
 
-engine = None
+from . import db
 
-db_session = scoped_session(
-    lambda: create_session(
-        bind=engine,
-        autocommit=False,
-        autoflush=False,
-    )
-)
+db_session = db.session
 
-Base = declarative_base()
-Base.query = db_session.query_property()
+# engine = None
 
-'''
+# db_session = scoped_session(
+#     lambda: create_session(
+#         bind=engine,
+#         autocommit=False,
+#         autoflush=False,
+#     )
+# )
+
+# Base = declarative_base()
+# Base.query = db_session.query_property()
+
+
 # Listener to switch on foreign key checking in SQLite
-def _fk_pragma_on_connect(dbapi_con, con_record):
-    dbapi_con.execute('pragma foreign_keys=ON')
-'''
+# def _fk_pragma_on_connect(dbapi_con, con_record):
+#     dbapi_con.execute('pragma foreign_keys=ON')
 
-def init_engine(uri, **kwargs):
-    # Non so easy to explain: see:
-    # http://flask.pocoo.org/snippets/22/
-    global engine
-    kwargs.setdefault('convert_unicode', True)
+
+# def init_engine(uri, **kwargs):
+#     # Non so easy to explain: see:
+#     # http://flask.pocoo.org/snippets/22/
+#     global engine
+#     kwargs.setdefault('convert_unicode', True)
     # Get debug info from database connection
-    kwargs.setdefault('echo', 'debug')
-    engine = create_engine(uri, **kwargs)
+#     kwargs.setdefault('echo', 'debug')
+#     engine = create_engine(uri, **kwargs)
 
-    '''
+
     # Add SQLite foreign key checking
-    from sqlalchemy import event
-    event.listen(engine, 'connect', _fk_pragma_on_connect)
-    '''
-    return engine
+#     from sqlalchemy import event
+#     event.listen(engine, 'connect', _fk_pragma_on_connect)
+#     return engine
 
 
 def init_db():
@@ -70,9 +73,10 @@ def init_db():
     # they will be registered properly on the metadata.  Otherwise
     # you will have to import them first before calling init_db()
     # pylint: disable=W0611 flake8: noqa
-    from . import models
-
-    Base.metadata.create_all(bind=engine)
+    from . import models, db
+    db.create_all()
+    # Base.metadata.create_all(bind=engine)
+    
 
 
 def drop_db():
@@ -80,6 +84,8 @@ def drop_db():
     Drop the database
     '''
     # TODO: this could be slower than a native query
-    meta = MetaData(engine)
-    meta.reflect()
-    meta.drop_all()
+    # meta = MetaData(engine)
+    # meta.reflect()
+    # meta.drop_all()
+    from . import models, db
+    db.drop_all()

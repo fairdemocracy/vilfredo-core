@@ -24,13 +24,17 @@
 The database Bases
 '''
 
-from sqlalchemy import Column, Integer, String, ForeignKey
+# from sqlalchemy import Column, Integer, String, ForeignKey
 
-from sqlalchemy import Enum, DateTime, Text, and_, event
+# from sqlalchemy import Enum, DateTime, Text, and_, event
 
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy import and_, event
 
-from database import Base, db_session
+# from sqlalchemy.orm import backref
+
+# from database import Base, db_session
+
+from database import db_session
 
 import datetime
 
@@ -40,9 +44,11 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from flask.ext.login import UserMixin
 
-from . import app
+from . import app, db
 
 from HTMLParser import HTMLParser
+
+# from flask.ext.sqlalchemy import SQLAlchemy
 
 
 def enum(**enums):
@@ -52,64 +58,70 @@ def enum(**enums):
 GraphLevelType = enum(layers=1, num_votes=2, flat=3)
 
 
-class Update(Base):
+class Update(db.Model):
     '''
     Stores user question subscription data
     '''
 
     __tablename__ = 'update'
 
-    user_id = Column(Integer, ForeignKey('user.id'),
-                     primary_key=True, autoincrement=False)
-    how = Column(Enum('daily', 'weekly', 'asap'))
-    last_update = Column(DateTime)
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    how = db.Column(db.Enum('daily', 'weekly', 'asap'))
+    last_update = db.Column(db.DateTime)
     # M:1
-    question_id = Column(Integer, ForeignKey('question.id'),
-                         primary_key=True, autoincrement=False)
+    question_id = db.Column(db.Integer, db.ForeignKey('question.id'))
 
-    subscribed_to = relationship("Question", backref="subscriber_update",
-                                 cascade="all, delete-orphan",
-                                 single_parent=True)
+    subscribed_to = db.relationship("Question",
+                                    backref="subscriber_update",
+                                    single_parent=True)
 
     def __init__(self, subscriber, subscribed_to, how=None):
         self.user_id = subscriber.id
         self.question_id = subscribed_to.id
         self.how = how or 'asap'
+    '''
+    def __init__(self, subscriber_id, question_id, how=None):
+        self.user_id = subscriber_id
+        self.question_id = subscribed_to
+        self.how = how or 'asap'
+    '''
 
 
-class User(Base, UserMixin):
+class User(db.Model, UserMixin):
     '''
     Stores the user data
     '''
 
     __tablename__ = 'user'
 
-    id = Column(Integer, primary_key=True)
-    username = Column(String(64), unique=True, nullable=False)
-    email = Column(String(120))
-    password = Column(String(60), nullable=False)
-    registered = Column(DateTime)
-    last_seen = Column(DateTime)
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(64), unique=True, nullable=False)
+    email = db.Column(db.String(120))
+    password = db.Column(db.String(60), nullable=False)
+    registered = db.Column(db.DateTime)
+    last_seen = db.Column(db.DateTime)
     # 1:M
-    questions = relationship('Question', backref='author', lazy='dynamic',
-                             cascade="all, delete-orphan")
-
-    proposals = relationship('Proposal', backref='author', lazy='dynamic',
-                             cascade="all, delete-orphan")
-
-    endorsements = relationship('Endorsement',
-                                backref='endorser', lazy='dynamic',
+    questions = db.relationship('Question', backref='author', lazy='dynamic',
                                 cascade="all, delete-orphan")
 
+    proposals = db.relationship('Proposal', backref='author', lazy='dynamic',
+                                cascade="all, delete-orphan")
+
+    endorsements = db.relationship('Endorsement',
+                                   backref='endorser', lazy='dynamic',
+                                   cascade="all, delete-orphan")
+
     # updates 1:M
-    subscribed_questions = relationship("Update", backref='subscriber',
-                                        lazy='dynamic',
-                                        cascade="all, delete-orphan")
+    subscribed_questions = db.relationship("Update", backref='subscriber',
+                                           lazy='dynamic',
+                                           cascade="all, delete-orphan")
 
     # invites M:M
-    invites = relationship("Invite", primaryjoin="User.id==Invite.sender_id",
-                           backref="sender", lazy='dynamic',
-                           cascade="all, delete-orphan")
+    invites = db.relationship("Invite",
+                              primaryjoin="User.id==Invite.sender_id",
+                              backref="sender", lazy='dynamic',
+                              cascade="all, delete-orphan")
 
     def invite(self, receiver, question):
         # Only author can invite to own question and cannot invite himself
@@ -160,7 +172,7 @@ class User(Base, UserMixin):
         return True
 
     def is_active(self):
-        return self.is_active
+        return True
 
     def is_anonymous(self):
         return False
@@ -178,7 +190,7 @@ class User(Base, UserMixin):
         :param question: associated question
         :type question: Question
         :param generation: question generation
-        :type generation: integer or None
+        :type generation: db.Integer or None
         :rtype: set
         '''
         generation = generation or question.generation
@@ -203,7 +215,7 @@ class User(Base, UserMixin):
 
         :param question: associated question
         :param generation: question generation
-        :type generation: integer or None
+        :type generation: db.Integer or None
         :rtype: list of proposals
         '''
         generation = generation or question.generation
@@ -228,7 +240,7 @@ class User(Base, UserMixin):
 
         :param question: associated question
         :param generation: question generation
-        :type generation: integer or None
+        :type generation: db.Integer or None
         :rtype: list of proposals
         '''
         generation = generation or question.generation
@@ -249,7 +261,7 @@ class User(Base, UserMixin):
 
         :param question: associated question
         :param generation: question generation
-        :type generation: integer or None
+        :type generation: db.Integer or None
         :rtype: list of proposals
         '''
         generation = generation or question.generation
@@ -270,7 +282,7 @@ class User(Base, UserMixin):
 
         :param question: associated question
         :param generation: question generation
-        :type generation: integer or None
+        :type generation: db.Integer or None
         :rtype: list of proposals
         '''
         generation = generation or question.generation
@@ -300,12 +312,15 @@ class User(Base, UserMixin):
             Proposal.id == prop.id,
             Proposal.user_id == self.id
         )).first()
+        app.logger.debug("delete_proposal: Found: %s\n",
+                         proposal)
         if (proposal is not None
                 and proposal.question.phase == 'writing'
                 and
                 proposal.question.generation == proposal.generation_created):
 
             # Delete entry from QuestionHistory table or not ???
+            app.logger.debug("Removing proposal.....\n")
             self.proposals.remove(proposal)
             return True
         return False
@@ -367,6 +382,7 @@ class User(Base, UserMixin):
         '''
         self.password = generate_password_hash(password)
 
+    # @staticmethod
     def check_password(self, password):
         '''
         .. function:: check_password(password)
@@ -392,22 +408,21 @@ class User(Base, UserMixin):
                                           self.username)
 
 
-class Invite(Base):
+class Invite(db.Model):
     '''
     Stores users invitaions to participate in questions
     '''
     __tablename__ = 'invite'
 
-    sender_id = Column(Integer, ForeignKey('user.id'),
-                       primary_key=True, autoincrement=False)
-    receiver_id = Column(Integer, ForeignKey('user.id'),
-                         primary_key=True, autoincrement=False)
-    question_id = Column(Integer, primary_key=True, autoincrement=False)
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    receiver_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    question_id = db.Column(db.Integer)
 
-    receiver = relationship("User", primaryjoin="Invite.receiver_id==User.id",
-                            backref="invitations",
-                            lazy='static', single_parent=True,
-                            cascade="all, delete-orphan")
+    receiver = db.relationship("User",
+                               primaryjoin="Invite.receiver_id==User.id",
+                               backref="invitations",
+                               lazy='static', single_parent=True)
 
     def __init__(self, sender, receiver, question_id):
         self.sender_id = sender.id
@@ -415,7 +430,7 @@ class Invite(Base):
         self.question_id = question_id
 
 
-class Question(Base):
+class Question(db.Model):
     '''
     Stores data and handles functionality and relations for
     the question object.
@@ -423,24 +438,25 @@ class Question(Base):
 
     __tablename__ = 'question'
 
-    id = Column(Integer, primary_key=True)
-    title = Column(String(120), nullable=False)
-    blurb = Column(Text, nullable=False)
-    generation = Column(Integer, default=1, nullable=False)
-    room = Column(String(20))
-    phase = Column(Enum('writing', 'voting', 'archived'), default='writing')
-    created = Column(DateTime)
-    last_move_on = Column(DateTime)
-    minimum_time = Column(Integer)
-    maximum_time = Column(Integer)
-    user_id = Column(Integer, ForeignKey('user.id'))
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(120), nullable=False)
+    blurb = db.Column(db.Text, nullable=False)
+    generation = db.Column(db.Integer, default=1, nullable=False)
+    room = db.Column(db.String(20))
+    phase = db.Column(db.Enum('writing', 'voting', 'archived'),
+                      default='writing')
+    created = db.Column(db.DateTime)
+    last_move_on = db.Column(db.DateTime)
+    minimum_time = db.Column(db.Integer)
+    maximum_time = db.Column(db.Integer)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     # 1:M
-    proposals = relationship('Proposal', backref='question', lazy='dynamic',
-                             cascade="all, delete-orphan")
-    history = relationship('QuestionHistory', lazy='dynamic',
-                           cascade="all, delete-orphan")
-    key_players = relationship('KeyPlayer', lazy='dynamic',
-                               cascade="all, delete-orphan")
+    proposals = db.relationship('Proposal', backref='question', lazy='dynamic',
+                                cascade="all, delete-orphan")
+    history = db.relationship('QuestionHistory', lazy='dynamic',
+                              cascade="all, delete-orphan")
+    key_players = db.relationship('KeyPlayer', lazy='dynamic',
+                                  cascade="all, delete-orphan")
 
     def __init__(self, author, title, blurb,
                  minimum_time=86400, maximum_time=604800, room=None):
@@ -457,9 +473,9 @@ class Question(Base):
         :param blurb: author of the question
         :type blurb: string
         :param minimum_time: author of the question
-        :type minimum_time: integer
+        :type minimum_time: db.Integer
         :param maximum_time: author of the question
-        :type maximum_time: integer
+        :type maximum_time: db.Integer
         :param room: room associated with the question
         :type room: string
         '''
@@ -592,7 +608,7 @@ class Question(Base):
         for the selected generation of the question.
 
         :param generation: question generation.
-        :type generation: integer
+        :type generation: db.Integer
         :rtype: list
         '''
         generation = generation or self.generation
@@ -611,7 +627,7 @@ class Question(Base):
         of this question indexed by the peoposal ID.
 
         :param generation: question generation.
-        :type generation: integer
+        :type generation: db.Integer
         :rtype: dict
         '''
         generation = generation or self.generation
@@ -634,7 +650,7 @@ class Question(Base):
         the question.
 
         :param generation: question generation.
-        :type generation: integer
+        :type generation: db.Integer
         :rtype: set
         '''
         generation = generation or self.generation
@@ -653,7 +669,7 @@ class Question(Base):
         the question.
 
         :param generation: question generation.
-        :type generation: integer
+        :type generation: db.Integer
         :rtype: set
         '''
         generation = generation or self.generation
@@ -674,7 +690,7 @@ class Question(Base):
         element it calculates which dominates and which are dominated.
 
         :param generation: question generation.
-        :type generation: integer
+        :type generation: db.Integer
         :rtype: dict
         '''
         generation = generation or self.generation
@@ -720,16 +736,16 @@ class Question(Base):
 
         Takes 2 SETS and calulates which element if any
         domiantes the other.
-        Returns either the dominating set, or an integer value of:
+        Returns either the dominating set, or an db.Integer value of:
 
             - 0 if the sets of endorsers are different
             - -1 if the sets of endorsers are the same
 
         :param element1: element 1
-        :type element1: set of integers
+        :type element1: set of db.Integers
         :param element2: element 2
-        :type element2: set of integers
-        :rtype: interger or set of integers
+        :type element2: set of db.Integers
+        :rtype: interger or set of db.Integers
         '''
         # If element1 and element2 are the same return -1
         if (element1 == element2):
@@ -758,7 +774,7 @@ class Question(Base):
         it calculates which dominate and which are dominated.
 
         :param generation: question generation.
-        :type generation: integer
+        :type generation: db.Integer
         :rtype: dict
         '''
         generation = generation or self.generation
@@ -805,7 +821,7 @@ class Question(Base):
         it calculates which dominate and which are dominated.
 
         :param generation: question generation.
-        :type generation: integer
+        :type generation: db.Integer
         :rtype: dict
         '''
         generation = generation or self.generation
@@ -863,7 +879,7 @@ class Question(Base):
         :param exclude_user: user to exclude from the calculation
         :type exclude_user: User
         :param generation: question generation.
-        :type generation: integer
+        :type generation: db.Integer
         :param save: save the domination info in the DB
         :type save: boolean
         :rtype: set of proposal objects
@@ -942,7 +958,7 @@ class Question(Base):
         then the set of IDs of the newly calculated pareto is returned.
 
         :param generation: question generation.
-        :type generation: integer
+        :type generation: db.Integer
         :rtype: set or boolean.
         '''
         generation = generation or self.generation
@@ -967,7 +983,7 @@ class Question(Base):
             domination if missing
         :type calculate_if_missing: boolean
         :param generation: question generation.
-        :type generation: integer
+        :type generation: db.Integer
         :rtype: set or boolean.
         '''
         generation = generation or self.generation
@@ -997,7 +1013,7 @@ class Question(Base):
         the question.
 
         :param generation: question generation.
-        :type generation: integer
+        :type generation: db.Integer
         :rtype: set
         '''
         generation = generation or self.generation
@@ -1017,7 +1033,7 @@ class Question(Base):
         What proposals has he forced into the pareto?
 
         :param generation: question generation.
-        :type generation: integer
+        :type generation: db.Integer
         :rtype: dict
         '''
         generation = generation or self.generation
@@ -1050,7 +1066,7 @@ class Question(Base):
         What proposals has he forced into the pareto?
 
         :param generation: question generation.
-        :type generation: integer
+        :type generation: db.Integer
         :rtype: dict
         '''
         generation = generation or self.generation
@@ -1118,7 +1134,7 @@ class Question(Base):
         :param user: the user to exclude from the calculation
         :type user: User
         :param generation: the generation
-        :type generation: integer or None
+        :type generation: db.Integer or None
         :rtype: set
         '''
 
@@ -1200,7 +1216,7 @@ class Question(Base):
         :param proposals: set of proposals
         :type generation: set or None
         :param generation: the generation
-        :type generation: integer or None
+        :type generation: db.Integer or None
         :param internal_links:
         :type internal_links: boolean or None
         :param proposal_level_type: required layout of user nodes
@@ -1300,7 +1316,7 @@ class Question(Base):
         app.logger.debug("endorsers_covering %s\n",
                          endorsers_covering)
 
-        if (proposal_level_type == GraphLevelType. num_votes):
+        if (proposal_level_type == GraphLevelType.num_votes):
             proposal_levels = self.find_levels_based_on_size(
                 proposal_endorsers)
         elif (proposal_level_type == GraphLevelType.layers):
@@ -1312,7 +1328,7 @@ class Question(Base):
         app.logger.debug("proposal_levels %s\n",
                          proposal_levels)
 
-        if (user_level_type == GraphLevelType. num_votes):
+        if (user_level_type == GraphLevelType.num_votes):
             user_levels = self.find_levels_based_on_size(endorser_proposals)
                 # reverse()
         elif (user_level_type == GraphLevelType.layers):
@@ -1879,7 +1895,6 @@ class Question(Base):
         app.logger.debug("proposals_covered INSIDE ==> %s\n",
                          proposals_covered)
 
-
         below = proposals_covered[proposal]
         # app.logger.debug("below INSIDE ==> %s\n", below)
 
@@ -2279,9 +2294,9 @@ class Question(Base):
         return combined_to_endorsers
 
     def __repr__(self):
-        return "<Question('%s',auth: '%s', '%s')>" % (self.title,
-                                                      self.author.username,
-                                                      self.phase)
+        return "<Question('%s' by '%s' - '%s')>" % (self.title,
+                                                    self.author.username,
+                                                    self.phase)
 
 
 class Generation():
@@ -2572,24 +2587,20 @@ class Generation():
                                                   self.question.id)
 
 
-class KeyPlayer(Base):
+class KeyPlayer(db.Model):
     '''
     Stores key player information for each geenration
     '''
     __tablename__ = "key_player"
 
-    user_id = Column(Integer, ForeignKey('user.id'),
-                     primary_key=True, autoincrement=False)
-    proposal_id = Column(Integer, ForeignKey('proposal.id'),
-                         primary_key=True, autoincrement=False)
-    question_id = Column(Integer, ForeignKey('question.id'),
-                         primary_key=True, autoincrement=False)
-    generation = Column(Integer, primary_key=True, autoincrement=False)
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    proposal_id = db.Column(db.Integer, db.ForeignKey('proposal.id'))
+    question_id = db.Column(db.Integer, db.ForeignKey('question.id'))
+    generation = db.Column(db.Integer)
 
-    proposal = relationship("Proposal", cascade="all, delete-orphan",
-                            single_parent=True)
-    user = relationship("User", cascade="all, delete-orphan",
-                        single_parent=True)
+    proposal = db.relationship("Proposal", single_parent=True)
+    user = db.relationship("User", single_parent=True)
 
     def __init__(self, user_id, proposal_id, question_id, generation):
         self.user_id = user_id
@@ -2604,7 +2615,7 @@ class KeyPlayer(Base):
                                                       self.question_id)
 
 
-class VotingComments(Base):
+class VotingComments(db.Model):
     '''
     Holds comments made during voting when disagreeing with a proposal or
     not understanding one enough.
@@ -2612,12 +2623,12 @@ class VotingComments(Base):
 
     __tablename__ = 'voting_comments'
 
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer)
-    proposal_id = Column(Integer)
-    created = Column(DateTime)
-    comment = Column(Text, nullable=False)
-    comment_type = Column(Enum('confused', 'disagree'), nullable=False)
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer)
+    proposal_id = db.Column(db.Integer)
+    created = db.Column(db.DateTime)
+    comment = db.Column(db.Text, nullable=False)
+    comment_type = db.Column(db.Enum('confused', 'disagree'), nullable=False)
 
     def __init__(self, user, proposal, comment, comment_type):
         self.user_id = user.id
@@ -2627,7 +2638,7 @@ class VotingComments(Base):
         self.comment_type = comment_type
 
 
-class QuestionHistory(Base):
+class QuestionHistory(db.Model):
     '''
     Represents the QuestionHistory object which holds the historical
     proposal data for the question.
@@ -2638,12 +2649,11 @@ class QuestionHistory(Base):
 
     __tablename__ = 'question_history'
 
-    proposal_id = Column(Integer, ForeignKey('proposal.id'),
-                         primary_key=True, autoincrement=False)
-    question_id = Column(Integer, ForeignKey('question.id'),
-                         primary_key=True, autoincrement=False)
-    generation = Column(Integer, primary_key=True, autoincrement=False)
-    dominated_by = Column(Integer, nullable=False, default=0)
+    id = db.Column(db.Integer, primary_key=True)
+    proposal_id = db.Column(db.Integer, db.ForeignKey('proposal.id'))
+    question_id = db.Column(db.Integer, db.ForeignKey('question.id'))
+    generation = db.Column(db.Integer)
+    dominated_by = db.Column(db.Integer, nullable=False, default=0)
 
     def __init__(self, proposal):
         self.proposal_id = proposal.id
@@ -2659,41 +2669,45 @@ class QuestionHistory(Base):
                                                        self.dominated_by)
 
 
-class Proposal(Base):
+class Proposal(db.Model):
     '''
     Represents the proposal object
     '''
 
     __tablename__ = 'proposal'
 
-    id = Column(Integer, primary_key=True)
-    title = Column(String(120), nullable=False)
-    blurb = Column(Text, nullable=False)
-    abstract = Column(Text)
-    #generation = Column(Integer, default=1)
-    generation_created = Column(Integer, default=1)
-    created = Column(DateTime)
-    user_id = Column(Integer, ForeignKey('user.id'))
-    question_id = Column(Integer, ForeignKey('question.id'))
-    #dominated_by = Column(Integer, default=0)
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(120), nullable=False)
+    blurb = db.Column(db.Text, nullable=False)
+    abstract = db.Column(db.Text)
+    #generation = db.Column(db.Integer, default=1)
+    generation_created = db.Column(db.Integer, default=1)
+    created = db.Column(db.DateTime)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    question_id = db.Column(db.Integer, db.ForeignKey('question.id'))
+    #dominated_by = db.Column(db.Integer, default=0)
     # 1:M
-    endorsements = relationship('Endorsement', backref="proposal",
-                                lazy='dynamic', cascade="all, delete-orphan")
+    endorsements = db.relationship('Endorsement', backref="proposal",
+                                   lazy='dynamic',
+                                   cascade="all, delete-orphan")
 
-    history = relationship('QuestionHistory',
-                           backref=backref("proposal", lazy="joined"),
-                           lazy='joined', cascade="all, delete-orphan")
+    history = db.relationship('QuestionHistory',
+                              backref=db.backref("proposal", lazy="joined"),
+                              lazy='joined', cascade="all, delete-orphan")
 
     def __init__(self, author, question, title, blurb, abstract=None):
         self.user_id = author.id
         self.question_id = question.id
         self.title = title
         self.blurb = blurb
-        #self.generation = question.generation
         self.generation_created = question.generation
         self.created = datetime.datetime.utcnow()
         self.abstract = abstract
         self.question = question
+
+    def __marshallable__(self):
+        # return {"id": self.author.id, "username": self.author.username}
+        return {"id": 10, "username": 'Bob'}
 
     def publish(self):
         self.history.append(QuestionHistory(self))
@@ -2784,7 +2798,7 @@ class Proposal(Base):
 
         :param user: user
         :param generation: question generation
-        :type generation: integer or None
+        :type generation: db.Integer or None
         :rtype: bool
         '''
         generation = generation or self.question.generation
@@ -2803,7 +2817,7 @@ class Proposal(Base):
             - Defaults to current generation
 
         :param generation: question generation
-        :type generation: integer or None
+        :type generation: db.Integer or None
         :rtype: set
         '''
         generation = generation or self.question.generation
@@ -2825,8 +2839,8 @@ class Proposal(Base):
         this generation.
 
         :param generation: proposal generation
-        :type generation: integer or None
-        :rtype: set of integers
+        :type generation: db.Integer or None
+        :rtype: set of db.Integers
         '''
         generation = generation or self.question.generation
         endorsers = self.endorsers(generation)
@@ -2842,16 +2856,16 @@ class Proposal(Base):
 
         Takes 2 SETS of ENDORSER IDs representing who endorsed each proposal
         and calulates which proposal if any domiantes the other.
-        Returns either the dominating set, or an integer value of:
+        Returns either the dominating set, or an db.Integer value of:
 
             - 0 if the sets of endorsers are different
             - -1 if the sets of endorsers are the same
 
         :param proposal1: set of voters for proposal 1
-        :type proposal1: set of integers
+        :type proposal1: set of db.Integers
         :param proposal2: set of voters for proposal 2
-        :type proposal2: set of integers
-        :rtype: interger or set of integers
+        :type proposal2: set of db.Integers
+        :rtype: interger or set of db.Integers
         '''
         # If proposal1 and proposal2 are the same return -1
         if (proposal1 == proposal2):
@@ -2878,18 +2892,18 @@ class Proposal(Base):
                self.question_id)
 
 
-class Endorsement(Base):
+class Endorsement(db.Model):
     '''
     Stores endorsement data
     '''
 
     __tablename__ = 'endorsement'
 
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('user.id'))
-    proposal_id = Column(Integer, ForeignKey('proposal.id'))
-    generation = Column(Integer, nullable=False)
-    endorsement_date = Column(DateTime)
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    proposal_id = db.Column(db.Integer, db.ForeignKey('proposal.id'))
+    generation = db.Column(db.Integer, nullable=False)
+    endorsement_date = db.Column(db.DateTime)
 
     def __init__(self, endorser, proposal):
         self.user_id = endorser.id

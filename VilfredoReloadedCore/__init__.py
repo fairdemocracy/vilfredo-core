@@ -63,6 +63,8 @@ except ImportError:
 
 from flask.ext.mail import Mail
 
+from flask_login import LoginManager
+
 
 def config_app(app):
     # Load setting using various methods
@@ -71,11 +73,15 @@ def config_app(app):
     # TODO: document the VCR_VARIABLE
     app.config.from_envvar('VRC_SETTINGS', silent=True)
 
-    from .database import init_engine
-    init_engine(app.config['DATABASE_URI'])
+    # from .database import init_engine
+    # init_engine(app.config['DATABASE_URI'])
 
 app = Flask(__name__)
 config_app(app)
+
+from flask.ext.sqlalchemy import SQLAlchemy
+db = SQLAlchemy(app)
+
 mail = Mail(app)
 
 # Logging
@@ -88,13 +94,12 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 # Set logging
 config_file = os.path.join(basedir, app.config['LOG_CONFIG_FILE'])
 
-
 # # Passing mode='w' to file handler not causing overwrite
-# if (os.path.isfile('/var/tmp/vr.log')):
-#     try:
-#         os.remove('/var/tmp/vr.log')
-#     except IOError:
-#         print 'Failed to delete log file /var/tmp/vr.log'
+if (os.path.isfile('/var/tmp/vr.log')):
+    try:
+        os.remove('/var/tmp/vr.log')
+    except IOError:
+        print 'Failed to delete log file /var/tmp/vr.log'
 
 logging.config.fileConfig(config_file)
 # create logger
@@ -104,3 +109,6 @@ logger.propagate = False
 # Apply the logger.handlers to the flask application
 for lh in logger.handlers:
     app.logger.addHandler(lh)
+
+login_manager = LoginManager()
+login_manager.init_app(app)

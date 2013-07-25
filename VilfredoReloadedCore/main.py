@@ -28,6 +28,8 @@ Convenience module to run vilfredo-reloaded-core
 
 from . import app
 
+# from . import views
+
 
 def main():
     '''Run vilfredo using built-in webserver on port 8080'''
