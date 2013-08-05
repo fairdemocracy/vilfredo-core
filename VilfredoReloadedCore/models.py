@@ -48,6 +48,8 @@ from . import app, db
 
 from HTMLParser import HTMLParser
 
+from flask import url_for
+
 # from flask.ext.sqlalchemy import SQLAlchemy
 
 
@@ -55,7 +57,28 @@ def enum(**enums):
     return type('Enum', (), enums)
 
 
+def makeMapFilename(question_id, generation, map_type="votes"):
+    '''
+        .. function:: makeMapFilename(question_id,
+                                      generation[, map_type="votes"])
+
+        Create the filname for the voting map.
+
+        :param question_id: ID of the question
+        :type question_id: Integer
+        :param generation: generation of the voting map
+        :type generation: Integer
+        :param generation: Map type
+        :type generation: String
+        :rtype: String
+        '''
+    return "map" + "_Q" + str(question_id) + "_G" + \
+           str(generation) + "_T" + str(map_type)
+
+
 GraphLevelType = enum(layers=1, num_votes=2, flat=3)
+
+QuestionPhaseType = enum(writing=1, voting=2, archive=3)
 
 
 class Update(db.Model):
@@ -64,6 +87,22 @@ class Update(db.Model):
     '''
 
     __tablename__ = 'update'
+
+    def get_public(self):
+        '''
+        .. function:: get_public()
+
+        Return public propoerties as string values for REST responses.
+
+        :rtype: dict
+        '''
+        return {'id': str(self.id),
+                'user_id': str(self.user_id),
+                'subscriber_username': self.subscriber.username,
+                'subscriber_email': self.subscriber.email,
+                'user_url': '/users/' + str(self.user_id),  # FIXME
+                'how': self.how,
+                'last_update': str(self.last_update)}
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
@@ -94,6 +133,20 @@ class User(db.Model, UserMixin):
     '''
 
     __tablename__ = 'user'
+
+    def get_public(self):
+        '''
+        .. function:: get_public()
+
+        Return public propoerties as string values for REST responses.
+
+        :rtype: dict
+        '''
+        return {'id': str(self.id),
+                'username': self.username,
+                "registered": str(self.registered),
+                "last_seen": str(self.last_seen),
+                'url': url_for('api_get_users', user_id=self.id)}
 
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False)
@@ -142,6 +195,27 @@ class User(db.Model, UserMixin):
             return True
         return False
 
+    def invite_all(self, receivers, question):
+        # Only author can invite to own question and cannot invite himself
+        '''
+        .. function:: invite(receiver, question)
+
+        Create invitations to request the receivers participate
+        in the question.
+
+        :param receivers: the users to be invited
+        :type receiver: List
+        :param question: the author's question
+        :type question: Question
+        :rtype: boolean
+        '''
+        if (self.id == question.author.id and self.id not in receivers):
+            for receiver in receivers:
+                app.logger.debug('appending invite for user id %s', receiver)
+                self.invites.append(Invite(self, receiver, question.id))
+            return True
+        return False
+
     @staticmethod
     def username_available(username):
         '''
@@ -167,18 +241,6 @@ class User(db.Model, UserMixin):
         :rtype: boolean
         '''
         return User.query.filter_by(email=email).first() is None
-
-    def is_authenticated(self):
-        return True
-
-    def is_active(self):
-        return True
-
-    def is_anonymous(self):
-        return False
-
-    def get_id(self):
-        return unicode(self.id)
 
     def get_endorsed_proposal_ids(self, question, generation=None):
         '''
@@ -361,7 +423,7 @@ class User(db.Model, UserMixin):
         '''
         .. function:: is_subscribed_to(question)
 
-        Checks if the user issubscribed to the question.
+        Checks if the user is subscribed to the question.
 
         :param question: the question to subscribe to.
         :type question: Question
@@ -382,7 +444,6 @@ class User(db.Model, UserMixin):
         '''
         self.password = generate_password_hash(password)
 
-    # @staticmethod
     def check_password(self, password):
         '''
         .. function:: check_password(password)
@@ -414,6 +475,23 @@ class Invite(db.Model):
     '''
     __tablename__ = 'invite'
 
+    def get_public(self):
+        '''
+        .. function:: get_public()
+
+        Return public propoerties as string values for REST responses.
+
+        :rtype: dict
+        '''
+        return {'id': str(self.id),
+                'sender_id': self.sender_id,
+                'receiver_id': self.receiver_id,
+                'question_id': self.question_id,
+                'sender_url': url_for('api_get_users',
+                                      user_id=self.sender_id),
+                'receiver_id': url_for('api_get_users',
+                                       user_id=self.receiver_id)}
+
     id = db.Column(db.Integer, primary_key=True)
     sender_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     receiver_id = db.Column(db.Integer, db.ForeignKey('user.id'))
@@ -426,8 +504,12 @@ class Invite(db.Model):
 
     def __init__(self, sender, receiver, question_id):
         self.sender_id = sender.id
-        self.receiver_id = receiver.id
         self.question_id = question_id
+
+        if isinstance(receiver, int):
+            self.receiver_id = receiver
+        else:
+            self.receiver_id = receiver.id
 
 
 class Question(db.Model):
@@ -437,6 +519,27 @@ class Question(db.Model):
     '''
 
     __tablename__ = 'question'
+
+    def get_public(self):
+        '''
+        .. function:: get_public()
+
+        Return public propoerties as string values for REST responses.
+
+        :rtype: dict
+        '''
+        return {'id': str(self.id),
+                'url': url_for('api_get_questions', question_id=self.id),
+                'title': self.title,
+                'blurb': self.blurb,
+                'room': self.room,
+                'generation': str(self.generation),
+                'created': str(self.created),
+                "last_move_on": str(self.last_move_on),
+                "minimum_time": str(self.minimum_time),
+                "maximum_time": str(self.maximum_time),
+                'phase': self.phase,
+                'author_url': url_for('api_get_users', user_id=self.user_id)}
 
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(120), nullable=False)
@@ -502,6 +605,49 @@ class Question(db.Model):
             self.history.append(QuestionHistory(proposal))
         return self
 
+    def auto_move_on(self):
+        '''
+        .. function:: auto_move_on()
+
+        Moves the question to the the next phase if the minimum time has
+        passed. Called by the system.
+
+        :rtype: String or Boolean
+        '''
+        if self.minimum_time_passed():
+            if self.phase == 'writing':
+                self.phase = 'voting'
+
+            elif self.phase == 'voting':
+                self.phase = 'writing'
+
+            return self.phase
+        else:
+            return False
+
+    def author_move_on(self, user_id):
+        '''
+        .. function:: author_move_on(user_id)
+
+        Moves the question to the the next phase if the minimum time has
+        passed. Called by the author.
+
+        :param user_id: Author's user ID.
+        :type user_id: Integer
+        :rtype: String or Boolean
+        '''
+        # Only the author can move a question on
+        if user_id != self.user_id or not self.minimum_time_passed():
+            return False
+
+        if self.phase == 'writing':
+            self.phase = 'voting'
+
+        elif self.phase in {'voting', 'archive'}:
+            self.phase = 'writing'
+
+        return self.phase
+
     def move_to_writing(self):
         '''
         .. function:: move_to_writing()
@@ -514,7 +660,25 @@ class Question(db.Model):
         if (self.phase not in ['voting', 'archived']
                 or not self.minimum_time_passed()):
             return False
-        return True
+        else:
+            self.phase = 'writing'
+            return True
+
+    def move_to_voting(self):
+        '''
+        .. function:: move_to_writing()
+
+        Moves the question to the writing phase if the minimum time has
+        passed and and the question is currently voting or archived.
+
+        :rtype: boolean
+        '''
+        if (self.phase not in ['writing', 'archived']
+                or not self.minimum_time_passed()):
+            return False
+        else:
+            self.phase = 'voting'
+            return True
 
     def get_generation(self, generation=None):
         '''
@@ -1191,6 +1355,55 @@ class Question(db.Model):
             keys.append(k)
         return inv
 
+    def get_voting_graph(self, generation, map_type):
+        '''
+        .. function:: get_voting_graph(generation, map_type)
+
+        Generates the svg map file from the dot string and returns the map URL.
+
+        :param generation: the question generation
+        :type generation: Integer
+        :param map_type: map type
+        :type map_type: string
+        :rtype: string
+        '''
+        # Generate filename
+        maps_path = 'map/'
+        filename = makeMapFilename(self.id, generation, map_type)
+        filepath = maps_path + filename
+        app.logger.debug("Filepath = %s", filepath)
+
+        import os
+        if not os.path.isfile(filepath + '.svg'):
+            if not os.path.isfile(filepath + '.dot'):
+                # Create the dot specification of the map
+                if map_type == 'pareto':
+                    map_proposals = self.\
+                        get_pareto_front(generation=generation)
+                else:
+                    map_proposals = self.\
+                        get_proposals(generation=generation)
+
+                voting_graph = self.make_graphviz_map(proposals=map_proposals,
+                                                      generation=generation)
+                # Save the dot specification as a dot file
+                dot_file = open(filename+".dot", "w")
+                dot_file.write(voting_graph)
+                dot_file.close()
+            # Generate svg file from the dot file using "dot"
+            #   Command Format: dot -Tsvg -v test.dot -otest.svg
+            #
+            from subprocess import call
+            call(["/usr/local/bin/dot",
+                  "-Tsvg", filename + ".dot", "-o" + filename + ".svg"])
+
+        # return voting_graph url
+        return url_for("api_question_graph", 
+                       question_id=self.id,
+                       generation=generation,
+                       map_type=map_type)
+
+
     def make_graphviz_map(self,
                           proposals=None,
                           generation=None,
@@ -1214,7 +1427,7 @@ class Question(db.Model):
         Generates the string to create a voting graph from Graphviz.
 
         :param proposals: set of proposals
-        :type generation: set or None
+        :type proposals: set or None
         :param generation: the generation
         :type generation: db.Integer or None
         :param internal_links:
@@ -1799,7 +2012,9 @@ class Question(db.Model):
                 voting_graph += " \n"
 
         voting_graph += "\n}"
+
         return voting_graph
+
 
     def calculate_propsal_node_id(self, proposal, combined_proposals):
         '''
@@ -2676,6 +2891,25 @@ class Proposal(db.Model):
 
     __tablename__ = 'proposal'
 
+    def get_public(self):
+        '''
+        .. function:: get_public()
+
+        Return public propoerties as string values for REST responses.
+
+        :rtype: dict
+        '''
+        return {'id': str(self.id),
+                'url': url_for('api_get_proposals', proposal_id=self.id),
+                'title': self.title,
+                'blurb': self.blurb,
+                'abstract': self.abstract,
+                'generation_created': str(self.generation_created),
+                'created': str(self.created),
+                'author_url': url_for('api_get_users', user_id=self.user_id),
+                'question_url': url_for('api_get_questions',
+                                        question_id=self.question_id)}
+
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(120), nullable=False)
     blurb = db.Column(db.Text, nullable=False)
@@ -2712,9 +2946,9 @@ class Proposal(db.Model):
     def publish(self):
         self.history.append(QuestionHistory(self))
 
-    def update(self, user, title, blurb):
+    def update(self, user, title, blurb, abstract=None):
         '''
-        .. function:: update(user, title, blurb)
+        .. function:: update(user, title, blurb[, abstract=None])
 
         Update the title and content of this proposal. Only available to the
         author during the question WRITING PHASE of the generation the
@@ -2726,6 +2960,8 @@ class Proposal(db.Model):
         :type title: string
         :param blurb: updated proposal content
         :type blurb: string
+        :param abstract: updated proposal abstract
+        :type abstract: string or None
         :rtype: boolean
         '''
         if (user.id == self.user_id
@@ -2734,6 +2970,7 @@ class Proposal(db.Model):
             if (len(title) > 0 and len(blurb) > 0):
                 self.title = title
                 self.blurb = blurb
+                self.abstract = abstract
                 self.updated = datetime.datetime.utcnow()
                 return True
         else:
@@ -2898,6 +3135,20 @@ class Endorsement(db.Model):
     '''
 
     __tablename__ = 'endorsement'
+
+    def get_public(self):
+        '''
+        .. function:: get_public()
+
+        Return public propoerties as string values for REST responses.
+
+        :rtype: dict
+        '''
+        return {'id': str(self.id),
+                'endorser_username': self.endorser.username,
+                'endorser_email': self.endorser.email,
+                'generation': str(self.generation),
+                'endorsement_date': str(self.endorsement_date)}
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))

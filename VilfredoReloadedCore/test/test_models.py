@@ -340,8 +340,9 @@ class EndorseTest(unittest.TestCase):
         self.assertEquals(user_query.count(), 4)
 
         # Create invitations (user invites users)
-        john.invite(susan, johns_q)
-        john.invite(bill, johns_q)
+        # john.invite(susan, johns_q)
+        # john.invite(bill, johns_q)
+        john.invite_all([susan, bill], johns_q)
         john.invite(bill, johns_q2)
         db_session.commit()
         for inv in john.invites:
@@ -397,6 +398,8 @@ class EndorseTest(unittest.TestCase):
         bills_prop1.endorse(harry)
         susans_prop1.endorse(harry)
         db_session.commit()
+
+        # rest here
 
         print "Proposal ID", bills_prop1.id, "with endorses:",\
             bills_prop1.set_of_endorser_ids()
