@@ -95,7 +95,7 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 config_file = os.path.join(basedir, app.config['LOG_CONFIG_FILE'])
 
 # # Passing mode='w' to file handler not causing overwrite
-if (os.path.isfile('/var/tmp/vr.log')):
+if os.path.isfile('/var/tmp/vr.log'):
     try:
         os.remove('/var/tmp/vr.log')
     except IOError:
