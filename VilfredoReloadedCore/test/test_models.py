@@ -33,14 +33,33 @@ except ImportError:
     import unittest
 
 from .. import models, app, emails, mail
-
 from .. import views  # NOQA
-
 from .. database import db_session, drop_db, init_db
-
 import datetime
-
 import time
+import os
+
+DELETE_DB_ON_EXIT = True
+
+
+def setUpDB():
+    # For SQLite development DB only
+    if 'vr.db' in app.config['SQLALCHEMY_DATABASE_URI']:
+        # Drop existing DB first
+        if os.path.isfile('/var/tmp/vr.log'):
+            app.logger.debug("Dropping existing sqlite db\n")
+            drop_db()
+        # Create empty SQLite test DB
+        app.logger.debug("Initializing sqlite db\n")
+        init_db()
+
+
+def tearDownDB():
+    # For SQLite development DB only
+    if 'vr.db' in app.config['SQLALCHEMY_DATABASE_URI'] \
+            and DELETE_DB_ON_EXIT:
+        app.logger.debug("Dropping sqlite db\n")
+        drop_db()
 
 
 class PasswordHashTest(unittest.TestCase):
@@ -57,10 +76,10 @@ class PasswordHashTest(unittest.TestCase):
 
 class UserTest(unittest.TestCase):
     def setUp(self):
-        init_db()
+        setUpDB()
 
     def tearDown(self):
-        drop_db()
+        tearDownDB()
         db_session.remove()
 
     def test_create_user(self):
@@ -86,10 +105,10 @@ class UserTest(unittest.TestCase):
 
 class QuestionTest(unittest.TestCase):
     def setUp(self):
-        init_db()
+        setUpDB()
 
     def tearDown(self):
-        drop_db()
+        tearDownDB()
         db_session.remove()
 
     def time_passed_dhm(self, timestamp):
@@ -174,10 +193,10 @@ class QuestionTest(unittest.TestCase):
 
 class SubscriptionTest(unittest.TestCase):
     def setUp(self):
-        init_db()
+        setUpDB()
 
     def tearDown(self):
-        drop_db()
+        tearDownDB()
         db_session.remove()
 
     def test_create_question_subscription(self):
@@ -206,10 +225,10 @@ class SubscriptionTest(unittest.TestCase):
 
 class ProposalTest(unittest.TestCase):
     def setUp(self):
-        init_db()
+        setUpDB()
 
     def tearDown(self):
-        drop_db()
+        tearDownDB()
         db_session.remove()
 
     def test_create_proposal(self):
@@ -287,10 +306,10 @@ class ProposalTest(unittest.TestCase):
 class EndorseTest(unittest.TestCase):
     def setUp(self):
         db_session.remove()
-        init_db()
+        setUpDB()
 
     def tearDown(self):
-        drop_db()
+        tearDownDB()
         db_session.remove()
 
     def test_endorse_proposals(self):
@@ -557,10 +576,10 @@ class EndorseTest(unittest.TestCase):
 
 class TestWhoDominatesWho(unittest.TestCase):
     def setUp(self):
-        init_db()
+        setUpDB()
 
     def tearDown(self):
-        drop_db()
+        tearDownDB()
         db_session.remove()
 
     def test_proposal_domination(self):
@@ -582,10 +601,10 @@ class LoginTestCase(unittest.TestCase):
     def setUp(self):
         app.config['TESTING'] = True
         self.app = app.test_client()
-        init_db()
+        setUpDB()
 
     def tearDown(self):
-        drop_db()
+        tearDownDB()
         db_session.remove()
 
     def test_empty_db(self):
@@ -617,11 +636,11 @@ class RegisterTestCase(unittest.TestCase):
     def setUp(self):
         app.config['TESTING'] = True
         self.app = app.test_client()
-        init_db()
+        setUpDB()
         self.add_existing_user()
 
     def tearDown(self):
-        drop_db()
+        tearDownDB()
         db_session.remove()
 
     def test_register(self):

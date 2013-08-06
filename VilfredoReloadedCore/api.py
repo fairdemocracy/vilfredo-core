@@ -272,7 +272,7 @@ def api_update_user(user_id):
     db_session.commit()
     response = {'url': url_for('api_get_users', user_id=user.id)}
 
-    return jsonify(objects=response), 201
+    return jsonify(object=response), 201
 
 
 #
@@ -545,9 +545,11 @@ def api_question_subscribers(question_id=None):
                    num_items=str(subscriptions.total), objects=results), 200
 
 
-# Get quetion proposals DUPLICATE?
+# Get question proposals (Get Proposals)
 @app.route('/api/v1/questions/<int:question_id>/proposals', methods=['GET'])
-def api_get_question_proposals(question_id=None):
+@app.route('/api/v1/questions/<int:question_id>/proposals/<int:proposal_id>',
+           methods=['GET'])
+def api_get_question_proposals(question_id=None, proposal_id=None):
 
     app.logger.debug("api_get_question_proposals called with %s...\n",
                      question_id)
@@ -562,17 +564,35 @@ def api_get_question_proposals(question_id=None):
         app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
         abort(404)
 
-    generation = int(request.args.get('generation', question.generation))
-    proposals = question.get_proposals(generation=generation)
+    if not proposal_id is None:
+        proposal_id = int(proposal_id)
+        proposal = question.proposals.filter_by(id=proposal_id).one()
+        if proposal is None:
+            abort(404)
 
-    results = []
-    for p in proposals:
-        results.append(p.get_public())
+        results = [proposal.get_public()]
+        return jsonify(object=results), 200
 
-    return jsonify(question_id=str(question.id),
-                   query_generation=str(generation),
-                   current_generation=str(question.generation),
-                   num_items=str(len(proposals)), objects=results), 200
+    else:
+        generation = int(request.args.get('generation', question.generation))
+        page = int(request.args.get('page', 1))
+
+        proposals = models.Proposal.query.join(models.QuestionHistory).\
+            filter(models.QuestionHistory.question_id == question.id).\
+            filter(models.QuestionHistory.generation == generation).\
+            paginate(page, RESULTS_PER_PAGE, False)
+
+        items = len(proposals.items)
+        pages = proposals.pages
+        total_items = proposals.total
+
+        results = []
+        for p in proposals.items:
+            results.append(p.get_public())
+
+        return jsonify(total_items=str(total_items), items=str(items),
+                       page=str(page), pages=str(pages),
+                       objects=results), 200
 
 
 # Create Endorsement
@@ -708,9 +728,9 @@ def api_create_proposal(question_id):
     db_session.add(proposal)
     db_session.commit()
 
-    response = {'url': url_for('api_get_proposals',
-                proposal_id=proposal.id)}
-    return jsonify(objects=response), 201
+    response = {'url': url_for('api_get_question_proposals',
+                question_id=question_id, proposal_id=proposal.id)}
+    return jsonify(object=response), 201
 
 
 # Delete proposal
@@ -755,7 +775,8 @@ def api_delete_proposal(question_id, proposal_id):
 @requires_auth
 def api_delete_question(question_id):
 
-    app.logger.debug("api_delete_question called for question %s...\n", question_id)
+    app.logger.debug("api_delete_question called for question %s...\n",
+                     question_id)
 
     user = get_authenticated_user(request)
     if not user:
@@ -861,7 +882,7 @@ def api_edit_question(question_id):
 @requires_auth
 def api_edit_proposal(question_id, proposal_id):
 
-    app.logger.debug("api_delete_proposal called...\n")
+    app.logger.debug("api_edit_proposal called...\n")
 
     user = get_authenticated_user(request)
     if not user:
@@ -881,8 +902,8 @@ def api_edit_proposal(question_id, proposal_id):
         abort(400)
 
     elif 'abstract' in request.json and \
-            request.json['abstract'] == '' \
-            or len(request.json['abstract']) > MAX_LEN_PROPOSAL_ABSTRACT:
+            (request.json['abstract'] == ''
+             or len(request.json['abstract']) > MAX_LEN_PROPOSAL_ABSTRACT):
         abort(400)
 
     title = request.json.get('title')
@@ -904,7 +925,9 @@ def api_edit_proposal(question_id, proposal_id):
 
     if proposal.update(user, title, blurb, abstract):
         db_session.commit()
-        return 200
+        message = {"message":
+                   "Proposal updated"}
+        return jsonify(message), 200
     else:
         message = {"message": "There was an error updating this proposal"}
         return jsonify(message), 400
@@ -1097,7 +1120,7 @@ def api_question_proposal_relations(question_id=None):
         num_items=str(len(proposal_relations)), objects=results), 200
 
 
-# Get subscriptions  DUPLICATE?
+# Get subscriptions
 #
 @app.route('/api/v1/users/<int:user_id>/subscriptions', methods=['GET'])
 @app.route('/api/v1/users/<int:user_id>/subscriptions/<int:question_id>',
@@ -1139,13 +1162,6 @@ def api_get_user_subscriptions(user_id, question_id=None):
         results = []
         for s in subscribed_questions.items:
             results.append(s.get_public())
-
-        '''
-        subscriptions = [{'question_id': s.question_id,
-                         'how': s.how,
-                         'last_update': str(s.last_update)}
-                         for s in subscribed_questions.items]
-        '''
 
         return jsonify(items=(items), page=str(page), pages=str(pages),
                        objects=results), 200

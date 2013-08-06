@@ -37,6 +37,7 @@ from .. import views, api  # NOQA
 from .. database import drop_db, init_db
 import base64
 import json
+import os
 
 DELETE_DB_ON_EXIT = True
 
@@ -45,6 +46,11 @@ class LoginTestCase(unittest.TestCase):
     def setUp(self):
         # For SQLite development DB only
         if 'vr.db' in app.config['SQLALCHEMY_DATABASE_URI']:
+            # Drop existing DB first
+            if os.path.isfile('/var/tmp/vr.log'):
+                app.logger.debug("Dropping existing sqlite db\n")
+                drop_db()
+            # Create empty SQLite test DB
             app.logger.debug("Initializing sqlite db\n")
             init_db()
 
@@ -204,8 +210,23 @@ class LoginTestCase(unittest.TestCase):
             'test123')
         self.assertEqual(rv.status_code, 201)
 
+        data = json.loads(rv.data)
+        new_proposal_url = data['object']['url']
+        app.logger.debug("New propoal URL = %s", new_proposal_url)
+        # Harry edits his proposal
+        rv = self.open_with_json_auth(
+            new_proposal_url,
+            'PATCH',
+            dict(
+                title='Harrys Cooler Proposal',
+                blurb='Harry edits like a champ'),
+            'harry',
+            'test123')
+        self.assertEqual(rv.status_code, 200, self.get_message(rv))
+
         #
-        # Author Deletes Question - Disallowed because it has proposals
+        # Author attempts to Delete a Question - Disallowed
+        # because it has proposals
         #
         rv = self.open_with_json_auth('/api/v1/questions/1',
                                       'DELETE',

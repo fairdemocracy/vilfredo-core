@@ -96,11 +96,7 @@ class Update(db.Model):
 
         :rtype: dict
         '''
-        return {'id': str(self.id),
-                'user_id': str(self.user_id),
-                'subscriber_username': self.subscriber.username,
-                'subscriber_email': self.subscriber.email,
-                'user_url': '/users/' + str(self.user_id),  # FIXME
+        return {'question_id': str(self.question_id),
                 'how': self.how,
                 'last_update': str(self.last_update)}
 
@@ -119,12 +115,6 @@ class Update(db.Model):
         self.user_id = subscriber.id
         self.question_id = subscribed_to.id
         self.how = how or 'asap'
-    '''
-    def __init__(self, subscriber_id, question_id, how=None):
-        self.user_id = subscriber_id
-        self.question_id = subscribed_to
-        self.how = how or 'asap'
-    '''
 
 
 class User(db.Model, UserMixin):
@@ -327,10 +317,9 @@ class User(db.Model, UserMixin):
         :rtype: list of proposals
         '''
         generation = generation or question.generation
-        proposals = self.proposals.filter(and_(
-            Proposal.question == question,
-            Proposal.generation == generation)
-        ).all()
+
+        proposals = self.get_proposals(question, generation)
+
         proposal_ids = list()
         for proposal in proposals:
             proposal_ids.append(proposal.id)
@@ -1398,11 +1387,10 @@ class Question(db.Model):
                   "-Tsvg", filename + ".dot", "-o" + filename + ".svg"])
 
         # return voting_graph url
-        return url_for("api_question_graph", 
+        return url_for("api_question_graph",
                        question_id=self.id,
                        generation=generation,
                        map_type=map_type)
-
 
     def make_graphviz_map(self,
                           proposals=None,
@@ -2014,7 +2002,6 @@ class Question(db.Model):
         voting_graph += "\n}"
 
         return voting_graph
-
 
     def calculate_propsal_node_id(self, proposal, combined_proposals):
         '''
