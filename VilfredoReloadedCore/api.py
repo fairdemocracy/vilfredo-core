@@ -283,8 +283,6 @@ def api_create_user():
 
     app.logger.debug("api_create_user called...\n")
 
-    app.logger.debug("0...\n")
-
     if request.json:
         app.logger.debug("username = %s\n", request.json['username'])
 
@@ -294,32 +292,25 @@ def api_create_user():
 
     elif not 'username' in request.json or request.json['username'] == '' \
             or len(request.json['username']) > MAX_LEN_USERNAME:
-        app.logger.debug("1...\n")
         abort(400)
 
     elif not 'email' in request.json or request.json['email'] == '' \
             or len(request.json['email']) > MAX_LEN_EMAIL:
-        app.logger.debug("2...\n")
         abort(400)
 
     elif not 'password' in request.json or request.json['password'] == '' or \
             len(request.json['password']) < MIN_LEN_PASSWORD or \
             len(request.json['password']) > MAX_LEN_PASSWORD:
-        app.logger.debug("3...\n")
         abort(400)
 
     elif models.User.username_available(request.json['username'])\
             is not True:
-        app.logger.debug("4...\n")
         response = {'message': 'Username not available'}
         return jsonify(objects=response), 400
 
     elif models.User.email_available(request.json['email']) is not True:
-            app.logger.debug("4...\n")
             response = {'message': 'Email not available'}
             return jsonify(objects=response), 400
-
-    app.logger.debug("5...\n")
 
     user = models.User(request.json['username'],
                        request.json['email'],
@@ -329,23 +320,6 @@ def api_create_user():
     response = {'url': url_for('api_get_users', user_id=user.id)}
 
     return jsonify(object=response), 201
-
-# Delete
-#
-'''
-@app.route('/api/v1/users', methods=['DELETE'])
-def api_delete_user(user_id):
-    app.logger.debug("api_delete_user called...\n")
-    if user_id is None:
-        abort(404)
-    user = models.User.query.get(int(user_id))
-    if user is None:
-        abort(404)
-
-    db_session.delete(user)
-    db_session.commit()
-    return 200
-'''
 
 
 # Delete subscription
@@ -934,7 +908,7 @@ def api_edit_proposal(question_id, proposal_id):
 
 
 # Get Proposal Endorsers
-@app.route('/api/v1/questions/<int:question_id>/proposal/' +
+@app.route('/api/v1/questions/<int:question_id>/proposals/' +
            '<int:proposal_id>/endorsers',
            methods=['GET'])
 def api_get_question_proposal_endorsers(question_id=None, proposal_id=None):
@@ -1016,9 +990,15 @@ def api_question_key_players(question_id=None):
     generation = int(request.args.get('generation', question.generation))
     key_players = question.calculate_key_players(generation=generation)
 
+    app.logger.debug("Key Players: %s", key_players)
+
     results = []
-    for kp in key_players:
-        results.append(kp.get_public())
+    for (endorser, vote_for) in key_players.iteritems():
+        proposals = []
+        for proposal in vote_for:
+            proposals.append(url_for('api_get_proposals', proposal_id=proposal.id))
+        kp = {endorser: proposals}
+        results.append(kp)
 
     return jsonify(question_id=str(question.id),
                    query_generation=str(generation),
@@ -1044,16 +1024,39 @@ def api_question_endorser_effects(question_id=None):
         abort(404)
 
     generation = int(request.args.get('generation', question.generation))
-    effects = question.calculate_endorser_effects(generation=generation)
+    endorser_effects = question.calculate_endorser_effects(generation=generation)
+
+    app.logger.debug("Endorser Effects==> %s", endorser_effects)
 
     results = []
-    for e in effects:
-        results.append(e.get_public())
+    for (endorser, effects) in endorser_effects.iteritems():
+        endorser_effects = dict()
+
+        if not effects is None:
+            PF_excluding_pulbic = replaceWithPublic(effects['PF_excluding'])
+            PF_plus_public = replaceWithPublic(effects['PF_plus'])
+            PF_minus_public = replaceWithPublic(effects['PF_minus'])
+
+            endorser_effects = {
+                        'PF_excluding': PF_excluding_pulbic,
+                        'PF_plus': PF_plus_public,
+                        'PF_minus': PF_minus_public}
+        else:
+            endorser_effects = {}
+
+        results.append({endorser.id: endorser_effects})
 
     return jsonify(question_id=str(question.id),
                    query_generation=str(generation),
                    current_generation=str(question.generation),
-                   num_items=str(len(effects)), objects=results), 200
+                   num_items=str(len(results)), objects=results), 200
+
+
+def replaceWithPublic(collection):
+    public = []
+    for c in collection:
+        public.append(c.get_public())
+    return public
 
 
 # http://[hostname]/api/v1.0/questions/47/graph?generation=2&graphtype=pareto
@@ -1109,9 +1112,20 @@ def api_question_proposal_relations(question_id=None):
     proposal_relations =\
         question.calculate_proposal_relations(generation=generation)
 
+    app.logger.debug("Proposal Relations==> %s", proposal_relations)
+
     results = []
-    for pr in proposal_relations:
-        results.append(pr.get_public())
+    for (proposal, relations) in proposal_relations.iteritems():
+        endorser_effects = dict()
+
+        dominated_public = replaceWithPublic(relations['dominated'])
+        dominating_public = replaceWithPublic(relations['dominating'])
+
+        prop_relations = {
+                    'dominated': dominated_public,
+                    'dominating': dominating_public}
+
+        results.append({proposal.id: prop_relations})
 
     return jsonify(
         question_id=str(question.id),

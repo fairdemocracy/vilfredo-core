@@ -325,14 +325,83 @@ class LoginTestCase(unittest.TestCase):
         self.assertEqual(rv.status_code, 201)
 
         #
-        # Remove Endorsements
+        # List Proposal Endorsers
         #
-        # susans_prop1.endorse(harry)
         rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals/3/endorsements',
-            'DELETE',
+            '/api/v1/questions/1/proposals/3/endorsers',
+            'GET',
             dict(),
             'harry',
+            'test123')
+        self.assertEqual(rv.status_code, 200, rv.status_code)
+        app.logger.debug("Data retrieved = %s\n", rv.data)
+
+        #
+        # List Question Pareto
+        #
+        rv = self.open_with_json_auth(
+            '/api/v1/questions/1/pareto',
+            'GET',
+            dict(),
+            'harry',
+            'test123')
+        self.assertEqual(rv.status_code, 200, rv.status_code)
+        app.logger.debug("Data retrieved = %s\n", rv.data)
+
+        #
+        # List Key Players
+        #
+        rv = self.open_with_json_auth(
+            '/api/v1/questions/1/key_players',
+            'GET',
+            dict(),
+            'harry',
+            'test123')
+        self.assertEqual(rv.status_code, 200, rv.status_code)
+        app.logger.debug("Data retrieved = %s\n", rv.data)
+
+        #
+        # List Endorser Effects
+        #
+        rv = self.open_with_json_auth(
+            '/api/v1/questions/1/endorser_effects',
+            'GET',
+            dict(),
+            'harry',
+            'test123')
+        self.assertEqual(rv.status_code, 200, rv.status_code)
+        app.logger.debug("Endorser Effects data retrieved = %s\n", rv.data)
+
+        #
+        # List Proposal Relations
+        #
+        rv = self.open_with_json_auth(
+            '/api/v1/questions/1/proposal_relations',
+            'GET',
+            dict(),
+            'harry',
+            'test123')
+        self.assertEqual(rv.status_code, 200, rv.status_code)
+        app.logger.debug("Proposal Relations data retrieved = %s\n", rv.data)
+        
+        #
+        # Remove Endorsements
+        #
+        # John endorses proposal 2
+        rv = self.open_with_json_auth(
+            '/api/v1/questions/1/proposals/2/endorsements',
+            'POST',
+            dict(),
+            'john',
+            'test123')
+        self.assertEqual(rv.status_code, 201)
+        #
+        # john removes endorsement from proposal 2
+        rv = self.open_with_json_auth(
+            '/api/v1/questions/1/proposals/2/endorsements',
+            'DELETE',
+            dict(),
+            'john',
             'test123')
         self.assertEqual(rv.status_code, 200, self.get_message(rv))
         self.assertEqual("Endorsement removed",
