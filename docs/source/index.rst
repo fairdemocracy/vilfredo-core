@@ -12,6 +12,7 @@ Contents:
   :maxdepth: 2
 
   modules
+  http_api
 
 
 Indices and tables
