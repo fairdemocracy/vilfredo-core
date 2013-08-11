@@ -44,10 +44,12 @@ DELETE_DB_ON_EXIT = True
 
 class LoginTestCase(unittest.TestCase):
     def setUp(self):
+        # app.logger.debug("Create DB")
+        # init_db()
         # For SQLite development DB only
         if 'vr.db' in app.config['SQLALCHEMY_DATABASE_URI']:
             # Drop existing DB first
-            if os.path.isfile('/var/tmp/vr.log'):
+            if os.path.isfile('/var/tmp/vr.db'):
                 app.logger.debug("Dropping existing sqlite db\n")
                 drop_db()
             # Create empty SQLite test DB
@@ -157,6 +159,29 @@ class LoginTestCase(unittest.TestCase):
         self.assertEqual(rv.status_code, 201)
         data = json.loads(rv.data)
         app.logger.debug("New question at = %s\n", data['object']['url'])
+        
+        #
+        # Create More Questions
+        #
+        rv = self.open_with_json_auth('/api/v1/questions',
+                                      'POST',
+                                      dict(title='Another Question',
+                                           blurb='Blah blah Blah blah Blah blah',
+                                           room='vilfredo',
+                                           minimum_time=0),
+                                      'john',
+                                      'test123')
+        self.assertEqual(rv.status_code, 201)
+
+        rv = self.open_with_json_auth('/api/v1/questions',
+                                      'POST',
+                                      dict(title='Too Many Chefs',
+                                           blurb='How can they avoid spoiling the broth?',
+                                           room='vilfredo',
+                                           minimum_time=0),
+                                      'harry',
+                                      'test123')
+        self.assertEqual(rv.status_code, 201)
 
         #
         # Create Invites
@@ -164,6 +189,30 @@ class LoginTestCase(unittest.TestCase):
         rv = self.open_with_json_auth('/api/v1/questions/1/invitations',
                                       'POST',
                                       dict(invite_user_ids=[2, 3, 4, 5]),
+                                      'john',
+                                      'test123')
+        self.assertEqual(rv.status_code, 201)
+
+        #
+        # Create Subscriptions
+        #
+        rv = self.open_with_json_auth('/api/v1/users/1/subscriptions',
+                                      'POST',
+                                      dict(question_id=1, how='asap'),
+                                      'john',
+                                      'test123')
+        self.assertEqual(rv.status_code, 201)
+
+        rv = self.open_with_json_auth('/api/v1/users/1/subscriptions',
+                                      'POST',
+                                      dict(question_id=2, how='asap'),
+                                      'john',
+                                      'test123')
+        self.assertEqual(rv.status_code, 201)
+
+        rv = self.open_with_json_auth('/api/v1/users/1/subscriptions',
+                                      'POST',
+                                      dict(question_id=3, how='weekly'),
                                       'john',
                                       'test123')
         self.assertEqual(rv.status_code, 201)
