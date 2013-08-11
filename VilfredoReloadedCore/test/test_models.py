@@ -46,7 +46,7 @@ def setUpDB():
     # For SQLite development DB only
     if 'vr.db' in app.config['SQLALCHEMY_DATABASE_URI']:
         # Drop existing DB first
-        if os.path.isfile('/var/tmp/vr.log'):
+        if os.path.isfile('/var/tmp/vr.db'):
             app.logger.debug("Dropping existing sqlite db\n")
             drop_db()
         # Create empty SQLite test DB
