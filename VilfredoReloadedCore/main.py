@@ -26,7 +26,7 @@ Main
 Convenience module to run vilfredo-reloaded-core
 '''
 
-from . import app
+from . import app, api
 
 
 def main():
