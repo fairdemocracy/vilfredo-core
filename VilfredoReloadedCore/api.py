@@ -229,7 +229,7 @@ def api_update_user(user_id):
 
     if int(user_id) != user.id:
         response = {'message': 'You are not authorized to edit this resource'}
-        return jsonify(objects=response), 400
+        return jsonify(objects=response), 401
 
     if not request.json:
         app.logger.debug("Non json request received...\n")
