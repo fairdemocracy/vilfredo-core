@@ -728,32 +728,32 @@ def api_add_proposal_endorsement(question_id, proposal_id):
     '''
     .. http:post:: /users
 
-    A user or list of users.
+        A user or list of users.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      POST /users HTTP/1.1
-      Host: example.com
-      Accept: application/json
+            POST /users HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      Status Code: 201 OK
-      Content-Type: application/json
+            Status Code: 201 OK
+            Content-Type: application/json
 
-      {
-        "message": "Endorsement added"
-      }
+            {
+                 "message": "Endorsement added"
+            }
 
-    :json username: username
-    :json email: email address
-    :json password: password
-    :statuscode 201: no error
-    :statuscode 400: bad request
+        :json username: username
+        :json email: email address
+        :json password: password
+        :statuscode 201: no error
+        :statuscode 400: bad request
     '''
     app.logger.debug("api_add_proposal_endorsement called...\n")
 
