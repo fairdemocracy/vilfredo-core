@@ -98,7 +98,10 @@ class Update(db.Model):
         '''
         return {'question_id': str(self.question_id),
                 'how': self.how,
-                'last_update': str(self.last_update)}
+                'last_update': str(self.last_update),
+                'url': url_for('api_get_user_subscriptions',
+                               user_id=self.user_id,
+                               question_id=self.question_id)}
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
@@ -2887,7 +2890,9 @@ class Proposal(db.Model):
         :rtype: dict
         '''
         return {'id': str(self.id),
-                'url': url_for('api_get_proposals', proposal_id=self.id),
+                'url': url_for('api_get_question_proposals',
+                               question_id=self.question.id,
+                               proposal_id=self.id),
                 'title': self.title,
                 'blurb': self.blurb,
                 'abstract': self.abstract,

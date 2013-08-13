@@ -96,13 +96,6 @@ class LoginTestCase(unittest.TestCase):
             return "No error message returned"
 
     def test_rest_api(self):
-        '''
-        john = models.User('john', 'john@example.com', 'test123')
-        susan = models.User('susan', 'susan@example.com', 'test123')
-        bill = models.User('bill', 'bill@example.com', 'test123')
-        jack = models.User('jack', 'jack@example.com', 'test123')
-        harry = models.User('harry', 'harry@example.com', 'test123')
-        '''
         #
         # Create Users
         #
@@ -116,6 +109,54 @@ class LoginTestCase(unittest.TestCase):
         self.assertEqual(rv.status_code, 201)
         data = json.loads(rv.data)
         app.logger.debug("New user at = %s\n", data['object']['url'])
+        # Log data received
+        app.logger.debug("Data retrieved from Create User = %s\n", rv.data)
+
+        # Attempt to create a user with a duplicate username
+        rv = self.open_with_json('/api/v1/users',
+                                 'POST',
+                                 dict(username='john',
+                                      email='john@example.com',
+                                      password='test123'))
+        self.assertEqual(rv.status_code, 400)
+        self.assertEqual('Username not available',
+                         self.get_message(rv),
+                         self.get_message(rv))
+        app.logger.debug("Create user with duplicate username: Message: %s",
+                         self.get_message(rv))
+        # Log data received
+        app.logger.debug("Data retrieved from Create Duplicate User = %s\n",
+                         rv.data)
+
+        # Attempt to create a user with a duplicate email
+        rv = self.open_with_json('/api/v1/users',
+                                 'POST',
+                                 dict(username='keith',
+                                      email='john@example.com',
+                                      password='test123'))
+        self.assertEqual(rv.status_code, 400)
+        self.assertEqual('Email not available', self.get_message(rv),
+                         self.get_message(rv))
+        app.logger.debug(
+            "Create user with duplicate email address: Message: %s",
+            self.get_message(rv))
+        # Log data received
+        app.logger.debug(
+            "Data retrieved from Create User/dupicate email = %s\n",
+            rv.data)
+
+        # Attempt to create a user with too short a password
+        rv = self.open_with_json('/api/v1/users',
+                                 'POST',
+                                 dict(username='keith',
+                                      email='keith@example.com',
+                                      password='12345'))
+        self.assertEqual(rv.status_code, 400)
+        self.assertIn('Password must be between',
+                      self.get_message(rv),
+                      self.get_message(rv))
+        app.logger.debug("Create user with too short a password: Message: %s",
+                         self.get_message(rv))
 
         rv = self.open_with_json('/api/v1/users',
                                  'POST',
@@ -159,14 +200,17 @@ class LoginTestCase(unittest.TestCase):
         self.assertEqual(rv.status_code, 201)
         data = json.loads(rv.data)
         app.logger.debug("New question at = %s\n", data['object']['url'])
-        
+        # Log data received
+        app.logger.debug("Data retrieved from Create Question = %s\n",
+                         rv.data)
+
         #
         # Create More Questions
         #
         rv = self.open_with_json_auth('/api/v1/questions',
                                       'POST',
                                       dict(title='Another Question',
-                                           blurb='Blah blah Blah blah Blah blah',
+                                           blurb='Blah blah Blah blah Blah',
                                            room='vilfredo',
                                            minimum_time=0),
                                       'john',
@@ -176,7 +220,7 @@ class LoginTestCase(unittest.TestCase):
         rv = self.open_with_json_auth('/api/v1/questions',
                                       'POST',
                                       dict(title='Too Many Chefs',
-                                           blurb='How can they avoid spoiling the broth?',
+                                           blurb='How to Spoil the broth?',
                                            room='vilfredo',
                                            minimum_time=0),
                                       'harry',
@@ -192,6 +236,8 @@ class LoginTestCase(unittest.TestCase):
                                       'john',
                                       'test123')
         self.assertEqual(rv.status_code, 201)
+        # Log data received
+        app.logger.debug("Data retrieved fro Create Invite = %s\n", rv.data)
 
         #
         # Create Subscriptions
@@ -202,6 +248,9 @@ class LoginTestCase(unittest.TestCase):
                                       'john',
                                       'test123')
         self.assertEqual(rv.status_code, 201)
+        # Log data received
+        app.logger.debug("Data retrieved from Create Subscription = %s\n",
+                         rv.data)
 
         rv = self.open_with_json_auth('/api/v1/users/1/subscriptions',
                                       'POST',
@@ -217,6 +266,29 @@ class LoginTestCase(unittest.TestCase):
                                       'test123')
         self.assertEqual(rv.status_code, 201)
 
+        rv = self.open_with_json_auth('/api/v1/users/1/subscriptions',
+                                      'GET',
+                                      dict(),
+                                      'john',
+                                      'test123')
+        self.assertEqual(rv.status_code, 200)
+        # Log data received
+        app.logger.debug("Data retrieved from Get Subscriptions = %s\n",
+                         rv.data)
+
+        #
+        # Delete Subscription
+        #
+        rv = self.open_with_json_auth('/api/v1/users/1/subscriptions/3',
+                                      'DELETE',
+                                      dict(),
+                                      'john',
+                                      'test123')
+        self.assertEqual(rv.status_code, 200)
+        # Log data received
+        app.logger.debug("Data retrieved from Delete Subscription = %s\n",
+                         rv.data)
+
         #
         # Create Proposals
         #
@@ -228,6 +300,9 @@ class LoginTestCase(unittest.TestCase):
             'bill',
             'test123')
         self.assertEqual(rv.status_code, 201)
+        # Log data received
+        app.logger.debug("Data retrieved from Create Proposal = %s\n",
+                         rv.data)
 
         rv = self.open_with_json_auth(
             '/api/v1/questions/1/proposals',
@@ -262,6 +337,7 @@ class LoginTestCase(unittest.TestCase):
         data = json.loads(rv.data)
         new_proposal_url = data['object']['url']
         app.logger.debug("New propoal URL = %s", new_proposal_url)
+
         # Harry edits his proposal
         rv = self.open_with_json_auth(
             new_proposal_url,
@@ -272,6 +348,9 @@ class LoginTestCase(unittest.TestCase):
             'harry',
             'test123')
         self.assertEqual(rv.status_code, 200, self.get_message(rv))
+        # Log data received
+        app.logger.debug("Data retrieved from Edit Proposal = %s\n",
+                         rv.data)
 
         #
         # Author attempts to Delete a Question - Disallowed
@@ -287,6 +366,8 @@ class LoginTestCase(unittest.TestCase):
                       self.get_message(rv),
                       self.get_message(rv))
         app.logger.debug("Response message: %s", self.get_message(rv))
+        # Log data received
+        app.logger.debug("Data retrieved = %s\n", rv.data)
 
         #
         # Author move question on
@@ -297,6 +378,9 @@ class LoginTestCase(unittest.TestCase):
                                       'john',
                                       'test123')
         self.assertEqual(rv.status_code, 200, self.get_message(rv))
+        # Log data received
+        app.logger.debug("Data retrieved from Edit Question (Move On) = %s\n",
+                         rv.data)
 
         #
         # Create Endorsements
@@ -309,6 +393,9 @@ class LoginTestCase(unittest.TestCase):
             'susan',
             'test123')
         self.assertEqual(rv.status_code, 201)
+        # Log data received
+        app.logger.debug("Data retrieved from Create Endorsement = %s\n",
+                         rv.data)
 
         # susans_prop1.endorse(john)
         rv = self.open_with_json_auth(
@@ -374,7 +461,7 @@ class LoginTestCase(unittest.TestCase):
         self.assertEqual(rv.status_code, 201)
 
         #
-        # List Proposal Endorsers
+        # Get Proposal Endorsers
         #
         rv = self.open_with_json_auth(
             '/api/v1/questions/1/proposals/3/endorsers',
@@ -384,9 +471,12 @@ class LoginTestCase(unittest.TestCase):
             'test123')
         self.assertEqual(rv.status_code, 200, rv.status_code)
         app.logger.debug("Data retrieved = %s\n", rv.data)
+        # Log data received
+        app.logger.debug("Data retrieved from Get Proposal Endorsers = %s\n",
+                         rv.data)
 
         #
-        # List Question Pareto
+        # Get Question Pareto
         #
         rv = self.open_with_json_auth(
             '/api/v1/questions/1/pareto',
@@ -396,9 +486,12 @@ class LoginTestCase(unittest.TestCase):
             'test123')
         self.assertEqual(rv.status_code, 200, rv.status_code)
         app.logger.debug("Data retrieved = %s\n", rv.data)
+        # Log data received
+        app.logger.debug("Data retrieved from Get Question Pareto = %s\n",
+                         rv.data)
 
         #
-        # List Key Players
+        # Get Key Players
         #
         rv = self.open_with_json_auth(
             '/api/v1/questions/1/key_players',
@@ -408,9 +501,12 @@ class LoginTestCase(unittest.TestCase):
             'test123')
         self.assertEqual(rv.status_code, 200, rv.status_code)
         app.logger.debug("Data retrieved = %s\n", rv.data)
+        # Log data received
+        app.logger.debug("Data retrieved from Get Key Players = %s\n",
+                         rv.data)
 
         #
-        # List Endorser Effects
+        # Get Endorser Effects
         #
         rv = self.open_with_json_auth(
             '/api/v1/questions/1/endorser_effects',
@@ -420,9 +516,12 @@ class LoginTestCase(unittest.TestCase):
             'test123')
         self.assertEqual(rv.status_code, 200, rv.status_code)
         app.logger.debug("Endorser Effects data retrieved = %s\n", rv.data)
+        # Log data received
+        app.logger.debug("Data retrieved from Get Endorser Effects= %s\n",
+                         rv.data)
 
         #
-        # List Proposal Relations
+        # Get Proposal Relations
         #
         rv = self.open_with_json_auth(
             '/api/v1/questions/1/proposal_relations',
@@ -431,8 +530,10 @@ class LoginTestCase(unittest.TestCase):
             'harry',
             'test123')
         self.assertEqual(rv.status_code, 200, rv.status_code)
-        app.logger.debug("Proposal Relations data retrieved = %s\n", rv.data)
-        
+        # Log data received
+        app.logger.debug("Data retrieved from Get Proposal Relations = %s\n",
+                         rv.data)
+
         #
         # Remove Endorsements
         #
@@ -457,6 +558,9 @@ class LoginTestCase(unittest.TestCase):
                          self.get_message(rv),
                          self.get_message(rv))
         app.logger.debug("Response message: %s", self.get_message(rv))
+        # Log data received
+        app.logger.debug("Data retrieved from Remove Endorsement = %s\n",
+                         rv.data)
 
         #
         # Create Another Question
@@ -487,6 +591,9 @@ class LoginTestCase(unittest.TestCase):
                       self.get_message(rv),
                       self.get_message(rv))
         app.logger.debug("Response message: %s", self.get_message(rv))
+        # Log data received
+        app.logger.debug("Data retrieved from Delete Question = %s\n",
+                         rv.data)
 
     def get_questions(self):
         rv = self.app.get('/api/v1/users')

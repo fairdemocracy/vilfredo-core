@@ -36,7 +36,7 @@ from flask import Response
 
 REST_API_VERSION = 'v1'
 REST_URL_PREFIX = '/api/' + REST_API_VERSION
-RESULTS_PER_PAGE = 3
+RESULTS_PER_PAGE = 2
 
 MAX_LEN_EMAIL = 60
 MAX_LEN_USERNAME = 50
@@ -114,52 +114,6 @@ def bad_request(error):
     return make_response(jsonify({'error': 'Bad request'}), 400)
 
 
-# Get Proposls
-#
-@app.route('/api/v1/proposals', methods=['GET'])
-@app.route('/api/v1/proposals/<int:proposal_id>', methods=['GET'])
-def api_get_proposals(proposal_id=None):
-    '''
-    .. function:: api_get_proposals([proposal_id=None])
-
-    Returns a JSON response containing the public values of a proposal
-    or a paged list of proposals
-
-    :param proposal_id: proposal ID
-    :type proposal_id: Integer
-    :param page: Optional page number for response list.
-    :type page: Integer
-    :rtype: Response
-    '''
-    app.logger.debug("api_get_proposals called...\n")
-
-    if proposal_id is not None:
-        proposal = models.Proposal.query.get(int(proposal_id))
-        if proposal is None:
-            abort(404)
-
-        results = [proposal.get_public()]
-        return jsonify(object=results), 200
-
-    else:
-        page = int(request.args.get('page', 1))
-        proposals = models.Proposal.query.paginate(
-            page,
-            RESULTS_PER_PAGE,
-            False)
-        items = len(proposals.items)
-        pages = proposals.pages
-        total_items = proposals.total
-
-        results = []
-        for p in proposals.items:
-            results.append(p.get_public())
-
-        return jsonify(total_items=total_items, items=str(items),
-                       page=str(page), pages=str(pages),
-                       objects=results), 200
-
-
 #
 # Get Users
 #
@@ -167,16 +121,54 @@ def api_get_proposals(proposal_id=None):
 @app.route('/api/v1/users/<int:user_id>', methods=['GET'])
 def api_get_users(user_id=None):
     '''
-    .. function:: api_get_users([user_id=None])
+    .. http:get:: /users/(int:user_id)
 
-    Returns a JSON response containing the public values of a user
-    or a paged list of users
+    A user or list of users.
 
-    :param user_id: user ID
-    :type user_id: Integer
-    :param page: Optional page number for response list.
-    :type page: Integer
-    :rtype: Response
+    **Example request**:
+
+   .. sourcecode:: http
+
+      GET /users/42 HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 200 OK
+      Content-Type: application/json
+
+        {
+           "total_items": 5,
+           "items": "2",
+           "objects":
+           [
+               {
+                   "username": "john",
+                   "url": "/users/1",
+                   "registered": "2013-08-12 09:51:38.559222",
+                   "id": "1",
+                   "last_seen": "2013-08-12 09:51:38.559240"
+               },
+               {
+                   "username": "susan",
+                   "url": "/users/2",
+                   "registered": "2013-08-12 09:51:38.576731",
+                   "id": "2",
+                   "last_seen": "2013-08-12 09:51:38.576745"
+               }
+           ],
+           "page": "1",
+           "pages": "2"
+        }
+
+    :param user_id: user id
+    :type user_id: int
+    :query page: page number. default is 1
+    :statuscode 200: no error
+    :statuscode 404: there's no user
     '''
     app.logger.debug("api_get_users called...\n")
 
@@ -217,13 +209,63 @@ def api_get_users(user_id=None):
 @app.route('/api/v1/users/<int:user_id>', methods=['PATCH'])
 @requires_auth
 def api_update_user(user_id):
+    '''
+    .. http:patch:: /users/(int:user_id)
 
+    Update a user's details'.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      PATCH /users/42 HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 200 OK
+      Content-Type: application/json
+
+        {
+           "total_items": 5,
+           "items": "2",
+           "objects":
+           [
+               {
+                   "username": "john",
+                   "url": "/users/1",
+                   "registered": "2013-08-12 09:51:38.559222",
+                   "id": "1",
+                   "last_seen": "2013-08-12 09:51:38.559240"
+               },
+               {
+                   "username": "susan",
+                   "url": "/users/2",
+                   "registered": "2013-08-12 09:51:38.576731",
+                   "id": "2",
+                   "last_seen": "2013-08-12 09:51:38.576745"
+               }
+           ],
+           "page": "1",
+           "pages": "2"
+        }
+
+    :param user_id: user id
+    :type user_id: int
+    :query page: page number. default is 1
+    :type page: int
+    :statuscode 200: no error
+    :statuscode 404: there's no user
+    '''
     if user_id is None:
         abort(404)
 
     user = get_authenticated_user(request)
     if not user:
-        abort(404)
+        abort(401)
 
     app.logger.debug("api_update_user called by %s...\n", user.id)
 
@@ -280,37 +322,77 @@ def api_update_user(user_id):
 #
 @app.route('/api/v1/users', methods=['POST'])
 def api_create_user():
+    '''
+    .. http:post:: /users
 
+    A user or list of users.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      POST /users HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 201 OK
+      Content-Type: application/json
+
+        {
+          "object":
+          {
+            "url": "/users/1"
+          }
+        }
+
+    :json username: username
+    :type username: string
+    :json email: email address
+    :type email: string
+    :json password: password
+    :type password: string
+    :statuscode 201: no error
+    :statuscode 400: bad request
+    '''
     app.logger.debug("api_create_user called...\n")
 
-    if request.json:
-        app.logger.debug("username = %s\n", request.json['username'])
+    app.logger.debug("Request %s...\n", request.json)
 
     if not request.json:
         app.logger.debug("Non json request received...\n")
-        abort(400)
+        message = "Non json request received"
+        return jsonify(message=message), 400
 
     elif not 'username' in request.json or request.json['username'] == '' \
             or len(request.json['username']) > MAX_LEN_USERNAME:
-        abort(400)
+        message = "Username must be less than %s characters" % MAX_LEN_USERNAME
+        return jsonify(message=message), 400
 
     elif not 'email' in request.json or request.json['email'] == '' \
             or len(request.json['email']) > MAX_LEN_EMAIL:
-        abort(400)
+        message = "Email required and must be shorter than %s characters" %\
+                  MAX_LEN_EMAIL
+        return jsonify(message=message), 400
 
     elif not 'password' in request.json or request.json['password'] == '' or \
             len(request.json['password']) < MIN_LEN_PASSWORD or \
             len(request.json['password']) > MAX_LEN_PASSWORD:
-        abort(400)
+        message = "Password must be between %s and %s characters" %\
+            (MIN_LEN_PASSWORD, MAX_LEN_PASSWORD)
+        return jsonify(message=message), 400
 
     elif models.User.username_available(request.json['username'])\
             is not True:
-        response = {'message': 'Username not available'}
-        return jsonify(objects=response), 400
+        message = "Username not available"
+        return jsonify(message=message), 400
 
     elif models.User.email_available(request.json['email']) is not True:
-            response = {'message': 'Email not available'}
-            return jsonify(objects=response), 400
+        message = "Email not available"
+        return jsonify(message=message), 400
 
     user = models.User(request.json['username'],
                        request.json['email'],
@@ -322,84 +404,65 @@ def api_create_user():
     return jsonify(object=response), 201
 
 
-# Delete subscription
-#
-# @app.route('/api/v1/users/<int:user_id>/subscriptions/<int:question_id>',
-@app.route('/api/v1/subscriptions/<int:question_id>',
-           methods=['DELETE'])
-@requires_auth
-def api_delete_user_subscriptions(user_id, question_id):
-
-    app.logger.debug("api_delete_user_subscriptions called...\n")
-
-    user = get_authenticated_user(request)
-
-    if user is None:
-        abort(404)
-
-    app.logger.debug("Authenticated User = %s\n", user.id)
-
-    subscription = user.subscribed_questions.filter(and_(
-        models.Update.question_id == int(question_id),
-        models.Update.user_id == user.id)).first()
-
-    if subscription is not None:
-        user.subscribed_questions.remove(subscription)
-    db_session.add(user)
-    db_session.commit()
-    return jsonify(message="Subscription deleted"), 200
-
-
-#
-# Update subscription
-#
-@app.route('/api/v1/subscriptions/<int:question_id>',
-           methods=['PATCH'])
-@requires_auth
-def api_update_user_subscriptions(question_id=None):
-
-    app.logger.debug("api_update_user_subscriptions called...\n")
-
-    user = get_authenticated_user(request)
-    if not user:
-        abort(404)
-
-    app.logger.debug("Authenticated User = %s\n", user.id)
-
-    if not request.json or not 'how' in request.json \
-            or not request.json['how'] in ['daily', 'weekly', 'asap']:
-        msg_txt = "You must supply the parameter 'how' " +\
-                  "set to one of the desired" +\
-                  "update methods: 'daily', 'weekly', 'asap'"
-        message = [{"message": msg_txt}]
-        return jsonify(objects=message), 400
-
-    subscription = user.subscribed_questions.\
-        filter(models.Update.question_id == int(question_id)).first()
-
-    if subscription is None:
-        abort(404)
-
-    subscription.how = request.json['how']
-    # db_session.add(user)
-    db_session.commit()
-
-    subscription = [{'question_id': subscription.question_id,
-                    'how': subscription.how,
-                    'last_update': str(subscription.last_update)}]
-
-    return jsonify(objects=subscription), 200
-
-
 #
 # Get Questions
 #
 @app.route('/api/v1/questions', methods=['GET'])
 @app.route('/api/v1/questions/<int:question_id>', methods=['GET'])
 def api_get_questions(question_id=None):
+    '''
+    .. http:get:: /questions/(int:question_id)
 
+    A question or list of questions.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      GET /questions/42 HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 200 OK
+      Content-Type: application/json
+
+        {
+          "total_items": "3",
+          "items": "2",
+          "objects": [
+            {
+              "last_move_on": "2013-08-12 09:51:38.632780",
+              "created": "2013-08-12 09:51:38.632763",
+              "title": "My question",
+              "minimum_time": "0",
+              "maximum_time": "604800",
+              "id": 1,
+              "blurb": "My blurb"
+            },
+            {
+              "last_move_on": "2013-08-12 09:51:38.665584",
+              "created": "2013-08-12 09:51:38.665570",
+              "title": "Too Many Chefs",
+              "minimum_time": "0",
+              "maximum_time": "604800",
+              "id": 3,
+              "blurb": "How can they avoid spoiling the broth?"
+            }
+          ],
+          "page": "1",
+          "pages": "1"
+        }
+
+    :param user_id: user id
+    :query page: page number. default is 1
+    :statuscode 200: no error
+    :statuscode 404: there's no user
+    '''
     app.logger.debug("api_get_questions called...\n")
-
     if question_id is not None:
         question = models.Question.query.get(int(question_id))
         if question is None:
@@ -440,12 +503,41 @@ def api_get_questions(question_id=None):
 @app.route('/api/v1/questions', methods=['POST'])
 @requires_auth
 def api_create_question():
+    '''
+    .. http:post:: /questions
 
+    A user or list of users.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      POST /questions HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 201 OK
+      Content-Type: application/json
+
+      {
+         "url": "/questions/10"
+      }
+
+    :json username: username
+    :json email: email address
+    :json password: password
+    :statuscode 201: no error
+    :statuscode 400: bad request
+    '''
     app.logger.debug("api_create_question called...\n")
 
     user = get_authenticated_user(request)
     if not user:
-        abort(404)
+        abort(401)
 
     app.logger.debug("Authenticated User = %s\n", user.id)
 
@@ -490,7 +582,36 @@ def api_create_question():
 
 @app.route('/api/v1/questions/<int:question_id>/subscribers', methods=['GET'])
 def api_question_subscribers(question_id=None):
+    '''
+    .. http:post:: /users
 
+    A user or list of users.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      POST /users HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 201 OK
+      Content-Type: application/json
+
+      {
+         "url": "/users/10"
+      }
+
+    :json username: username
+    :json email: email address
+    :json password: password
+    :statuscode 201: no error
+    :statuscode 400: bad request
+    '''
     app.logger.debug("api_question_subscribers called with %s...\n",
                      question_id)
 
@@ -524,9 +645,34 @@ def api_question_subscribers(question_id=None):
 @app.route('/api/v1/questions/<int:question_id>/proposals/<int:proposal_id>',
            methods=['GET'])
 def api_get_question_proposals(question_id=None, proposal_id=None):
+    '''
+    .. http:get:: /questions/(int:question_id)/proposals/(int:proposal_id)
 
-    app.logger.debug("api_get_question_proposals called with %s...\n",
-                     question_id)
+    A proposal or list of proposals.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      GET /questions/22/proposals HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 200 OK
+      Content-Type: application/json
+
+    :param question_id: user ID
+    :param proposal_id: proposal ID
+    :query generation: question generation. default is current
+    :query page: page number. default is 1
+    :statuscode 200: no error
+    :statuscode 404: there's no proposal
+    '''
+    app.logger.debug("api_get_question_proposals called...\n")
 
     if question_id is None:
         app.logger.debug("ERROR: question_id is None!\n")
@@ -579,12 +725,41 @@ def api_get_question_proposals(question_id=None, proposal_id=None):
     methods=['POST'])
 @requires_auth
 def api_add_proposal_endorsement(question_id, proposal_id):
+    '''
+    .. http:post:: /users
 
+    A user or list of users.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      POST /users HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 201 OK
+      Content-Type: application/json
+
+      {
+        "message": "Endorsement added"
+      }
+
+    :json username: username
+    :json email: email address
+    :json password: password
+    :statuscode 201: no error
+    :statuscode 400: bad request
+    '''
     app.logger.debug("api_add_proposal_endorsement called...\n")
 
     user = get_authenticated_user(request)
     if not user:
-        abort(404)
+        abort(401)
 
     app.logger.debug("Authenticated User = %s\n", user.id)
 
@@ -620,12 +795,41 @@ def api_add_proposal_endorsement(question_id, proposal_id):
            methods=['DELETE'])
 @requires_auth
 def api_remove_proposal_endorsement(question_id, proposal_id):
+    '''
+    .. http:post:: /users
 
+    A user or list of users.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      POST /users HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 201 OK
+      Content-Type: application/json
+
+      {
+         "url": "/users/10"
+      }
+
+    :json username: username
+    :json email: email address
+    :json password: password
+    :statuscode 201: no error
+    :statuscode 400: bad request
+    '''
     app.logger.debug("api_remove_proposal_endorsement called...\n")
 
     user = get_authenticated_user(request)
     if not user:
-        abort(404)
+        abort(401)
 
     app.logger.debug("Authenticated User = %s\n", user.id)
 
@@ -659,12 +863,41 @@ def api_remove_proposal_endorsement(question_id, proposal_id):
 @app.route('/api/v1/questions/<int:question_id>/proposals', methods=['POST'])
 @requires_auth
 def api_create_proposal(question_id):
+    '''
+    .. http:post:: /users
 
+    A user or list of users.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      POST /users HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 201 OK
+      Content-Type: application/json
+
+      {
+         "url": "/users/10"
+      }
+
+    :json username: username
+    :json email: email address
+    :json password: password
+    :statuscode 201: no error
+    :statuscode 400: bad request
+    '''
     app.logger.debug("api_create_proposal called...\n")
 
     user = get_authenticated_user(request)
     if not user:
-        abort(404)
+        abort(401)
 
     app.logger.debug("Authenticated User = %s\n", user.id)
 
@@ -713,12 +946,41 @@ def api_create_proposal(question_id):
            methods=['DELETE'])
 @requires_auth
 def api_delete_proposal(question_id, proposal_id):
+    '''
+    .. http:post:: /users
 
+    A user or list of users.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      POST /users HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 201 OK
+      Content-Type: application/json
+
+      {
+         "url": "/users/10"
+      }
+
+    :json username: username
+    :json email: email address
+    :json password: password
+    :statuscode 201: no error
+    :statuscode 400: bad request
+    '''
     app.logger.debug("api_delete_proposal called...\n")
 
     user = get_authenticated_user(request)
     if not user:
-        abort(404)
+        abort(401)
 
     app.logger.debug("Authenticated User = %s\n", user.id)
 
@@ -748,13 +1010,42 @@ def api_delete_proposal(question_id, proposal_id):
 @app.route('/api/v1/questions/<int:question_id>', methods=['DELETE'])
 @requires_auth
 def api_delete_question(question_id):
+    '''
+    .. http:post:: /users
 
+    A user or list of users.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      POST /users HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 201 OK
+      Content-Type: application/json
+
+        {
+          "message": "Question deleted"
+        }
+
+    :json username: username
+    :json email: email address
+    :json password: password
+    :statuscode 201: no error
+    :statuscode 400: bad request
+    '''
     app.logger.debug("api_delete_question called for question %s...\n",
                      question_id)
 
     user = get_authenticated_user(request)
     if not user:
-        abort(404)
+        abort(401)
 
     app.logger.debug("Authenticated User = %s\n", user.id)
 
@@ -787,12 +1078,41 @@ def api_delete_question(question_id):
 @app.route('/api/v1/questions/<int:question_id>', methods=['PATCH'])
 @requires_auth
 def api_edit_question(question_id):
+    '''
+    .. http:post:: /users
 
+    A user or list of users.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      POST /users HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 201 OK
+      Content-Type: application/json
+
+      {
+         "url": "/users/10"
+      }
+
+    :json username: username
+    :json email: email address
+    :json password: password
+    :statuscode 201: no error
+    :statuscode 400: bad request
+    '''
     app.logger.debug("api_edit_question called...\n")
 
     user = get_authenticated_user(request)
     if not user:
-        abort(404)
+        abort(401)
 
     app.logger.debug("Authenticated User = %s\n", user.id)
 
@@ -855,12 +1175,43 @@ def api_edit_question(question_id):
            methods=['PATCH'])
 @requires_auth
 def api_edit_proposal(question_id, proposal_id):
+    '''
+    .. http:patch:: questions/int:question_id/proposals/int:proposal_id
 
+    A user or list of users.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      PATCH questions/22/proposals/14 HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 201 OK
+      Content-Type: application/json
+
+        {
+          "message": "Proposal updated"
+        }
+
+    :param question_id: question id
+    :param proposal_id: proposal id
+    :json title: title
+    :json blurb: question content
+    :json abstract: optional abstract
+    :statuscode 201: no error
+    :statuscode 400: bad request
+    '''
     app.logger.debug("api_edit_proposal called...\n")
 
     user = get_authenticated_user(request)
     if not user:
-        abort(404)
+        abort(401)
 
     app.logger.debug("Authenticated User = %s\n", user.id)
 
@@ -912,7 +1263,38 @@ def api_edit_proposal(question_id, proposal_id):
            '<int:proposal_id>/endorsers',
            methods=['GET'])
 def api_get_question_proposal_endorsers(question_id=None, proposal_id=None):
+    '''
+    .. http:post:: /users
 
+    A user or list of users.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      POST /users HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 201 OK
+      Content-Type: application/json
+
+      {
+         "url": "/users/10"
+      }
+
+    :param question_id: question id
+    :param proposal_id: proposal id
+    :json username: username
+    :json email: email address
+    :json password: password
+    :statuscode 201: no error
+    :statuscode 400: bad request
+    '''
     app.logger.debug("api_get_question_proposal_endorsers called...\n")
 
     if question_id is None or proposal_id is None:
@@ -945,7 +1327,37 @@ def api_get_question_proposal_endorsers(question_id=None, proposal_id=None):
 #
 @app.route('/api/v1/questions/<int:question_id>/pareto', methods=['GET'])
 def api_question_pareto(question_id=None):
+    '''
+    .. http:post:: /users
 
+    A user or list of users.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      POST /users HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 201 OK
+      Content-Type: application/json
+
+      {
+         "url": "/users/10"
+      }
+
+    :param question_id: question id
+    :json username: username
+    :json email: email address
+    :json password: password
+    :statuscode 201: no error
+    :statuscode 400: bad request
+    '''
     app.logger.debug("api_question_pareto called with %s...\n", question_id)
 
     if question_id is None:
@@ -973,7 +1385,37 @@ def api_question_pareto(question_id=None):
 
 @app.route('/api/v1/questions/<int:question_id>/key_players', methods=['GET'])
 def api_question_key_players(question_id=None):
+    '''
+    .. http:post:: /users
 
+    A user or list of users.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      POST /users HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 201 OK
+      Content-Type: application/json
+
+      {
+         "url": "/users/10"
+      }
+
+    :param question_id: question id
+    :json username: username
+    :json email: email address
+    :json password: password
+    :statuscode 201: no error
+    :statuscode 400: bad request
+    '''
     app.logger.debug("api_question_key_players called with %s...\n",
                      question_id)
 
@@ -996,7 +1438,9 @@ def api_question_key_players(question_id=None):
     for (endorser, vote_for) in key_players.iteritems():
         proposals = []
         for proposal in vote_for:
-            proposals.append(url_for('api_get_proposals', proposal_id=proposal.id))
+            proposals.append(url_for('api_get_question_proposals',
+                                     question_id=question.id,
+                                     proposal_id=proposal.id))
         kp = {endorser: proposals}
         results.append(kp)
 
@@ -1009,7 +1453,36 @@ def api_question_key_players(question_id=None):
 @app.route('/api/v1/questions/<int:question_id>/endorser_effects',
            methods=['GET'])
 def api_question_endorser_effects(question_id=None):
+    '''
+    .. http:post:: /users
 
+    A user or list of users.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      POST /users HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 201 OK
+      Content-Type: application/json
+
+      {
+         "url": "/users/10"
+      }
+
+    :json username: username
+    :json email: email address
+    :json password: password
+    :statuscode 201: no error
+    :statuscode 400: bad request
+    '''
     app.logger.debug("api_question_endorser_effects called with %s...\n",
                      question_id)
 
@@ -1024,7 +1497,8 @@ def api_question_endorser_effects(question_id=None):
         abort(404)
 
     generation = int(request.args.get('generation', question.generation))
-    endorser_effects = question.calculate_endorser_effects(generation=generation)
+    endorser_effects = question.\
+        calculate_endorser_effects(generation=generation)
 
     app.logger.debug("Endorser Effects==> %s", endorser_effects)
 
@@ -1038,9 +1512,9 @@ def api_question_endorser_effects(question_id=None):
             PF_minus_public = replaceWithPublic(effects['PF_minus'])
 
             endorser_effects = {
-                        'PF_excluding': PF_excluding_pulbic,
-                        'PF_plus': PF_plus_public,
-                        'PF_minus': PF_minus_public}
+                'PF_excluding': PF_excluding_pulbic,
+                'PF_plus': PF_plus_public,
+                'PF_minus': PF_minus_public}
         else:
             endorser_effects = {}
 
@@ -1062,7 +1536,36 @@ def replaceWithPublic(collection):
 # http://[hostname]/api/v1.0/questions/47/graph?generation=2&graphtype=pareto
 @app.route('/api/v1/questions/<int:question_id>/graph', methods=['GET'])
 def api_question_graph(question_id):
+    '''
+    .. http:post:: /users
 
+    A user or list of users.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      POST /users HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 201 OK
+      Content-Type: application/json
+
+      {
+         "url": "/users/10"
+      }
+
+    :json username: username
+    :json email: email address
+    :json password: password
+    :statuscode 201: no error
+    :statuscode 400: bad request
+    '''
     app.logger.debug("api_question_votingmap called...\n")
 
     if question_id is None:
@@ -1094,7 +1597,88 @@ def api_question_graph(question_id):
 @app.route('/api/v1/questions/<int:question_id>/proposal_relations',
            methods=['GET'])
 def api_question_proposal_relations(question_id=None):
+    '''
+    .. http:post:: questions/(int:question_id)/proposal_relations
 
+    A user or list of users.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      GET questions/42/proposal_relations HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 201 OK
+      Content-Type: application/json
+
+      {
+          "query_generation": "1",
+          "current_generation": "1",
+          "objects": [
+            {
+              "3": {
+                "dominating": [
+                  {
+                    "question_url": "/api/v1/questions/1",
+                    "author_url": "/api/v1/users/3",
+                    "title": "Bills First Proposal",
+                    "url": "/api/v1/questions/1/proposals/1",
+                    "abstract": null,
+                    "created": "2013-08-13 10:42:55.625328",
+                    "id": "1",
+                    "blurb": "Bills blurb of varying interest",
+                    "generation_created": "1"
+                  }
+                ],
+                "dominated": []
+              }
+            },
+            {
+              "2": {
+                "dominating": [],
+                "dominated": []
+              }
+            },
+            {
+              "1": {
+                "dominating": [],
+                "dominated": [
+                  {
+                    "question_url": "/api/v1/questions/1",
+                    "author_url": "/api/v1/users/2",
+                    "title": "Susans Only Proposal",
+                    "url": "/api/v1/questions/1/proposals/3",
+                    "abstract": "Blah blah blah",
+                    "created": "2013-08-13 10:42:55.664450",
+                    "id": "3",
+                    "blurb": "My blub is cool",
+                    "generation_created": "1"
+                  }
+                ]
+              }
+            },
+            {
+              "4": {
+                "dominating": [],
+                "dominated": []
+              }
+            }
+          ],
+          "num_items": "4",
+          "question_id": "1"
+       }
+
+    :param question_id: question id
+    :type question_id: int
+    :statuscode 201: no error
+    :statuscode 400: bad request
+    '''
     app.logger.debug("api_question_proposal_relations called with %s...\n",
                      question_id)
 
@@ -1116,14 +1700,12 @@ def api_question_proposal_relations(question_id=None):
 
     results = []
     for (proposal, relations) in proposal_relations.iteritems():
-        endorser_effects = dict()
-
         dominated_public = replaceWithPublic(relations['dominated'])
         dominating_public = replaceWithPublic(relations['dominating'])
 
         prop_relations = {
-                    'dominated': dominated_public,
-                    'dominating': dominating_public}
+            'dominated': dominated_public,
+            'dominating': dominating_public}
 
         results.append({proposal.id: prop_relations})
 
@@ -1134,58 +1716,40 @@ def api_question_proposal_relations(question_id=None):
         num_items=str(len(proposal_relations)), objects=results), 200
 
 
-# Get subscriptions
-#
-@app.route('/api/v1/users/<int:user_id>/subscriptions', methods=['GET'])
-@app.route('/api/v1/users/<int:user_id>/subscriptions/<int:question_id>',
-           methods=['GET'])
-def api_get_user_subscriptions(user_id, question_id=None):
-
-    app.logger.debug("api_get_user_subscriptions called...\n")
-
-    if user_id is None:
-        abort(404)
-
-    user = models.User.query.get(int(user_id))
-
-    if question_id is not None:
-
-        subscribed_question = user.subscribed_questions.\
-            filter(models.Update.question_id == int(question_id)).one()
-
-        if subscribed_question is None:
-            abort(404)
-
-        app.logger.debug("Subscribed question ID %s\n",
-                         subscribed_question.question_id)
-        '''
-        subscriptions = [{'question_id': subscribed_question.question_id,
-                          'how': subscribed_question.how,
-                          'last_update': str(subscribed_question.last_update)}]
-        '''
-        results = [subscribed_question.get_public()]
-        return jsonify(object=results), 200
-
-    else:
-        page = int(request.args.get('page', 1))
-        subscribed_questions = user.subscribed_questions.\
-            paginate(page, RESULTS_PER_PAGE, False)
-        items = len(subscribed_questions.items)
-        pages = subscribed_questions.pages
-
-        results = []
-        for s in subscribed_questions.items:
-            results.append(s.get_public())
-
-        return jsonify(items=(items), page=str(page), pages=str(pages),
-                       objects=results), 200
-
-
 # Get Invitations
 @app.route('/api/v1/questions/<int:question_id>/invitations',
            methods=['GET'])
 def api_get_invitations(question_id):
+    '''
+    .. http:post:: /users
 
+    A user or list of users.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      POST /users HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 201 OK
+      Content-Type: application/json
+
+      {
+         "url": "/users/10"
+      }
+
+    :json username: username
+    :json email: email address
+    :json password: password
+    :statuscode 201: no error
+    :statuscode 400: bad request
+    '''
     app.logger.debug("api_get_invitations called...\n")
 
     if question_id is None:
@@ -1221,12 +1785,41 @@ def api_get_invitations(question_id):
            methods=['POST'])
 @requires_auth
 def api_create_invitation(question_id):
+    '''
+    .. http:post:: /users
 
+    A user or list of users.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      POST /users HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 201 OK
+      Content-Type: application/json
+
+      {
+         "url": "/users/10"
+      }
+
+    :json username: username
+    :json email: email address
+    :json password: password
+    :statuscode 201: no error
+    :statuscode 400: bad request
+    '''
     app.logger.debug("api_create_invitation called...\n")
 
     user = get_authenticated_user(request)
     if not user:
-        abort(404)
+        abort(401)
 
     app.logger.debug("Authenticated User = %s\n", user.id)
 
@@ -1264,18 +1857,146 @@ def api_create_invitation(question_id):
         abort(500)
 
 
+# Get subscriptions
+#
+@app.route('/api/v1/users/<int:user_id>/subscriptions', methods=['GET'])
+@app.route('/api/v1/users/<int:user_id>/subscriptions/<int:question_id>',
+           methods=['GET'])
+def api_get_user_subscriptions(user_id, question_id=None):
+    '''
+    .. http:post:: /users
+
+    A user or list of users.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      POST /users HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 201 OK
+      Content-Type: application/json
+
+        {
+          "total_items": 3,
+          "items": 2,
+          "objects": [
+            {
+              "url": "/users/1/subscriptions/1",
+              "how": "asap",
+              "last_update": "None",
+              "question_id": "1"
+            },
+            {
+              "url": "/users/1/subscriptions/2",
+              "how": "asap",
+              "last_update": "None",
+              "question_id": "2"
+            }
+          ],
+          "page": "1",
+          "pages": "2"
+        }
+
+    :param user_id: user id
+    :type user_id: int
+    :param question_id: question id
+    :type question_id: int
+    :json username: username
+    :json email: email address
+    :json password: password
+    :statuscode 201: no error
+    :statuscode 400: bad request
+    '''
+    app.logger.debug("api_get_user_subscriptions called...\n")
+
+    if user_id is None:
+        abort(404)
+
+    user = models.User.query.get(int(user_id))
+
+    if question_id is not None:
+
+        subscribed_question = user.subscribed_questions.\
+            filter(models.Update.question_id == int(question_id)).one()
+
+        if subscribed_question is None:
+            abort(404)
+
+        app.logger.debug("Subscribed question ID %s\n",
+                         subscribed_question.question_id)
+        '''
+        subscriptions = [{'question_id': subscribed_question.question_id,
+                          'how': subscribed_question.how,
+                          'last_update': str(subscribed_question.last_update)}]
+        '''
+        results = [subscribed_question.get_public()]
+        return jsonify(object=results), 200
+
+    else:
+        page = int(request.args.get('page', 1))
+        subscribed_questions = user.subscribed_questions.\
+            paginate(page, RESULTS_PER_PAGE, False)
+        items = len(subscribed_questions.items)
+        pages = subscribed_questions.pages
+        total_items = subscribed_questions.total
+
+        results = []
+        for s in subscribed_questions.items:
+            results.append(s.get_public())
+
+        return jsonify(total_items=total_items, items=(items),
+                       page=str(page), pages=str(pages),
+                       objects=results), 200
+
+
 #
 # Create Subscription
 #
 @app.route('/api/v1/users/<int:user_id>/subscriptions', methods=['POST'])
 @requires_auth
 def api_add_user_subscriptions(user_id):
+    '''
+    .. http:post:: /users
 
+    A user or list of users.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      POST /users HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 201 OK
+      Content-Type: application/json
+
+      {
+         "url": "/users/10"
+      }
+
+    :json username: username
+    :json email: email address
+    :json password: password
+    :statuscode 201: no error
+    :statuscode 400: bad request
+    '''
     app.logger.debug("api_add_user_subscriptions called...\n")
 
     user = get_authenticated_user(request)
     if not user:
-        abort(404)
+        abort(401)
 
     app.logger.debug("Authenticated User = %s\n", user.id)
 
@@ -1307,3 +2028,151 @@ def api_add_user_subscriptions(user_id):
     return jsonify({'url': url_for('api_get_user_subscriptions',
                                    user_id=user_id,
                                    question_id=question_id)}), 201
+
+
+# Delete subscription
+#
+# @app.route('/api/v1/subscriptions/<int:question_id>',
+@app.route('/api/v1/users/<int:user_id>/subscriptions/<int:question_id>',
+           methods=['DELETE'])
+@requires_auth
+def api_delete_user_subscriptions(user_id, question_id):
+    '''
+    .. http:delete:: /users/(int:user_id)/subscriptions/(int:question_id)
+
+    A user or list of users.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      DELETE users/56/subscriptions/44 HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 201 OK
+      Content-Type: application/json
+
+      {
+        "message": "Subscription Deleted"
+      }
+
+    :param user_id: user id
+    :param question_id: question id
+    :statuscode 200: no error
+    :statuscode 400: bad request
+    '''
+    app.logger.debug("api_delete_user_subscriptions called...\n")
+
+    user = get_authenticated_user(request)
+
+    if user is None:
+        abort(404)
+
+    if user_id is None:
+        abort(400)
+
+    if user.id != user_id:
+        abort(401)
+
+    if question_id is None:
+        abort(404)
+
+    app.logger.debug("Authenticated User = %s\n", user.id)
+
+    subscription = user.subscribed_questions.filter(and_(
+        models.Update.question_id == int(question_id),
+        models.Update.user_id == user.id)).first()
+
+    if subscription is not None:
+        user.subscribed_questions.remove(subscription)
+    db_session.add(user)
+    db_session.commit()
+    return jsonify(message="Subscription deleted"), 200
+
+
+#
+# Update subscription
+#
+@app.route('/api/v1/users/<int:user_id>/subscriptions/<int:question_id>',
+           methods=['PATCH'])
+@requires_auth
+def api_update_user_subscriptions(user_id, question_id):
+    '''
+    .. http:patch:: /users/(int:user_id)/subscriptions/(int:question_id)
+
+    Update a user's question subscription'.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      PATCH users/56/subscriptions/44 HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+   **Example response**:
+
+   .. sourcecode:: http
+
+      Status Code: 201 OK
+      Content-Type: application/json
+
+      {
+         "url": "/users/10"
+      }
+
+    :param user_id: user id
+    :type user_id: int
+    :param question_id: question id
+    :type question_id: int
+    :json how: one of daily, weekly, or asap
+    :type how: string
+    :statuscode 201: no error
+    :statuscode 400: bad request
+    :statuscode 401: unauthorized
+    '''
+    app.logger.debug("api_update_user_subscriptions called...\n")
+
+    user = get_authenticated_user(request)
+    if not user:
+        abort(401)
+
+    app.logger.debug("Authenticated User = %s\n", user.id)
+
+    if user_id is None:
+        abort(400)
+
+    if user.id != user_id:
+        abort(401)
+
+    if question_id is None:
+        abort(400)
+
+    if not request.json or not 'how' in request.json \
+            or not request.json['how'] in ['daily', 'weekly', 'asap']:
+        msg_txt = "You must supply the parameter 'how' " +\
+                  "set to one of the desired" +\
+                  "update methods: 'daily', 'weekly', 'asap'"
+        message = [{"message": msg_txt}]
+        return jsonify(objects=message), 400
+
+    subscription = user.subscribed_questions.\
+        filter(models.Update.question_id == int(question_id)).first()
+
+    if subscription is None:
+        abort(404)
+
+    subscription.how = request.json['how']
+    # db_session.add(user)
+    db_session.commit()
+
+    subscription = [{'question_id': subscription.question_id,
+                    'how': subscription.how,
+                    'last_update': str(subscription.last_update)}]
+
+    return jsonify(objects=subscription), 200
