@@ -44,6 +44,9 @@ Module documentation
 
 .. automodule:: VilfredoReloadedCore.main
   :members:
+
+.. automodule:: VilfredoReloadedCore.api
+  :members:
 """
 
 import pkg_resources
