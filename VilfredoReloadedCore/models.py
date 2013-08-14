@@ -1825,13 +1825,14 @@ class Question(db.Model):
             else:
                 if (not internal_links):
                     urlquery = self.create_proposal_url(p, self.room)
+                    tooltip = self.create_proposal_tooltip(p)
                     internal_proposal_url =\
                         self.create_internal_proposal_url(p)
                     voting_graph += str(p.id) +\
                         ' [id=p' + str(p.id) + ' label=' + str(p.id) +\
                         ' shape=box color=' + color + ' peripheries=' +\
                         str(peripheries) + ' tooltip="' +\
-                        internal_proposal_url +\
+                        tooltip +\
                         '"  fontsize=11 URL="' + app.config['SITE_DOMAIN'] +\
                         '/viewproposal.py/' + urlquery +\
                         '" target="_top"]'
