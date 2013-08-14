@@ -1671,7 +1671,8 @@ class Question(db.Model):
             voting_graph += self.write_bundled_users(
                 kc2u.username,
                 combined_users[kc2u],
-                self.room, details,
+                self.room,
+                details,
                 details_table)
 
         for e in endorsers:
@@ -2181,12 +2182,11 @@ class Question(db.Model):
 
     def write_bundled_users(self, bundle_name, bundle_content, room,
                             details, details_table, highlight_user1=None):
-
         node_id = ''
         for user in bundle_content:
             if (node_id):
                 node_id += '_'
-            node_id += 'p' + str(user.id)
+            node_id += 'u' + str(user.id)
 
         # ' [shape=plaintext ' +\
         bundle = '"' + bundle_name + '" ' +\
@@ -2205,7 +2205,7 @@ class Question(db.Model):
             to_add = ''
             # We write the highlighted user before and on a different color
             to_add = ' BGCOLOR="red" '
-            bundle += '<TR><TD ' + to_add + ' HREF="' +\
+            bundle += '<TR><TD ' + to_add + ' HREF="http://' +\
                 app.config['SITE_DOMAIN'] +\
                 '/user+php?u=' +\
                 urlquery + '" tooltip="' + tooltip + '" target="_top">' +\
@@ -2216,9 +2216,9 @@ class Question(db.Model):
             if (highlight_user1 and highlight_user1 == u):
                 continue
 
-            urlquery = ' HREF="' + str(u.id)
+            urlquery = str(u.id)
             tooltip = u.username
-            bundle += '<TR><TD ' + ' HREF="' + app.config['SITE_DOMAIN'] +\
+            bundle += '<TR><TD ' + ' HREF="http://' + app.config['SITE_DOMAIN'] +\
                 '/user/u=' + urlquery +\
                 '" tooltip="' + tooltip + '" target="_top">' +\
                 u.username + '</TD></TR>'
@@ -2243,7 +2243,7 @@ class Question(db.Model):
         return s
 
     def create_proposal_tooltip(self, proposal):
-        if (len(proposal.abstract) > 0):
+        if (proposal.abstract and len(proposal.abstract) > 0):
             tooltip = self.string_safe(proposal.abstract)
         else:
             tooltip = self.string_safe(proposal.blurb)
