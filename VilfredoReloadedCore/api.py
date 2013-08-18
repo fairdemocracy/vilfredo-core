@@ -26,11 +26,9 @@ REST API
 
 from flask import request,\
     url_for, jsonify, make_response, abort
-from . import app, models  # login_manager
+from . import app, models
 from . database import db_session
-# from flask.ext.login import current_user
 from sqlalchemy import and_
-# Authentication
 from functools import wraps
 from flask import Response
 
