@@ -42,35 +42,48 @@ from HTMLParser import HTMLParser
 
 from flask import url_for
 
-# from flask.ext.sqlalchemy import SQLAlchemy
-
 
 def enum(**enums):
     return type('Enum', (), enums)
 
-
-def makeMapFilename(question_id, generation, map_type="votes"):
-    '''
-        .. function:: makeMapFilename(question_id,
-                                      generation[, map_type="votes"])
-
-        Create the filname for the voting map.
-
-        :param question_id: ID of the question
-        :type question_id: Integer
-        :param generation: generation of the voting map
-        :type generation: Integer
-        :param generation: Map type
-        :type generation: String
-        :rtype: String
-        '''
-    return "map" + "_Q" + str(question_id) + "_G" + \
-           str(generation) + "_T" + str(map_type)
-
-
 GraphLevelType = enum(layers=1, num_votes=2, flat=3)
 
 QuestionPhaseType = enum(writing=1, voting=2, archive=3)
+
+map_path = app.config['MAP_PATH']
+
+
+def make_map_filename(question_id,
+                      generation,
+                      map_type="all",
+                      proposal_level_type=GraphLevelType.layers,
+                      user_level_type=GraphLevelType.layers):
+    '''
+        .. function:: make_map_filename(
+            question_id,
+            generation[,
+            map_type="all",
+            proposal_level_type=GraphLevelType.layers,
+            user_level_type=GraphLevelType.layers])
+
+        Create the filname for the voting map.
+
+        :param question_id: question id
+        :type question_id: int
+        :param generation: generation of the voting map
+        :type generation: int
+        :param map_type: map type
+        :type map_type: string
+        :param proposal_level_type: GraphLevelType
+        :type proposal_level_type: GraphLevelType
+        :type user_level_type: GraphLevelType
+        :param user_level_type: GraphLevelType
+        :rtype: String
+        '''
+    return "map" + "_Q" + str(question_id) + "_G" + \
+           str(generation) + "_" + str(map_type) + \
+           "_" + str(proposal_level_type) + \
+           "_" + str(user_level_type)
 
 
 class Update(db.Model):
@@ -103,8 +116,7 @@ class Update(db.Model):
     question_id = db.Column(db.Integer, db.ForeignKey('question.id'))
 
     subscribed_to = db.relationship("Question",
-                                    backref="subscriber_update",
-                                    single_parent=True)
+                                    backref="subscriber_update")
 
     def __init__(self, subscriber, subscribed_to, how=None):
         self.user_id = subscriber.id
@@ -1339,7 +1351,11 @@ class Question(db.Model):
             keys.append(k)
         return inv
 
-    def get_voting_graph(self, generation, map_type):
+    def get_voting_graph(self,
+                         generation=None,
+                         map_type='all',
+                         proposal_level_type=GraphLevelType.layers,
+                         user_level_type=GraphLevelType.layers):
         '''
         .. function:: get_voting_graph(generation, map_type)
 
@@ -1349,15 +1365,25 @@ class Question(db.Model):
         :type generation: Integer
         :param map_type: map type
         :type map_type: string
-        :rtype: string
+        :rtype: string or Boolean
         '''
         # Generate filename
-        maps_path = 'map/'
-        filename = makeMapFilename(self.id, generation, map_type)
-        filepath = maps_path + filename
+        filename = make_map_filename(self.id,
+                                     generation,
+                                     map_type,
+                                     proposal_level_type,
+                                     user_level_type)
+        filepath = map_path + filename
         app.logger.debug("Filepath = %s", filepath)
 
         import os
+        if not os.path.exists(map_path):
+            try:
+                os.makedirs(map_path)
+            except IOError:
+                app.logger.debug('Failed to create map path %s', map_path)
+                return False
+
         if not os.path.isfile(filepath + '.svg'):
             if not os.path.isfile(filepath + '.dot'):
                 # Create the dot specification of the map
@@ -1368,10 +1394,13 @@ class Question(db.Model):
                     map_proposals = self.\
                         get_proposals(generation=generation)
 
-                voting_graph = self.make_graphviz_map(proposals=map_proposals,
-                                                      generation=generation)
+                voting_graph = self.make_graphviz_map(
+                    proposals=map_proposals,
+                    generation=generation,
+                    proposal_level_type=proposal_level_type,
+                    user_level_type=user_level_type)
                 # Save the dot specification as a dot file
-                dot_file = open(filename+".dot", "w")
+                dot_file = open(filepath+".dot", "w")
                 dot_file.write(voting_graph)
                 dot_file.close()
             # Generate svg file from the dot file using "dot"
@@ -1379,13 +1408,10 @@ class Question(db.Model):
             #
             from subprocess import call
             call(["/usr/local/bin/dot",
-                  "-Tsvg", filename + ".dot", "-o" + filename + ".svg"])
+                  "-Tsvg", filepath + ".dot", "-o" + filepath + ".svg"])
 
-        # return voting_graph url
-        return url_for("api_question_graph",
-                       question_id=self.id,
-                       generation=generation,
-                       map_type=map_type)
+        # Return voting graph file path
+        return filepath + ".svg"
 
     def make_graphviz_map(self,
                           proposals=None,
@@ -1818,8 +1844,8 @@ class Question(db.Model):
                 if (not internal_links):
                     urlquery = self.create_proposal_url(p, self.room)
                     tooltip = self.create_proposal_tooltip(p)
-                    internal_proposal_url =\
-                        self.create_internal_proposal_url(p)
+                    # internal_proposal_url =\
+                      # self.create_internal_proposal_url(p)
                     voting_graph += str(p.id) +\
                         ' [id=p' + str(p.id) + ' label=' + str(p.id) +\
                         ' shape=box color=' + color + ' peripheries=' +\
@@ -2211,7 +2237,8 @@ class Question(db.Model):
 
             urlquery = str(u.id)
             tooltip = u.username
-            bundle += '<TR><TD ' + ' HREF="http://' + app.config['SITE_DOMAIN'] +\
+            bundle += '<TR><TD ' + ' HREF="http://' +\
+                app.config['SITE_DOMAIN'] +\
                 '/user/u=' + urlquery +\
                 '" tooltip="' + tooltip + '" target="_top">' +\
                 u.username + '</TD></TR>'

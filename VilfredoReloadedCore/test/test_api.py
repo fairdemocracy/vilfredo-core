@@ -33,16 +33,17 @@ except ImportError:
     import unittest
 
 from .. import app
-from .. import views, api  # NOQA
+from .. import api
 from .. database import drop_db, init_db
 import base64
 import json
 import os
 
 DELETE_DB_ON_EXIT = True
+MAKE_GRAPH = True
 
 
-class LoginTestCase(unittest.TestCase):
+class RESTAPITestCase(unittest.TestCase):
     def setUp(self):
         # app.logger.debug("Create DB")
         # init_db()
@@ -56,8 +57,12 @@ class LoginTestCase(unittest.TestCase):
             app.logger.debug("Initializing sqlite db\n")
             init_db()
 
-        app.config['TESTING'] = True
-        self.app = app.test_client()
+            app.config['TESTING'] = True
+            self.app = app.test_client()
+        else:
+            app.logger.debug("Using historical db: skipping test %s.... ",
+                             __name__)
+            print "Using historical db: skipping test %s.... " % (__name__)
 
     def tearDown(self):
         # For SQLite development DB only
@@ -97,6 +102,12 @@ class LoginTestCase(unittest.TestCase):
 
     def test_rest_api(self):
         #
+        # Don't run against histroical data DB
+        #
+        if not 'vr.db' in app.config['SQLALCHEMY_DATABASE_URI']:
+            return
+
+        #
         # Create Users
         #
         # rv = self.app.post('/api/v1/users', data=payload,
@@ -106,11 +117,11 @@ class LoginTestCase(unittest.TestCase):
                                  dict(username='john',
                                       email='john@example.com',
                                       password='test123'))
-        self.assertEqual(rv.status_code, 201)
-        data = json.loads(rv.data)
-        app.logger.debug("New user at = %s\n", data['object']['url'])
         # Log data received
         app.logger.debug("Data retrieved from Create User = %s\n", rv.data)
+        self.assertEqual(rv.status_code, 201)
+        data = json.loads(rv.data)
+        app.logger.debug("New user at = %s\n", data['url'])
 
         # Attempt to create a user with a duplicate username
         rv = self.open_with_json('/api/v1/users',
@@ -199,7 +210,7 @@ class LoginTestCase(unittest.TestCase):
                                       'test123')
         self.assertEqual(rv.status_code, 201)
         data = json.loads(rv.data)
-        app.logger.debug("New question at = %s\n", data['object']['url'])
+        app.logger.debug("New question at = %s\n", data['url'])
         # Log data received
         app.logger.debug("Data retrieved from Create Question = %s\n",
                          rv.data)
@@ -237,7 +248,19 @@ class LoginTestCase(unittest.TestCase):
                                       'test123')
         self.assertEqual(rv.status_code, 201)
         # Log data received
-        app.logger.debug("Data retrieved fro Create Invite = %s\n", rv.data)
+        app.logger.debug("Data retrieved from Create Invite = %s\n", rv.data)
+
+        #
+        # Get Invites
+        #
+        rv = self.open_with_json_auth('/api/v1/questions/1/invitations',
+                                      'GET',
+                                      dict(),
+                                      'john',
+                                      'test123')
+        self.assertEqual(rv.status_code, 200)
+        # Log data received
+        app.logger.debug("Data retrieved from Get Invites = %s\n", rv.data)
 
         #
         # Create Subscriptions
@@ -266,6 +289,29 @@ class LoginTestCase(unittest.TestCase):
                                       'test123')
         self.assertEqual(rv.status_code, 201)
 
+        rv = self.open_with_json_auth('/api/v1/users/5/subscriptions',
+                                      'POST',
+                                      dict(question_id=3, how='daily'),
+                                      'harry',
+                                      'test123')
+        self.assertEqual(rv.status_code, 201)
+
+        #
+        # Update Subscriptions
+        #
+        rv = self.open_with_json_auth('/api/v1/users/5/subscriptions',
+                                      'PATCH',
+                                      dict(question_id=3, how='asap'),
+                                      'harry',
+                                      'test123')
+        # Log data received
+        app.logger.debug("Data retrieved from Update Subscriptions = %s\n",
+                         rv.data)
+        self.assertEqual(rv.status_code, 201)
+
+        #
+        # Get Subscriptions
+        #
         rv = self.open_with_json_auth('/api/v1/users/1/subscriptions',
                                       'GET',
                                       dict(),
@@ -274,6 +320,19 @@ class LoginTestCase(unittest.TestCase):
         self.assertEqual(rv.status_code, 200)
         # Log data received
         app.logger.debug("Data retrieved from Get Subscriptions = %s\n",
+                         rv.data)
+
+        #
+        # Get question subscribers
+        #
+        rv = self.open_with_json_auth('/api/v1/questions/3/subscribers',
+                                      'GET',
+                                      dict(),
+                                      'john',
+                                      'test123')
+        self.assertEqual(rv.status_code, 200)
+        # Log data received
+        app.logger.debug("Data retrieved from Get Question Subscribers = %s\n",
                          rv.data)
 
         #
@@ -335,7 +394,7 @@ class LoginTestCase(unittest.TestCase):
         self.assertEqual(rv.status_code, 201)
 
         data = json.loads(rv.data)
-        new_proposal_url = data['object']['url']
+        new_proposal_url = data['url']
         app.logger.debug("New propoal URL = %s", new_proposal_url)
 
         # Harry edits his proposal
@@ -350,6 +409,20 @@ class LoginTestCase(unittest.TestCase):
         self.assertEqual(rv.status_code, 200, self.get_message(rv))
         # Log data received
         app.logger.debug("Data retrieved from Edit Proposal = %s\n",
+                         rv.data)
+
+        #
+        # Get Question Proposals
+        #
+        rv = self.open_with_json_auth(
+            '/api/v1/questions/1/proposals',
+            'GET',
+            dict(),
+            'bill',
+            'test123')
+        self.assertEqual(rv.status_code, 200)
+        # Log data received
+        app.logger.debug("Data retrieved from Get Question Proposals = %s\n",
                          rv.data)
 
         #
@@ -381,6 +454,40 @@ class LoginTestCase(unittest.TestCase):
         # Log data received
         app.logger.debug("Data retrieved from Edit Question (Move On) = %s\n",
                          rv.data)
+
+        #
+        # Create then Delete a Proposal.
+        # Must be done in the writing phase where the proposal was created.
+        #
+        rv = self.open_with_json_auth(
+            '/api/v1/questions/3/proposals',
+            'POST',
+            dict(
+                title="My less than stirling proposal",
+                blurb="This is not very good. Think I'll delete it."),
+            'harry',
+            'test123')
+        app.logger.debug("Data retrieved from Create Proposal = %s\n",
+                         rv.data)
+        self.assertEqual(rv.status_code, 201)
+        data = json.loads(rv.data)
+        harrys_proposal_url = data['url']
+        #
+        # Delete the proposal
+        #
+        app.logger.debug("Harry deletes his proposal with url: %s",
+                         harrys_proposal_url)
+        rv = self.open_with_json_auth(
+            harrys_proposal_url,
+            'DELETE',
+            dict(),
+            'harry',
+            'test123')
+        app.logger.debug("Harry deletes his proposal - message: %s",
+                         self.get_message(rv))
+        app.logger.debug("Data retrieved from Delete Proposal = %s\n",
+                         rv.data)
+        self.assertEqual(rv.status_code, 200)
 
         #
         # Create Endorsements
@@ -534,6 +641,22 @@ class LoginTestCase(unittest.TestCase):
         app.logger.debug("Data retrieved from Get Proposal Relations = %s\n",
                          rv.data)
 
+        if (MAKE_GRAPH):
+            #
+            # Create Voting Map
+            #
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/graph?generation=1&map_type=all',
+                'GET',
+                dict(),
+                'harry',
+                'test123')
+            self.assertEqual(rv.status_code, 200)
+            data = json.loads(rv.data)
+            app.logger.debug("Data retrieved from get graph = %s\n", data)
+            self.assertIn('map_Q1_G1_all_1_1.svg', data['url'],
+                          "File URL not returned")
+
         #
         # Remove Endorsements
         #
@@ -575,8 +698,8 @@ class LoginTestCase(unittest.TestCase):
                                       'test123')
         self.assertEqual(rv.status_code, 201)
         data = json.loads(rv.data)
-        app.logger.debug("New question at = %s\n", data['object']['url'])
-        new_question_url = data['object']['url']
+        app.logger.debug("New question at = %s\n", data['url'])
+        new_question_url = data['url']
 
         #
         # Author Deletes Question

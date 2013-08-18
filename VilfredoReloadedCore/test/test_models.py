@@ -40,6 +40,7 @@ import time
 import os
 
 DELETE_DB_ON_EXIT = True
+MAKE_GRAPH = False
 
 
 def setUpDB():
@@ -52,6 +53,12 @@ def setUpDB():
         # Create empty SQLite test DB
         app.logger.debug("Initializing sqlite db\n")
         init_db()
+    else:
+            app.logger.debug(
+                "Using historical vga_live db: skipping test %s.... ",
+                __name__)
+            print "Using historical vga_live db: skipping test %s.... " %\
+                  (__name__)
 
 
 def tearDownDB():
@@ -60,6 +67,7 @@ def tearDownDB():
             and DELETE_DB_ON_EXIT:
         app.logger.debug("Dropping sqlite db\n")
         drop_db()
+        db_session.remove()
 
 
 class PasswordHashTest(unittest.TestCase):
@@ -80,9 +88,14 @@ class UserTest(unittest.TestCase):
 
     def tearDown(self):
         tearDownDB()
-        db_session.remove()
 
     def test_create_user(self):
+        #
+        # Don't run against histroical data DB
+        #
+        if not 'vr.db' in app.config['SQLALCHEMY_DATABASE_URI']:
+            return
+
         user = models.User('test_username', 'test_email', 'test_password')
         db_session.add(user)
         db_session.commit()
@@ -109,7 +122,6 @@ class QuestionTest(unittest.TestCase):
 
     def tearDown(self):
         tearDownDB()
-        db_session.remove()
 
     def time_passed_dhm(self, timestamp):
         td = datetime.datetime.utcfromtimestamp(time.time()) -\
@@ -119,6 +131,12 @@ class QuestionTest(unittest.TestCase):
                 'minutes': (td.seconds//60) % 60}
 
     def test_create_question(self):
+        #
+        # Don't run against histroical data DB
+        #
+        if not 'vr.db' in app.config['SQLALCHEMY_DATABASE_URI']:
+            return
+
         user = models.User('test_username_1', 'test_email_1', 'test_password')
         db_session.add(user)
         db_session.commit()
@@ -197,9 +215,14 @@ class SubscriptionTest(unittest.TestCase):
 
     def tearDown(self):
         tearDownDB()
-        db_session.remove()
 
     def test_create_question_subscription(self):
+        #
+        # Don't run against histroical data DB
+        #
+        if not 'vr.db' in app.config['SQLALCHEMY_DATABASE_URI']:
+            return
+
         user = models.User('test_username', 'test_email', 'test_password')
         db_session.add(user)
         db_session.commit()
@@ -229,9 +252,14 @@ class ProposalTest(unittest.TestCase):
 
     def tearDown(self):
         tearDownDB()
-        db_session.remove()
 
     def test_create_proposal(self):
+        #
+        # Don't run against histroical data DB
+        #
+        if not 'vr.db' in app.config['SQLALCHEMY_DATABASE_URI']:
+            return
+
         user = models.User('test_username', 'test_email', 'test_password')
         db_session.add(user)
         db_session.commit()
@@ -310,11 +338,14 @@ class EndorseTest(unittest.TestCase):
 
     def tearDown(self):
         tearDownDB()
-        db_session.remove()
 
     def test_endorse_proposals(self):
-        # STOP !!!
-        #self.assertTrue(False)
+        #
+        # Don't run against histroical data DB
+        #
+        if not 'vr.db' in app.config['SQLALCHEMY_DATABASE_URI']:
+            return
+
         send_emails = False
         # Create users
         john = models.User('john', 'john@example.com', 'fgfdfg')
@@ -566,6 +597,23 @@ class EndorseTest(unittest.TestCase):
         self.assertTrue(susans_prop1.is_endorsed_by(susan))
         self.assertFalse(susans_prop1.is_endorsed_by(bill))
 
+        if (MAKE_GRAPH):
+            map_file = johns_q.get_voting_graph(
+                generation=1,
+                map_type='all',
+                proposal_level_type=models.GraphLevelType.layers,
+                user_level_type=models.GraphLevelType.layers)
+
+            app.logger.debug("Voting Map file ==> %s\n",
+                             map_file)
+
+            self.assertEqual("maps/map_Q1_G1_all_1_1.svg",
+                             map_file,
+                             "SVG file name or path wrong!")
+            import os
+            map_file_exists = os.path.isfile(map_file)
+            self.assertTrue(map_file_exists, "Map svg file not generated!")
+
         # Remove endorsement
         susans_prop1.remove_endorsement(susan)
         db_session.commit()
@@ -576,11 +624,10 @@ class EndorseTest(unittest.TestCase):
 
 class TestWhoDominatesWho(unittest.TestCase):
     def setUp(self):
-        setUpDB()
+        pass
 
     def tearDown(self):
-        tearDownDB()
-        db_session.remove()
+        pass
 
     def test_proposal_domination(self):
         p1 = {1, 2, 3}
@@ -599,20 +646,36 @@ class TestWhoDominatesWho(unittest.TestCase):
 
 class LoginTestCase(unittest.TestCase):
     def setUp(self):
+        #
+        # Don't run against histroical data DB
+        #
+        if not 'vr.db' in app.config['SQLALCHEMY_DATABASE_URI']:
+            return
         app.config['TESTING'] = True
         self.app = app.test_client()
         setUpDB()
 
     def tearDown(self):
         tearDownDB()
-        db_session.remove()
 
     def test_empty_db(self):
+        #
+        # Don't run against histroical data DB
+        #
+        if not 'vr.db' in app.config['SQLALCHEMY_DATABASE_URI']:
+            return
+
         """Start with a blank database."""
         rv = self.app.get('/')
         self.assertTrue('No questions here so far' in rv.data, rv.data)
 
     def test_login_logout(self):
+        #
+        # Don't run against histroical data DB
+        #
+        if not 'vr.db' in app.config['SQLALCHEMY_DATABASE_URI']:
+            return
+
         rv = self.login('test_user', 'test_password')
         self.assertTrue('You were logged in' in rv.data, rv.data)
         rv = self.logout()
@@ -634,6 +697,12 @@ class LoginTestCase(unittest.TestCase):
 
 class RegisterTestCase(unittest.TestCase):
     def setUp(self):
+        #
+        # Don't run against histroical data DB
+        #
+        if not 'vr.db' in app.config['SQLALCHEMY_DATABASE_URI']:
+            return
+
         app.config['TESTING'] = True
         self.app = app.test_client()
         setUpDB()
@@ -641,9 +710,14 @@ class RegisterTestCase(unittest.TestCase):
 
     def tearDown(self):
         tearDownDB()
-        db_session.remove()
 
     def test_register(self):
+        #
+        # Don't run against histroical data DB
+        #
+        if not 'vr.db' in app.config['SQLALCHEMY_DATABASE_URI']:
+            return
+
         # Test for empty fields
         rv = self.register('', 'test_email', 'test_password')
         self.assertTrue('Invalid username' in rv.data, rv.data)

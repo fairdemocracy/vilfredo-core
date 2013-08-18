@@ -141,52 +141,52 @@ def api_get_users(user_id=None):
     '''
     .. http:get:: /users/(int:user_id)
 
-    A user or list of users.
+        A user or list of users.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      GET /users/42 HTTP/1.1
-      Host: example.com
-      Accept: application/json
+            GET /users/42 HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      Status Code: 200 OK
-      Content-Type: application/json
+            Status Code: 200 OK
+            Content-Type: application/json
 
-        {
-           "total_items": 5,
-           "items": "2",
-           "objects":
-           [
-               {
-                   "username": "john",
-                   "url": "/users/1",
-                   "registered": "2013-08-12 09:51:38.559222",
-                   "id": "1",
-                   "last_seen": "2013-08-12 09:51:38.559240"
-               },
-               {
-                   "username": "susan",
-                   "url": "/users/2",
-                   "registered": "2013-08-12 09:51:38.576731",
-                   "id": "2",
-                   "last_seen": "2013-08-12 09:51:38.576745"
-               }
-           ],
-           "page": "1",
-           "pages": "2"
-        }
+            {
+               "total_items": 5,
+               "items": "2",
+               "objects":
+               [
+                   {
+                       "username": "john",
+                       "url": "/users/1",
+                       "registered": "2013-08-12 09:51:38.559222",
+                       "id": "1",
+                       "last_seen": "2013-08-12 09:51:38.559240"
+                   },
+                   {
+                       "username": "susan",
+                       "url": "/users/2",
+                       "registered": "2013-08-12 09:51:38.576731",
+                       "id": "2",
+                       "last_seen": "2013-08-12 09:51:38.576745"
+                   }
+               ],
+               "page": "1",
+               "pages": "2"
+            }
 
-    :param user_id: user id
-    :type user_id: int
-    :query page: page number. default is 1
-    :statuscode 200: no error
-    :statuscode 404: there's no user
+        :param user_id: user id
+        :type user_id: int
+        :query page: page number. default is 1
+        :statuscode 200: no error
+        :statuscode 404: there's no user
     '''
     app.logger.debug("api_get_users called...\n")
 
@@ -230,53 +230,53 @@ def api_update_user(user_id):
     '''
     .. http:patch:: /users/(int:user_id)
 
-    Update a user's details'.
+        Update a user's details'.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      PATCH /users/42 HTTP/1.1
-      Host: example.com
-      Accept: application/json
+            PATCH /users/42 HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      Status Code: 200 OK
-      Content-Type: application/json
+            Status Code: 200 OK
+            Content-Type: application/json
 
-        {
-           "total_items": 5,
-           "items": "2",
-           "objects":
-           [
-               {
-                   "username": "john",
-                   "url": "/users/1",
-                   "registered": "2013-08-12 09:51:38.559222",
-                   "id": "1",
-                   "last_seen": "2013-08-12 09:51:38.559240"
-               },
-               {
-                   "username": "susan",
-                   "url": "/users/2",
-                   "registered": "2013-08-12 09:51:38.576731",
-                   "id": "2",
-                   "last_seen": "2013-08-12 09:51:38.576745"
-               }
-           ],
-           "page": "1",
-           "pages": "2"
-        }
+            {
+               "total_items": 5,
+               "items": "2",
+               "objects":
+               [
+                   {
+                       "username": "john",
+                       "url": "/users/1",
+                       "registered": "2013-08-12 09:51:38.559222",
+                       "id": "1",
+                       "last_seen": "2013-08-12 09:51:38.559240"
+                   },
+                   {
+                       "username": "susan",
+                       "url": "/users/2",
+                       "registered": "2013-08-12 09:51:38.576731",
+                       "id": "2",
+                       "last_seen": "2013-08-12 09:51:38.576745"
+                   }
+               ],
+               "page": "1",
+               "pages": "2"
+            }
 
-    :param user_id: user id
-    :type user_id: int
-    :query page: page number. default is 1
-    :type page: int
-    :statuscode 200: no error
-    :statuscode 404: there's no user
+        :param user_id: user id
+        :type user_id: int
+        :query page: page number. default is 1
+        :type page: int
+        :statuscode 200: no error
+        :statuscode 404: there's no user
     '''
     if user_id is None:
         abort(404)
@@ -315,8 +315,8 @@ def api_update_user(user_id):
 
     elif models.User.username_available(request.json['new_username'])\
             is not True:
-        response = {'message': 'New Username not available'}
-        return jsonify(objects=response), 400
+        message = "Username not available"
+        return jsonify(message=message), 400
 
     elif models.User.email_available(request.json['email']) is not True:
             response = {'message': 'New Email not available'}
@@ -343,38 +343,32 @@ def api_create_user():
     '''
     .. http:post:: /users
 
-    A user or list of users.
+        A user or list of users.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      POST /users HTTP/1.1
-      Host: example.com
-      Accept: application/json
+            POST /users HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      Status Code: 201 OK
-      Content-Type: application/json
+            Status Code: 201 OK
+            Content-Type: application/json
 
-        {
-          "object":
-          {
-            "url": "/users/1"
-          }
-        }
+            {
+                "url": "/users/1"
+            }
 
-    :json username: username
-    :type username: string
-    :json email: email address
-    :type email: string
-    :json password: password
-    :type password: string
-    :statuscode 201: no error
-    :statuscode 400: bad request
+        :json username: username
+        :json email: email address
+        :json password: password
+        :statuscode 201: no error
+        :statuscode 400: bad request
     '''
     app.logger.debug("api_create_user called...\n")
 
@@ -419,7 +413,7 @@ def api_create_user():
     db_session.commit()
     response = {'url': url_for('api_get_users', user_id=user.id)}
 
-    return jsonify(object=response), 201
+    return jsonify(response), 201
 
 
 #
@@ -431,54 +425,54 @@ def api_get_questions(question_id=None):
     '''
     .. http:get:: /questions/(int:question_id)
 
-    A question or list of questions.
+        A question or list of questions.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      GET /questions/42 HTTP/1.1
-      Host: example.com
-      Accept: application/json
+            GET /questions/42 HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      Status Code: 200 OK
-      Content-Type: application/json
+            Status Code: 200 OK
+            Content-Type: application/json
 
-        {
-          "total_items": "3",
-          "items": "2",
-          "objects": [
             {
-              "last_move_on": "2013-08-12 09:51:38.632780",
-              "created": "2013-08-12 09:51:38.632763",
-              "title": "My question",
-              "minimum_time": "0",
-              "maximum_time": "604800",
-              "id": 1,
-              "blurb": "My blurb"
-            },
-            {
-              "last_move_on": "2013-08-12 09:51:38.665584",
-              "created": "2013-08-12 09:51:38.665570",
-              "title": "Too Many Chefs",
-              "minimum_time": "0",
-              "maximum_time": "604800",
-              "id": 3,
-              "blurb": "How can they avoid spoiling the broth?"
+              "total_items": "3",
+              "items": "2",
+              "objects": [
+                {
+                  "last_move_on": "2013-08-12 09:51:38.632780",
+                  "created": "2013-08-12 09:51:38.632763",
+                  "title": "My question",
+                  "minimum_time": "0",
+                  "maximum_time": "604800",
+                  "id": 1,
+                  "blurb": "My blurb"
+                },
+                {
+                  "last_move_on": "2013-08-12 09:51:38.665584",
+                  "created": "2013-08-12 09:51:38.665570",
+                  "title": "Too Many Chefs",
+                  "minimum_time": "0",
+                  "maximum_time": "604800",
+                  "id": 3,
+                  "blurb": "How can they avoid spoiling the broth?"
+                }
+              ],
+              "page": "1",
+              "pages": "1"
             }
-          ],
-          "page": "1",
-          "pages": "1"
-        }
 
-    :param user_id: user id
-    :query page: page number. default is 1
-    :statuscode 200: no error
-    :statuscode 404: there's no user
+        :param user_id: user id
+        :query page: page number. default is 1
+        :statuscode 200: no error
+        :statuscode 404: there's no user
     '''
     app.logger.debug("api_get_questions called...\n")
     if question_id is not None:
@@ -522,34 +516,34 @@ def api_get_questions(question_id=None):
 @requires_auth
 def api_create_question():
     '''
-    .. http:post:: /questions
+        .. http:post:: /questions
 
-    A user or list of users.
+        A user or list of users.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      POST /questions HTTP/1.1
-      Host: example.com
-      Accept: application/json
+            POST /questions HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      Status Code: 201 OK
-      Content-Type: application/json
+            Status Code: 201 OK
+            Content-Type: application/json
 
-      {
-         "url": "/questions/10"
-      }
+            {
+                "url": "/questions/1"
+            }
 
-    :json username: username
-    :json email: email address
-    :json password: password
-    :statuscode 201: no error
-    :statuscode 400: bad request
+        :json username: username
+        :json email: email address
+        :json password: password
+        :statuscode 201: no error
+        :statuscode 400: bad request
     '''
     app.logger.debug("api_create_question called...\n")
 
@@ -594,41 +588,58 @@ def api_create_question():
     db_session.add(question)
     db_session.commit()
 
-    response = {'url': url_for('api_get_questions', question_id=question.id)}
-    return jsonify(object=response), 201
+    url = {'url': url_for('api_get_questions', question_id=question.id)}
+    return jsonify(url), 201
 
 
 @app.route('/api/v1/questions/<int:question_id>/subscribers', methods=['GET'])
 def api_question_subscribers(question_id=None):
     '''
-    .. http:post:: /users
+        .. http:get:: /questions/(int:question_id)/subscribers
 
-    A user or list of users.
+        A list of question subscribers.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      POST /users HTTP/1.1
-      Host: example.com
-      Accept: application/json
+            GET questions/3/subscribers HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      Status Code: 201 OK
-      Content-Type: application/json
+            Status Code: 200 OK
+            Content-Type: application/json
 
-      {
-         "url": "/users/10"
-      }
+            {
+              "objects": [
+                {
+                  "url": "/users/1/subscriptions/3",
+                  "how": "weekly",
+                  "last_update": "None",
+                  "question_id": "3"
+                },
+                {
+                  "url": "/users/5/subscriptions/3",
+                  "how": "daily",
+                  "last_update": "None",
+                  "question_id": "3"
+                }
+              ],
+              "num_items": "2",
+              "items": 2,
+              "question_id": "3",
+              "page": "1",
+              "pages": "1"
+            }
 
-    :json username: username
-    :json email: email address
-    :json password: password
-    :statuscode 201: no error
-    :statuscode 400: bad request
+        :param question_id: question id
+        :type question_id: int
+        :statuscode 200: no error
+        :statuscode 400: bad request
     '''
     app.logger.debug("api_question_subscribers called with %s...\n",
                      question_id)
@@ -644,18 +655,21 @@ def api_question_subscribers(question_id=None):
         abort(404)
 
     page = int(request.args.get('page', 1))
-    subscriptions = question.subscriber_update.\
+    # subscribers = question.subscriber_update.\
+        # paginate(page, RESULTS_PER_PAGE, False)
+    subscribers = models.Update.query.filter_by(question_id=question.id).\
         paginate(page, RESULTS_PER_PAGE, False)
-    items = len(subscriptions.items)
-    pages = subscriptions.pages
+
+    items = len(subscribers.items)
+    pages = subscribers.pages
 
     results = []
-    for s in subscriptions:
+    for s in subscribers.items:
         results.append(s.get_public())
 
     return jsonify(question_id=str(question.id),
                    items=(items), page=str(page), pages=str(pages),
-                   num_items=str(subscriptions.total), objects=results), 200
+                   num_items=str(subscribers.total), objects=results), 200
 
 
 # Get question proposals (Get Proposals)
@@ -666,29 +680,60 @@ def api_get_question_proposals(question_id=None, proposal_id=None):
     '''
     .. http:get:: /questions/(int:question_id)/proposals/(int:proposal_id)
 
-    A proposal or list of proposals.
+        A proposal or list of proposals.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      GET /questions/22/proposals HTTP/1.1
-      Host: example.com
-      Accept: application/json
+            GET /questions/22/proposals HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      Status Code: 200 OK
-      Content-Type: application/json
+            Status Code: 200 OK
+            Content-Type: application/json
 
-    :param question_id: user ID
-    :param proposal_id: proposal ID
-    :query generation: question generation. default is current
-    :query page: page number. default is 1
-    :statuscode 200: no error
-    :statuscode 404: there's no proposal
+            {
+                "total_items": "4",
+                "items": "2",
+                "objects": [
+                {
+                  "question_url": "/api/v1/questions/1",
+                  "author_url": "/api/v1/users/3",
+                  "title": "Bills First Proposal",
+                  "url": "/api/v1/questions/1/proposals/1",
+                  "abstract": null,
+                  "created": "2013-08-15 18:32:00.154844",
+                  "id": "1",
+                  "blurb": "Bills blurb of varying interest",
+                  "generation_created": "1"
+                },
+                {
+                  "question_url": "/api/v1/questions/1",
+                  "author_url": "/api/v1/users/3",
+                  "title": "Bills Second Proposal",
+                  "url": "/api/v1/questions/1/proposals/2",
+                  "abstract": "This is too abstract for an abstract",
+                  "created": "2013-08-15 18:32:00.176816",
+                  "id": "2",
+                  "blurb": "Bills blurb of varying disinterest",
+                  "generation_created": "1"
+                }
+                ],
+                "page": "1",
+                "pages": "2"
+            }
+
+        :param question_id: user ID
+        :param proposal_id: proposal ID
+        :query generation: question generation, default is current
+        :query page: page number, default is 1
+        :statuscode 200: no error
+        :statuscode 404: there's no proposal
     '''
     app.logger.debug("api_get_question_proposals called...\n")
 
@@ -744,15 +789,15 @@ def api_get_question_proposals(question_id=None, proposal_id=None):
 @requires_auth
 def api_add_proposal_endorsement(question_id, proposal_id):
     '''
-    .. http:post:: /users
+    .. http:post:: /questions/(int:question_id)/proposals/(int:proposal_id)/endorsements
 
-        A user or list of users.
+        Endorse a proposal.
 
         **Example request**:
 
         .. sourcecode:: http
 
-            POST /users HTTP/1.1
+            POST /questions/45/proposals/47/endorsements HTTP/1.1
             Host: example.com
             Accept: application/json
 
@@ -760,17 +805,14 @@ def api_add_proposal_endorsement(question_id, proposal_id):
 
         .. sourcecode:: http
 
-            Status Code: 201 OK
+            Status Code: 200 OK
             Content-Type: application/json
 
             {
                  "message": "Endorsement added"
             }
 
-        :json username: username
-        :json email: email address
-        :json password: password
-        :statuscode 201: no error
+        :statuscode 200: no error
         :statuscode 400: bad request
     '''
     app.logger.debug("api_add_proposal_endorsement called...\n")
@@ -814,33 +856,33 @@ def api_add_proposal_endorsement(question_id, proposal_id):
 @requires_auth
 def api_remove_proposal_endorsement(question_id, proposal_id):
     '''
-    .. http:post:: /users
+    .. http:post:: /questions/(int:question_id)/proposals/(int:proposal_id)/endorsements
 
-    A user or list of users.
+    Delete an endorsement.
 
     **Example request**:
 
    .. sourcecode:: http
 
-      POST /users HTTP/1.1
-      Host: example.com
-      Accept: application/json
+        DELETE /questions/45/proposals/47/endorsements HTTP/1.1
+        Host: example.com
+        Accept: application/json
 
    **Example response**:
 
    .. sourcecode:: http
 
-      Status Code: 201 OK
-      Content-Type: application/json
+        Status Code: 200 OK
+        Content-Type: application/json
 
-      {
-         "url": "/users/10"
-      }
+        {
+          "message": "Endorsement removed"
+        }
 
     :json username: username
     :json email: email address
     :json password: password
-    :statuscode 201: no error
+    :statuscode 200: no error
     :statuscode 400: bad request
     '''
     app.logger.debug("api_remove_proposal_endorsement called...\n")
@@ -882,34 +924,34 @@ def api_remove_proposal_endorsement(question_id, proposal_id):
 @requires_auth
 def api_create_proposal(question_id):
     '''
-    .. http:post:: /users
+    .. http:post:: /questions/(int:question_id)/proposals
 
-    A user or list of users.
+        Create a proposal.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      POST /users HTTP/1.1
-      Host: example.com
-      Accept: application/json
+            POST /questions/45/proposals HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      Status Code: 201 OK
-      Content-Type: application/json
+            Status Code: 201 OK
+            Content-Type: application/json
 
-      {
-         "url": "/users/10"
-      }
+            {
+                "url": "/api/v1/questions/45/proposals/1"
+            }
 
-    :json username: username
-    :json email: email address
-    :json password: password
-    :statuscode 201: no error
-    :statuscode 400: bad request
+        :json username: username
+        :json email: email address
+        :json password: password
+        :statuscode 201: no error
+        :statuscode 400: bad request
     '''
     app.logger.debug("api_create_proposal called...\n")
 
@@ -943,8 +985,6 @@ def api_create_proposal(question_id):
              or len(request.json['abstract']) > MAX_LEN_PROPOSAL_ABSTRACT):
         abort(400)
 
-    app.logger.debug("1...\n")
-
     title = request.json.get('title')
     blurb = request.json.get('blurb')
     abstract = request.json.get('abstract', None)
@@ -955,7 +995,7 @@ def api_create_proposal(question_id):
 
     response = {'url': url_for('api_get_question_proposals',
                 question_id=question_id, proposal_id=proposal.id)}
-    return jsonify(object=response), 201
+    return jsonify(response), 201
 
 
 # Delete proposal
@@ -965,34 +1005,38 @@ def api_create_proposal(question_id):
 @requires_auth
 def api_delete_proposal(question_id, proposal_id):
     '''
-    .. http:post:: /users
+        .. http:delete:: questions/(int:question_id)/proposals/(int:proposal_id)
 
-    A user or list of users.
+        Delete a proposal.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      POST /users HTTP/1.1
-      Host: example.com
-      Accept: application/json
+            DELETE questions/34/proposals/77 HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      Status Code: 201 OK
-      Content-Type: application/json
+            Status Code: 201 OK
+            Content-Type: application/json
 
-      {
-         "url": "/users/10"
-      }
+            {
+             "message": "Proposal deleted"
+            }
 
-    :json username: username
-    :json email: email address
-    :json password: password
-    :statuscode 201: no error
-    :statuscode 400: bad request
+        :param question_id: question id
+        :type question_id: int
+        :param proposal_id: proposal id
+        :type proposal_id: int
+        :statuscode 201: no error
+        :statuscode 400: bad request
+        :statuscode 401: user not authorized
+        :statuscode 403: action forbidden
+        :statuscode 404: question or proposal not found
     '''
     app.logger.debug("api_delete_proposal called...\n")
 
@@ -1029,34 +1073,34 @@ def api_delete_proposal(question_id, proposal_id):
 @requires_auth
 def api_delete_question(question_id):
     '''
-    .. http:post:: /users
+    .. http:post:: /questions/(int:question_id)
 
-    A user or list of users.
+        Delete a question.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      POST /users HTTP/1.1
-      Host: example.com
-      Accept: application/json
+            POST /questions/34 HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      Status Code: 201 OK
-      Content-Type: application/json
+            Status Code: 200 OK
+            Content-Type: application/json
 
-        {
-          "message": "Question deleted"
-        }
+            {
+              "message": "Question deleted"
+            }
 
-    :json username: username
-    :json email: email address
-    :json password: password
-    :statuscode 201: no error
-    :statuscode 400: bad request
+        :json username: username
+        :json email: email address
+        :json password: password
+        :statuscode 200: no error
+        :statuscode 400: bad request
     '''
     app.logger.debug("api_delete_question called for question %s...\n",
                      question_id)
@@ -1097,34 +1141,34 @@ def api_delete_question(question_id):
 @requires_auth
 def api_edit_question(question_id):
     '''
-    .. http:post:: /users
+    .. http:post:: /questions/(int:question_id)
 
-    A user or list of users.
+        Update a question.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      POST /users HTTP/1.1
-      Host: example.com
-      Accept: application/json
+            POST /questions/33 HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      Status Code: 201 OK
-      Content-Type: application/json
+            Status Code: 201 OK
+            Content-Type: application/json
 
-      {
-         "url": "/users/10"
-      }
+            {
+             "message": "Question updated"
+            }
 
-    :json username: username
-    :json email: email address
-    :json password: password
-    :statuscode 201: no error
-    :statuscode 400: bad request
+        :json username: username
+        :json email: email address
+        :json password: password
+        :statuscode 201: no error
+        :statuscode 400: bad request
     '''
     app.logger.debug("api_edit_question called...\n")
 
@@ -1196,34 +1240,34 @@ def api_edit_proposal(question_id, proposal_id):
     '''
     .. http:patch:: questions/int:question_id/proposals/int:proposal_id
 
-    A user or list of users.
+        Edit proposal.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      PATCH questions/22/proposals/14 HTTP/1.1
-      Host: example.com
-      Accept: application/json
+            PATCH questions/22/proposals/14 HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      Status Code: 201 OK
-      Content-Type: application/json
+            Status Code: 201 OK
+            Content-Type: application/json
 
-        {
-          "message": "Proposal updated"
-        }
+            {
+              "message": "Proposal updated"
+            }
 
-    :param question_id: question id
-    :param proposal_id: proposal id
-    :json title: title
-    :json blurb: question content
-    :json abstract: optional abstract
-    :statuscode 201: no error
-    :statuscode 400: bad request
+        :param question_id: question id
+        :param proposal_id: proposal id
+        :json title: title
+        :json blurb: question content
+        :json abstract: optional abstract
+        :statuscode 201: no error
+        :statuscode 400: bad request
     '''
     app.logger.debug("api_edit_proposal called...\n")
 
@@ -1282,36 +1326,61 @@ def api_edit_proposal(question_id, proposal_id):
            methods=['GET'])
 def api_get_question_proposal_endorsers(question_id=None, proposal_id=None):
     '''
-    .. http:post:: /users
+    .. http:get:: /questions/(int:question_id)/proposals/(int:proposal_id)/endorsers
 
-    A user or list of users.
+        A list of proposal endorsers.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      POST /users HTTP/1.1
-      Host: example.com
-      Accept: application/json
+            GET /questions/42/proposals/67/endorsers HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      Status Code: 201 OK
-      Content-Type: application/json
+            Status Code: 200 OK
+            Content-Type: application/json
 
-      {
-         "url": "/users/10"
-      }
+            {
+              "query_generation": "1",
+              "current_generation": "1",
+              "objects": [
+                {
+                  "username": "john",
+                  "url": "/users/1",
+                  "registered": "2013-08-15 18:10:23.877239",
+                  "id": "1",
+                  "last_seen": "2013-08-15 18:10:23.877268"
+                },
+                {
+                  "username": "susan",
+                  "url": "/users/2",
+                  "registered": "2013-08-15 18:10:23.938536",
+                  "id": "2",
+                  "last_seen": "2013-08-15 18:10:23.938550"
+                },
+                {
+                  "username": "harry",
+                  "url": "/users/5",
+                  "registered": "2013-08-15 18:10:23.981326",
+                  "id": "5",
+                  "last_seen": "2013-08-15 18:10:23.981341"
+                }
+              ],
+              "num_items": "3",
+              "question_id": "1"
+            }
 
-    :param question_id: question id
-    :param proposal_id: proposal id
-    :json username: username
-    :json email: email address
-    :json password: password
-    :statuscode 201: no error
-    :statuscode 400: bad request
+        :param question_id: question id
+        :type question_id: int
+        :param proposal_id: proposal id
+        :type proposal_id: int
+        :statuscode 200: no error
+        :statuscode 400: bad request
     '''
     app.logger.debug("api_get_question_proposal_endorsers called...\n")
 
@@ -1346,35 +1415,73 @@ def api_get_question_proposal_endorsers(question_id=None, proposal_id=None):
 @app.route('/api/v1/questions/<int:question_id>/pareto', methods=['GET'])
 def api_question_pareto(question_id=None):
     '''
-    .. http:post:: /users
+    .. http:post:: /questions/(int:question_id)/pareto
 
-    A user or list of users.
+        The pareto front of a question.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      POST /users HTTP/1.1
-      Host: example.com
-      Accept: application/json
+            POST /questions/44/proposals HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      Status Code: 201 OK
-      Content-Type: application/json
+            Status Code: 200 OK
+            Content-Type: application/json
 
-      {
-         "url": "/users/10"
-      }
+            {
+              "query_generation": "1",
+              "current_generation": "1",
+              "objects": [
+                {
+                  "question_url": "/api/v1/questions/1",
+                  "author_url": "/api/v1/users/3",
+                  "title": "Bills Second Proposal",
+                  "url": "/api/v1/questions/1/proposals/2",
+                  "abstract": "This is too abstract for an abstract",
+                  "created": "2013-08-15 18:32:00.176816",
+                  "id": "2",
+                  "blurb": "Bills blurb of varying disinterest",
+                  "generation_created": "1"
+                },
+                {
+                  "question_url": "/api/v1/questions/1",
+                  "author_url": "/api/v1/users/2",
+                  "title": "Susans Only Proposal",
+                  "url": "/api/v1/questions/1/proposals/3",
+                  "abstract": "Blah blah blah",
+                  "created": "2013-08-15 18:32:00.194978",
+                  "id": "3",
+                  "blurb": "My blub is cool",
+                  "generation_created": "1"
+                },
+                {
+                  "question_url": "/api/v1/questions/1",
+                  "author_url": "/api/v1/users/5",
+                  "title": "Harrys Cooler Proposal",
+                  "url": "/api/v1/questions/1/proposals/4",
+                  "abstract": null,
+                  "created": "2013-08-15 18:32:00.228671",
+                  "id": "4",
+                  "blurb": "Harry edits like a champ",
+                  "generation_created": "1"
+                }
+              ],
+              "num_items": "3",
+              "question_id": "1"
+            }
 
-    :param question_id: question id
-    :json username: username
-    :json email: email address
-    :json password: password
-    :statuscode 201: no error
-    :statuscode 400: bad request
+        :param question_id: question id
+        :json username: username
+        :json email: email address
+        :json password: password
+        :statuscode 200: no error
+        :statuscode 400: bad request
     '''
     app.logger.debug("api_question_pareto called with %s...\n", question_id)
 
@@ -1404,35 +1511,51 @@ def api_question_pareto(question_id=None):
 @app.route('/api/v1/questions/<int:question_id>/key_players', methods=['GET'])
 def api_question_key_players(question_id=None):
     '''
-    .. http:post:: /users
+    .. http:post:: /questions/(int:question_id)/key_players
 
-    A user or list of users.
+        A user or list of users.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      POST /users HTTP/1.1
-      Host: example.com
-      Accept: application/json
+            POST /questions/44/key_players HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      Status Code: 201 OK
-      Content-Type: application/json
+            Status Code: 200 OK
+            Content-Type: application/json
 
-      {
-         "url": "/users/10"
-      }
+            {
+              "query_generation": "1",
+              "current_generation": "1",
+              "objects": [
+                {
+                  "3": [
+                    "/api/v1/questions/1/proposals/4",
+                    "/api/v1/questions/1/proposals/3"
+                  ]
+                },
+                {
+                  "4": [
+                    "/api/v1/questions/1/proposals/3"
+                  ]
+                }
+              ],
+              "num_items": "2",
+              "question_id": "1"
+            }
 
-    :param question_id: question id
-    :json username: username
-    :json email: email address
-    :json password: password
-    :statuscode 201: no error
-    :statuscode 400: bad request
+        :param question_id: question id
+        :json username: username
+        :json email: email address
+        :json password: password
+        :statuscode 200: no error
+        :statuscode 400: bad request
     '''
     app.logger.debug("api_question_key_players called with %s...\n",
                      question_id)
@@ -1472,34 +1595,107 @@ def api_question_key_players(question_id=None):
            methods=['GET'])
 def api_question_endorser_effects(question_id=None):
     '''
-    .. http:post:: /users
+    .. http:post:: /questions/(int:question_id)/endorser_effects
 
-    A user or list of users.
+        A list of endorser effects.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      POST /users HTTP/1.1
-      Host: example.com
-      Accept: application/json
+            POST /questions/44/endorser_effects HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      Status Code: 201 OK
-      Content-Type: application/json
+            Status Code: 200 OK
+            Content-Type: application/json
 
-      {
-         "url": "/users/10"
-      }
+            {
+              "query_generation": "1",
+              "current_generation": "1",
+              "objects": [
+                {
+                  "5": {}
+                },
+                {
+                  "4": {
+                    "PF_excluding": [
+                      {
+                        "question_url": "/api/v1/questions/1",
+                        "author_url": "/api/v1/users/2",
+                        "title": "Susans Only Proposal",
+                        "url": "/api/v1/questions/1/proposals/3",
+                        "abstract": "Blah blah blah",
+                        "created": "2013-08-15 18:32:00.194978",
+                        "id": "3",
+                        "blurb": "My blub is cool",
+                        "generation_created": "1"
+                      }
+                    ],
+                    "PF_plus": [],
+                    "PF_minus": [
+                      {
+                        "question_url": "/api/v1/questions/1",
+                        "author_url": "/api/v1/users/5",
+                        "title": "Harrys Cooler Proposal",
+                        "url": "/api/v1/questions/1/proposals/4",
+                        "abstract": null,
+                        "created": "2013-08-15 18:32:00.228671",
+                        "id": "4",
+                        "blurb": "Harry edits like a champ",
+                        "generation_created": "1"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "3": {
+                    "PF_excluding": [
+                      {
+                        "question_url": "/api/v1/questions/1",
+                        "author_url": "/api/v1/users/5",
+                        "title": "Harrys Cooler Proposal",
+                        "url": "/api/v1/questions/1/proposals/4",
+                        "abstract": null,
+                        "created": "2013-08-15 18:32:00.228671",
+                        "id": "4",
+                        "blurb": "Harry edits like a champ",
+                        "generation_created": "1"
+                      }
+                    ],
+                    "PF_plus": [],
+                    "PF_minus": [
+                      {
+                        "question_url": "/api/v1/questions/1",
+                        "author_url": "/api/v1/users/3",
+                        "title": "Bills Second Proposal",
+                        "url": "/api/v1/questions/1/proposals/2",
+                        "abstract": "This is too abstract for an abstract",
+                        "created": "2013-08-15 18:32:00.176816",
+                        "id": "2",
+                        "blurb": "Bills blurb of varying disinterest",
+                        "generation_created": "1"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "1": {}
+                }
+              ],
+              "num_items": "5",
+              "question_id": "1"
+            }
 
-    :json username: username
-    :json email: email address
-    :json password: password
-    :statuscode 201: no error
-    :statuscode 400: bad request
+        :json username: username
+        :json email: email address
+        :json password: password
+        :statuscode 200: no error
+        :statuscode 400: bad request
     '''
     app.logger.debug("api_question_endorser_effects called with %s...\n",
                      question_id)
@@ -1555,36 +1751,46 @@ def replaceWithPublic(collection):
 @app.route('/api/v1/questions/<int:question_id>/graph', methods=['GET'])
 def api_question_graph(question_id):
     '''
-    .. http:post:: /users
+        .. http:get:: questions/(int:question_id)/graph
 
-    A user or list of users.
+        Get the Voting map for this generation.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      POST /users HTTP/1.1
-      Host: example.com
-      Accept: application/json
+              GET /questions/42/graph?graph_type=pareto&genration=3 HTTP/1.1
+              Host: example.com
+              Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      Status Code: 201 OK
-      Content-Type: application/json
+            Status Code: 200 OK
+            Content-Type: application/json
 
-      {
-         "url": "/users/10"
-      }
+            {
+             "question_id": 42,
+             "graph_generation": 3,
+             "graph_type": "all",
+             "current_generation": 4,
+             "url": "/maps/map_Q42_G4_all_1_1.svg"
+            }
 
-    :json username: username
-    :json email: email address
-    :json password: password
-    :statuscode 201: no error
-    :statuscode 400: bad request
+        :query map_type: map type. default is all generation proposals
+        :type map_type: string: either "all" or "pareto", defaults to "all"
+        :query generation: question generation
+        :type generation: int
+        :query proposal_level_type: define the layout of the proposal nodes, defaults to "layers"
+        :type proposal_level_type: string: one of "layers", "num_votes" or "flat"
+        :query user_level_type: define the layout of the user nodes, defaults to "layers"
+        :type user_level_type: string: one of "layers", "num_votes" or "flat"
+
+        :statuscode 200: no error
+        :statuscode 400: bad request
     '''
-    app.logger.debug("api_question_votingmap called...\n")
+    app.logger.debug("api_question_graph called...\n")
 
     if question_id is None:
         app.logger.debug("ERROR: question_id is None!\n")
@@ -1597,105 +1803,116 @@ def api_question_graph(question_id):
         abort(404)
 
     generation = int(request.args.get('generation', question.generation))
-    map_type = request.args.get('map_type', 'votes')
+    map_type = request.args.get('map_type', 'all')
+    proposal_level_type = request.args.get('proposal_level_type',
+                                           models.GraphLevelType.layers)
+    user_level_type = request.args.get('user_level_type',
+                                       models.GraphLevelType.layers)
 
     app.logger.debug("Call get_voting_graph()...")
-    graph_url = question.get_voting_graph(generation=generation,
-                                          map_type=map_type)
+    graph_svg = question.get_voting_graph(
+        generation=generation,
+        map_type=map_type,
+        proposal_level_type=proposal_level_type,
+        user_level_type=user_level_type)
 
-    # results = []
-    # results.append({'url': graph_url})
+    if not graph_svg:
+        message = "There was a problem creating the graph"
+        return jsonify(message=message), 500
 
     return jsonify(question_id=str(question.id),
-                   query_generation=str(generation),
+                   graph_generation=str(generation),
                    current_generation=str(question.generation),
-                   url=graph_url), 200
+                   url='http://' + app.config['SITE_DOMAIN'] +
+                       '/' + graph_svg,
+                   proposal_level_type=proposal_level_type,
+                   user_level_type=user_level_type), 200
 
 
 @app.route('/api/v1/questions/<int:question_id>/proposal_relations',
            methods=['GET'])
 def api_question_proposal_relations(question_id=None):
     '''
-    .. http:post:: questions/(int:question_id)/proposal_relations
+        .. http:post:: questions/(int:question_id)/proposal_relations
 
-    A user or list of users.
+        A list of proposal relations.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      GET questions/42/proposal_relations HTTP/1.1
-      Host: example.com
-      Accept: application/json
+            GET questions/42/proposal_relations HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      Status Code: 201 OK
-      Content-Type: application/json
+            Status Code: 201 OK
+            Content-Type: application/json
 
-      {
-          "query_generation": "1",
-          "current_generation": "1",
-          "objects": [
             {
-              "3": {
-                "dominating": [
-                  {
-                    "question_url": "/api/v1/questions/1",
-                    "author_url": "/api/v1/users/3",
-                    "title": "Bills First Proposal",
-                    "url": "/api/v1/questions/1/proposals/1",
-                    "abstract": null,
-                    "created": "2013-08-13 10:42:55.625328",
-                    "id": "1",
-                    "blurb": "Bills blurb of varying interest",
-                    "generation_created": "1"
+              "query_generation": "1",
+              "current_generation": "1",
+              "objects": [
+                {
+                  "3": {
+                    "dominating": [
+                      {
+                        "question_url": "/api/v1/questions/1",
+                        "author_url": "/api/v1/users/3",
+                        "title": "Bills First Proposal",
+                        "url": "/api/v1/questions/1/proposals/1",
+                        "abstract": null,
+                        "created": "2013-08-13 10:42:55.625328",
+                        "id": "1",
+                        "blurb": "Bills blurb of varying interest",
+                        "generation_created": "1"
+                      }
+                    ],
+                    "dominated": []
                   }
-                ],
-                "dominated": []
-              }
-            },
-            {
-              "2": {
-                "dominating": [],
-                "dominated": []
-              }
-            },
-            {
-              "1": {
-                "dominating": [],
-                "dominated": [
-                  {
-                    "question_url": "/api/v1/questions/1",
-                    "author_url": "/api/v1/users/2",
-                    "title": "Susans Only Proposal",
-                    "url": "/api/v1/questions/1/proposals/3",
-                    "abstract": "Blah blah blah",
-                    "created": "2013-08-13 10:42:55.664450",
-                    "id": "3",
-                    "blurb": "My blub is cool",
-                    "generation_created": "1"
+                },
+                {
+                  "2": {
+                    "dominating": [],
+                    "dominated": []
                   }
-                ]
-              }
-            },
-            {
-              "4": {
-                "dominating": [],
-                "dominated": []
-              }
+                },
+                {
+                  "1": {
+                    "dominating": [],
+                    "dominated": [
+                      {
+                        "question_url": "/api/v1/questions/1",
+                        "author_url": "/api/v1/users/2",
+                        "title": "Susans Only Proposal",
+                        "url": "/api/v1/questions/1/proposals/3",
+                        "abstract": "Blah blah blah",
+                        "created": "2013-08-13 10:42:55.664450",
+                        "id": "3",
+                        "blurb": "My blub is cool",
+                        "generation_created": "1"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "4": {
+                    "dominating": [],
+                    "dominated": []
+                  }
+                }
+              ],
+              "num_items": "4",
+              "question_id": "1"
             }
-          ],
-          "num_items": "4",
-          "question_id": "1"
-       }
 
-    :param question_id: question id
-    :type question_id: int
-    :statuscode 201: no error
-    :statuscode 400: bad request
+        :param question_id: question id
+        :type question_id: int
+        :statuscode 200: no error
+        :statuscode 400: bad request
     '''
     app.logger.debug("api_question_proposal_relations called with %s...\n",
                      question_id)
@@ -1739,42 +1956,58 @@ def api_question_proposal_relations(question_id=None):
            methods=['GET'])
 def api_get_invitations(question_id):
     '''
-    .. http:post:: /users
+        .. http:get:: /questions/(int:question_id)/invitations
 
-    A user or list of users.
+        A list of invitations for a question.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      POST /users HTTP/1.1
-      Host: example.com
-      Accept: application/json
+            GET /questions/45/invitations HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      Status Code: 201 OK
-      Content-Type: application/json
+            Status Code: 201 OK
+            Content-Type: application/json
 
-      {
-         "url": "/users/10"
-      }
+            {
+              "total_items": "4",
+              "items": "2",
+              "objects": [
+                {
+                  "receiver_id": "/api/v1/users/2",
+                  "sender_url": "/api/v1/users/1",
+                  "sender_id": 1,
+                  "id": "1",
+                  "question_id": 1
+                },
+                {
+                  "receiver_id": "/api/v1/users/3",
+                  "sender_url": "/api/v1/users/1",
+                  "sender_id": 1,
+                  "id": "2",
+                  "question_id": 1
+                }
+              ],
+              "page": "1",
+              "pages": "2"
+            }
 
-    :json username: username
-    :json email: email address
-    :json password: password
-    :statuscode 201: no error
-    :statuscode 400: bad request
+        :json username: username
+        :json email: email address
+        :json password: password
+        :statuscode 201: no error
+        :statuscode 400: bad request
     '''
     app.logger.debug("api_get_invitations called...\n")
 
     if question_id is None:
         abort(404)
-
-    if not request.json:
-        abort(400)
 
     question = models.Question.query.get(int(question_id))
     if question is None:
@@ -1782,7 +2015,8 @@ def api_get_invitations(question_id):
 
     page = int(request.args.get('page', 1))
 
-    invites = question.author.invitations.filter_by(question_id=question_id).\
+    invites = models.Invite.query.filter(
+        models.Invite.question_id == int(question_id)).\
         paginate(page, RESULTS_PER_PAGE, False)
 
     items = len(invites.items)
@@ -1804,34 +2038,35 @@ def api_get_invitations(question_id):
 @requires_auth
 def api_create_invitation(question_id):
     '''
-    .. http:post:: /users
+    .. http:post:: questions/(int:question_id)/invitations
 
-    A user or list of users.
+        Create invitations to a question.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      POST /users HTTP/1.1
-      Host: example.com
-      Accept: application/json
+            POST questions/45/invitations HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      Status Code: 201 OK
-      Content-Type: application/json
+            Status Code: 201 OK
+            Content-Type: application/json
 
-      {
-         "url": "/users/10"
-      }
+            {
+              "message": "Invites sent"
+            }
 
-    :json username: username
-    :json email: email address
-    :json password: password
-    :statuscode 201: no error
-    :statuscode 400: bad request
+        :param question_id: question id
+        :type question_id: int
+        :json invite_user_ids: list of user ids to invite
+        :type invite_user_ids: list of int
+        :statuscode 201: no error
+        :statuscode 400: bad request
     '''
     app.logger.debug("api_create_invitation called...\n")
 
@@ -1882,55 +2117,54 @@ def api_create_invitation(question_id):
            methods=['GET'])
 def api_get_user_subscriptions(user_id, question_id=None):
     '''
-    .. http:post:: /users
+    .. http:get:: users/(int:user_id)/subscriptions
 
-    A user or list of users.
+        A subscription or list of subscriptions to a question.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      POST /users HTTP/1.1
-      Host: example.com
-      Accept: application/json
+            GET users/12/subscriptions HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      Status Code: 201 OK
-      Content-Type: application/json
+            Status Code: 200 OK
+            Content-Type: application/json
 
-        {
-          "total_items": 3,
-          "items": 2,
-          "objects": [
             {
-              "url": "/users/1/subscriptions/1",
-              "how": "asap",
-              "last_update": "None",
-              "question_id": "1"
-            },
-            {
-              "url": "/users/1/subscriptions/2",
-              "how": "asap",
-              "last_update": "None",
-              "question_id": "2"
+              "total_items": 3,
+              "items": 2,
+              "objects": [
+                {
+                  "url": "/users/1/subscriptions/1",
+                  "how": "asap",
+                  "last_update": "None",
+                  "question_id": "1"
+                },
+                {
+                  "url": "/users/1/subscriptions/2",
+                  "how": "asap",
+                  "last_update": "None",
+                  "question_id": "2"
+                }
+              ],
+              "page": "1",
+              "pages": "2"
             }
-          ],
-          "page": "1",
-          "pages": "2"
-        }
 
-    :param user_id: user id
-    :type user_id: int
-    :param question_id: question id
-    :type question_id: int
-    :json username: username
-    :json email: email address
-    :json password: password
-    :statuscode 201: no error
-    :statuscode 400: bad request
+        :param user_id: user id
+        :type user_id: int
+        :param question_id: question id
+        :type question_id: int
+        :query page: page number, defaults to 1
+        :type page: int
+        :statuscode 200: no error
+        :statuscode 400: bad request
     '''
     app.logger.debug("api_get_user_subscriptions called...\n")
 
@@ -1981,34 +2215,36 @@ def api_get_user_subscriptions(user_id, question_id=None):
 @requires_auth
 def api_add_user_subscriptions(user_id):
     '''
-    .. http:post:: /users
+    .. http:post:: /users/(int:user_id)/subscriptions
 
-    A user or list of users.
+        Create a subscription.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      POST /users HTTP/1.1
-      Host: example.com
-      Accept: application/json
+            POST /users/22/subscriptions HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      Status Code: 201 OK
-      Content-Type: application/json
+            Status Code: 201 OK
+            Content-Type: application/json
 
-      {
-         "url": "/users/10"
-      }
+            {
+              "url": "/api/v1/users/1/subscriptions/1"
+            }
 
-    :json username: username
-    :json email: email address
-    :json password: password
+    :param user_id: user id
+    :type user_id: int
+    :json question_id: question id
+    :json how: one of daily, weekly, or asap
     :statuscode 201: no error
     :statuscode 400: bad request
+    :statuscode 401: unauthorized
     '''
     app.logger.debug("api_add_user_subscriptions called...\n")
 
@@ -2048,6 +2284,104 @@ def api_add_user_subscriptions(user_id):
                                    question_id=question_id)}), 201
 
 
+#
+# Update subscription
+#
+@app.route('/api/v1/users/<int:user_id>/subscriptions',
+           methods=['PATCH'])
+@requires_auth
+def api_update_user_subscriptions(user_id):
+    '''
+    .. http:patch:: /users/(int:user_id)/subscriptions
+
+    Update a user's question subscription'.
+
+    **Example request**:
+
+   .. sourcecode:: http
+
+      PATCH users/56/subscriptions HTTP/1.1
+      Host: example.com
+      Accept: application/json
+
+    **Example response**:
+
+    .. sourcecode:: http
+
+        Status Code: 201 OK
+        Content-Type: application/json
+
+        {
+          "objects": [
+            {
+              "how": "asap",
+              "last_update": "None",
+              "question_id": 3
+            }
+          ]
+        }
+
+    :param user_id: user id
+    :type user_id: int
+    :json question_id: question id
+    :type question_id: int
+    :json how: one of daily, weekly, or asap
+    :type how: string
+    :statuscode 201: no error
+    :statuscode 400: bad request
+    :statuscode 401: unauthorized
+    '''
+    app.logger.debug("api_update_user_subscriptions called...\n")
+
+    user = get_authenticated_user(request)
+    if not user:
+        abort(401)
+
+    app.logger.debug("Authenticated User = %s\n", user.id)
+
+    if not request.json:
+        abort(400)
+
+    if user_id is None:
+        abort(400)
+
+    if user.id != user_id:
+        abort(401)
+
+    if not 'question_id' in request.json:
+        msg_txt = "You must supply the parameter 'question_id' " +\
+                  "set to the id of the question" +\
+                  "you wish to subscribe to"
+        message = {"message": msg_txt}
+        return jsonify(message), 400
+
+    question_id = int(request.json['question_id'])
+
+    if not 'how' in request.json \
+            or not request.json['how'] in ['daily', 'weekly', 'asap']:
+        msg_txt = "You must supply the parameter 'how' " +\
+                  "set to one of the desired" +\
+                  "update methods: 'daily', 'weekly', 'asap'"
+        message = {"message": msg_txt}
+        return jsonify(message), 400
+
+    subscription = user.subscribed_questions.\
+        filter(models.Update.question_id == int(question_id)).first()
+
+    if subscription is None:
+        abort(404)
+
+    subscription.how = request.json['how']
+    # db_session.add(user)
+    db_session.commit()
+
+    subscription = [{'question_id': subscription.question_id,
+                    'how': subscription.how,
+                    'last_update': str(subscription.last_update)}]
+
+    return jsonify(objects=subscription), 201
+
+
 # Delete subscription
 #
 # @app.route('/api/v1/subscriptions/<int:question_id>',
@@ -2056,33 +2390,35 @@ def api_add_user_subscriptions(user_id):
 @requires_auth
 def api_delete_user_subscriptions(user_id, question_id):
     '''
-    .. http:delete:: /users/(int:user_id)/subscriptions/(int:question_id)
+        .. http:delete:: /users/(int:user_id)/subscriptions/(int:question_id)
 
-    A user or list of users.
+        Delete a question subscription.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      DELETE users/56/subscriptions/44 HTTP/1.1
-      Host: example.com
-      Accept: application/json
+            DELETE users/56/subscriptions/44 HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      Status Code: 201 OK
-      Content-Type: application/json
+            Status Code: 200 OK
+            Content-Type: application/json
 
-      {
-        "message": "Subscription Deleted"
-      }
+            {
+            "message": "Subscription Deleted"
+            }
 
-    :param user_id: user id
-    :param question_id: question id
-    :statuscode 200: no error
-    :statuscode 400: bad request
+        :param user_id: user id
+        :type user_id: int
+        :param question_id: question id
+        :type question_id: int
+        :statuscode 200: no error
+        :statuscode 400: bad request
     '''
     app.logger.debug("api_delete_user_subscriptions called...\n")
 
@@ -2111,86 +2447,3 @@ def api_delete_user_subscriptions(user_id, question_id):
     db_session.add(user)
     db_session.commit()
     return jsonify(message="Subscription deleted"), 200
-
-
-#
-# Update subscription
-#
-@app.route('/api/v1/users/<int:user_id>/subscriptions/<int:question_id>',
-           methods=['PATCH'])
-@requires_auth
-def api_update_user_subscriptions(user_id, question_id):
-    '''
-    .. http:patch:: /users/(int:user_id)/subscriptions/(int:question_id)
-
-    Update a user's question subscription'.
-
-    **Example request**:
-
-   .. sourcecode:: http
-
-      PATCH users/56/subscriptions/44 HTTP/1.1
-      Host: example.com
-      Accept: application/json
-
-   **Example response**:
-
-   .. sourcecode:: http
-
-      Status Code: 201 OK
-      Content-Type: application/json
-
-      {
-         "url": "/users/10"
-      }
-
-    :param user_id: user id
-    :type user_id: int
-    :param question_id: question id
-    :type question_id: int
-    :json how: one of daily, weekly, or asap
-    :type how: string
-    :statuscode 201: no error
-    :statuscode 400: bad request
-    :statuscode 401: unauthorized
-    '''
-    app.logger.debug("api_update_user_subscriptions called...\n")
-
-    user = get_authenticated_user(request)
-    if not user:
-        abort(401)
-
-    app.logger.debug("Authenticated User = %s\n", user.id)
-
-    if user_id is None:
-        abort(400)
-
-    if user.id != user_id:
-        abort(401)
-
-    if question_id is None:
-        abort(400)
-
-    if not request.json or not 'how' in request.json \
-            or not request.json['how'] in ['daily', 'weekly', 'asap']:
-        msg_txt = "You must supply the parameter 'how' " +\
-                  "set to one of the desired" +\
-                  "update methods: 'daily', 'weekly', 'asap'"
-        message = [{"message": msg_txt}]
-        return jsonify(objects=message), 400
-
-    subscription = user.subscribed_questions.\
-        filter(models.Update.question_id == int(question_id)).first()
-
-    if subscription is None:
-        abort(404)
-
-    subscription.how = request.json['how']
-    # db_session.add(user)
-    db_session.commit()
-
-    subscription = [{'question_id': subscription.question_id,
-                    'how': subscription.how,
-                    'last_update': str(subscription.last_update)}]
-
-    return jsonify(objects=subscription), 200
