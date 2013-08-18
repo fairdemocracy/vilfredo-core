@@ -1,5 +1,3 @@
-
-
 # default configuration settings
 
 # WARNNG: must be changed in production!
@@ -29,8 +27,8 @@ ADMINS = ['admin@example.com']
 # name of logger configuration file
 LOG_CONFIG_FILE = 'logging_debug.conf'
 
-import os
-BASE = os.path.abspath(os.path.dirname(__file__))
-
 # Probably don't need this
 SITE_DOMAIN = 'localhost'
+
+# Directory to put the voting maps - it will be created if not found
+MAP_PATH = 'maps/'
