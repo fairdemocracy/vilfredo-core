@@ -113,6 +113,26 @@ def bad_request(error):
 
 
 #
+# Index
+#
+@app.route('/api/v1/', methods=['GET', 'POST'])
+@app.route('/api/v1/index', methods=['GET', 'POST'])
+def api_index():
+    app.logger.debug("api_index called...\n")
+
+    # Get authenticated user or None
+    current_user = get_authenticated_user(request)
+
+    if current_user:
+        message = "Welcome back " + current_user.username +\
+            " to the Vilfredo Reloaded REST API"
+    else:
+        message = "Welcome to the Vilfredo Reloaded REST API"
+
+    return jsonify(message=message), 200
+
+
+#
 # Get Users
 #
 @app.route('/api/v1/users', methods=['GET'])
