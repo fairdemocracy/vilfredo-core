@@ -24,15 +24,7 @@
 The database Bases
 '''
 
-# from sqlalchemy import Column, Integer, String, ForeignKey
-
-# from sqlalchemy import Enum, DateTime, Text, and_, event
-
 from sqlalchemy import and_, event
-
-# from sqlalchemy.orm import backref
-
-# from database import Base, db_session
 
 from database import db_session
 
