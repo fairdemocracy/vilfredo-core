@@ -858,32 +858,32 @@ def api_remove_proposal_endorsement(question_id, proposal_id):
     '''
     .. http:post:: /questions/(int:question_id)/proposals/(int:proposal_id)/endorsements
 
-    Delete an endorsement.
+        Delete an endorsement.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-        DELETE /questions/45/proposals/47/endorsements HTTP/1.1
-        Host: example.com
-        Accept: application/json
+            DELETE /questions/45/proposals/47/endorsements HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-   **Example response**:
+        **Example response**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-        Status Code: 200 OK
-        Content-Type: application/json
+            Status Code: 200 OK
+            Content-Type: application/json
 
-        {
-          "message": "Endorsement removed"
-        }
+            {
+              "message": "Endorsement removed"
+            }
 
-    :json username: username
-    :json email: email address
-    :json password: password
-    :statuscode 200: no error
-    :statuscode 400: bad request
+        :json username: username
+        :json email: email address
+        :json password: password
+        :statuscode 200: no error
+        :statuscode 400: bad request
     '''
     app.logger.debug("api_remove_proposal_endorsement called...\n")
 
@@ -2294,42 +2294,42 @@ def api_update_user_subscriptions(user_id):
     '''
     .. http:patch:: /users/(int:user_id)/subscriptions
 
-    Update a user's question subscription'.
+        Update a user's question subscription'.
 
-    **Example request**:
+        **Example request**:
 
-   .. sourcecode:: http
+        .. sourcecode:: http
 
-      PATCH users/56/subscriptions HTTP/1.1
-      Host: example.com
-      Accept: application/json
+            PATCH users/56/subscriptions HTTP/1.1
+            Host: example.com
+            Accept: application/json
 
-    **Example response**:
+        **Example response**:
 
-    .. sourcecode:: http
+        .. sourcecode:: http
 
-        Status Code: 201 OK
-        Content-Type: application/json
+            Status Code: 201 OK
+            Content-Type: application/json
 
-        {
-          "objects": [
             {
-              "how": "asap",
-              "last_update": "None",
-              "question_id": 3
+              "objects": [
+                {
+                  "how": "asap",
+                  "last_update": "None",
+                  "question_id": 3
+                }
+              ]
             }
-          ]
-        }
 
-    :param user_id: user id
-    :type user_id: int
-    :json question_id: question id
-    :type question_id: int
-    :json how: one of daily, weekly, or asap
-    :type how: string
-    :statuscode 201: no error
-    :statuscode 400: bad request
-    :statuscode 401: unauthorized
+        :param user_id: user id
+        :type user_id: int
+        :json question_id: question id
+        :type question_id: int
+        :json how: one of daily, weekly, or asap
+        :type how: string
+        :statuscode 201: no error
+        :statuscode 400: bad request
+        :statuscode 401: unauthorized
     '''
     app.logger.debug("api_update_user_subscriptions called...\n")
 
