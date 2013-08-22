@@ -516,7 +516,7 @@ def api_get_questions(question_id=None):
 @requires_auth
 def api_create_question():
     '''
-        .. http:post:: /questions
+    .. http:post:: /questions
 
         A user or list of users.
 
@@ -595,7 +595,7 @@ def api_create_question():
 @app.route('/api/v1/questions/<int:question_id>/subscribers', methods=['GET'])
 def api_question_subscribers(question_id=None):
     '''
-        .. http:get:: /questions/(int:question_id)/subscribers
+    .. http:get:: /questions/(int:question_id)/subscribers
 
         A list of question subscribers.
 
@@ -1005,7 +1005,7 @@ def api_create_proposal(question_id):
 @requires_auth
 def api_delete_proposal(question_id, proposal_id):
     '''
-        .. http:delete:: questions/(int:question_id)/proposals/(int:proposal_id)
+    .. http:delete:: questions/(int:question_id)/proposals/(int:proposal_id)
 
         Delete a proposal.
 
@@ -1751,7 +1751,7 @@ def replaceWithPublic(collection):
 @app.route('/api/v1/questions/<int:question_id>/graph', methods=['GET'])
 def api_question_graph(question_id):
     '''
-        .. http:get:: questions/(int:question_id)/graph
+    .. http:get:: questions/(int:question_id)/graph
 
         Get the Voting map for this generation.
 
@@ -1833,7 +1833,7 @@ def api_question_graph(question_id):
            methods=['GET'])
 def api_question_proposal_relations(question_id=None):
     '''
-        .. http:post:: questions/(int:question_id)/proposal_relations
+    .. http:post:: questions/(int:question_id)/proposal_relations
 
         A list of proposal relations.
 
@@ -1956,7 +1956,7 @@ def api_question_proposal_relations(question_id=None):
            methods=['GET'])
 def api_get_invitations(question_id):
     '''
-        .. http:get:: /questions/(int:question_id)/invitations
+    .. http:get:: /questions/(int:question_id)/invitations
 
         A list of invitations for a question.
 
@@ -2238,13 +2238,13 @@ def api_add_user_subscriptions(user_id):
               "url": "/api/v1/users/1/subscriptions/1"
             }
 
-    :param user_id: user id
-    :type user_id: int
-    :json question_id: question id
-    :json how: one of daily, weekly, or asap
-    :statuscode 201: no error
-    :statuscode 400: bad request
-    :statuscode 401: unauthorized
+        :param user_id: user id
+        :type user_id: int
+        :json question_id: question id
+        :json how: one of daily, weekly, or asap
+        :statuscode 201: no error
+        :statuscode 400: bad request
+        :statuscode 401: unauthorized
     '''
     app.logger.debug("api_add_user_subscriptions called...\n")
 
@@ -2390,7 +2390,7 @@ def api_update_user_subscriptions(user_id):
 @requires_auth
 def api_delete_user_subscriptions(user_id, question_id):
     '''
-        .. http:delete:: /users/(int:user_id)/subscriptions/(int:question_id)
+    .. http:delete:: /users/(int:user_id)/subscriptions/(int:question_id)
 
         Delete a question subscription.
 
