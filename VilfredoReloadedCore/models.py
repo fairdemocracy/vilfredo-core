@@ -1384,7 +1384,10 @@ class Question(db.Model):
                 app.logger.debug('Failed to create map path %s', map_path)
                 return False
 
+        # Create the SVG file if it doesn't exist
         if not os.path.isfile(filepath + '.svg'):
+
+            # Create DOT file if it doesn't exist
             if not os.path.isfile(filepath + '.dot'):
                 # Create the dot specification of the map
                 if map_type == 'pareto':
@@ -1403,12 +1406,19 @@ class Question(db.Model):
                 dot_file = open(filepath+".dot", "w")
                 dot_file.write(voting_graph)
                 dot_file.close()
+
+                if not os.path.isfile(filepath + '.dot'):
+                    app.logger.debug('Failed to create dot file %s.dot', filepath)
+                    return False
+
             # Generate svg file from the dot file using "dot"
-            #   Command Format: dot -Tsvg -v test.dot -otest.svg
-            #
-            from subprocess import call
-            call(["/usr/local/bin/dot",
-                  "-Tsvg", filepath + ".dot", "-o" + filepath + ".svg"])
+            import pydot
+            graph = pydot.graph_from_dot_file(filepath+'.dot')
+            graph.write_svg(filepath+'.svg')
+
+            if not os.path.isfile(filepath + '.svg'):
+                app.logger.debug('Failed to create svg file %s.svg', filepath)
+                return False
 
         # Return voting graph file path
         return filepath + ".svg"
