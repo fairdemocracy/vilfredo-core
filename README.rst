@@ -77,6 +77,16 @@ If not just follow the following suggestions:
     Remember to activate the virtualenv every time you start developing.
 
 
+Graphviz
+------------
+
+Vilfredo uses Graphviz to create voting graphs, so this needs to be installed.
+
+.. code:: sh
+
+    apt-get install graphviz
+
+
 Source code
 -----------
 
