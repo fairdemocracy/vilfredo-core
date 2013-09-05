@@ -9,8 +9,9 @@ Welcome to vilfredo-reloaded-core's documentation!
 Contents:
 
 .. toctree::
-  :maxdepth: 2
+  :maxdepth: 3
 
+  readme
   modules
   http_api
 
