@@ -250,33 +250,14 @@ def api_update_user(user_id):
             Content-Type: application/json
 
             {
-               "total_items": 5,
-               "items": "2",
-               "objects":
-               [
-                   {
-                       "username": "john",
-                       "url": "/users/1",
-                       "registered": "2013-08-12 09:51:38.559222",
-                       "id": "1",
-                       "last_seen": "2013-08-12 09:51:38.559240"
-                   },
-                   {
-                       "username": "susan",
-                       "url": "/users/2",
-                       "registered": "2013-08-12 09:51:38.576731",
-                       "id": "2",
-                       "last_seen": "2013-08-12 09:51:38.576745"
-                   }
-               ],
-               "page": "1",
-               "pages": "2"
+                "url": "/users/1"
             }
 
         :param user_id: user id
         :type user_id: int
-        :query page: page number. default is 1
-        :type page: int
+        :json new_username: new username
+        :json new_password: new password
+        :json new_email: new email address
         :statuscode 200: no error
         :statuscode 404: there's no user
     '''
@@ -345,7 +326,7 @@ def api_create_user():
     '''
     .. http:post:: /users
 
-        A user or list of users.
+        Create a new user.
 
         **Example request**:
 
@@ -472,6 +453,7 @@ def api_get_questions(question_id=None):
             }
 
         :param user_id: user id
+        :type user_id: int
         :query page: page number. default is 1
         :statuscode 200: no error
         :statuscode 404: there's no user
@@ -520,7 +502,7 @@ def api_create_question():
     '''
     .. http:post:: /questions
 
-        A user or list of users.
+        Create a question.
 
         **Example request**:
 
@@ -541,9 +523,11 @@ def api_create_question():
                 "url": "/questions/1"
             }
 
-        :json username: username
-        :json email: email address
-        :json password: password
+        :json title: question title
+        :json blurb: question content
+        :json room: question room
+        :json minimum_time: minimum time before question can be moved on
+        :json maximum_time: maximum time before question is automatically moved on
         :statuscode 201: no error
         :statuscode 400: bad request
     '''
@@ -640,6 +624,7 @@ def api_question_subscribers(question_id=None):
 
         :param question_id: question id
         :type question_id: int
+        :query page: page number, default is 1
         :statuscode 200: no error
         :statuscode 400: bad request
     '''
@@ -730,8 +715,10 @@ def api_get_question_proposals(question_id=None, proposal_id=None):
                 "pages": "2"
             }
 
-        :param question_id: user ID
+        :param question_id: question ID
+        :type question_id: int
         :param proposal_id: proposal ID
+        :type proposal_id: int
         :query generation: question generation, default is current
         :query page: page number, default is 1
         :statuscode 200: no error
@@ -814,6 +801,10 @@ def api_add_proposal_endorsement(question_id, proposal_id):
                  "message": "Endorsement added"
             }
 
+        :param question_id: question ID
+        :type question_id: int
+        :param proposal_id: proposal ID
+        :type proposal_id: int
         :statuscode 200: no error
         :statuscode 400: bad request
     '''
@@ -881,9 +872,10 @@ def api_remove_proposal_endorsement(question_id, proposal_id):
               "message": "Endorsement removed"
             }
 
-        :json username: username
-        :json email: email address
-        :json password: password
+        :param question_id: question ID
+        :type question_id: int
+        :param proposal_id: proposal ID
+        :type proposal_id: int
         :statuscode 200: no error
         :statuscode 400: bad request
     '''
@@ -949,9 +941,11 @@ def api_create_proposal(question_id):
                 "url": "/api/v1/questions/45/proposals/1"
             }
 
-        :json username: username
-        :json email: email address
-        :json password: password
+        :param question_id: question ID
+        :type question_id: int
+        :json title: proposal title
+        :json blurb: proposal content
+        :json abstract: proposal abstract
         :statuscode 201: no error
         :statuscode 400: bad request
     '''
@@ -1098,9 +1092,8 @@ def api_delete_question(question_id):
               "message": "Question deleted"
             }
 
-        :json username: username
-        :json email: email address
-        :json password: password
+        :param question_id: question ID
+        :type question_id: int
         :statuscode 200: no error
         :statuscode 400: bad request
     '''
@@ -1166,9 +1159,13 @@ def api_edit_question(question_id):
              "message": "Question updated"
             }
 
-        :json username: username
-        :json email: email address
-        :json password: password
+        :param question_id: question ID
+        :type question_id: int
+        :json title: question title
+        :json blurb: question content
+        :json room: question room
+        :json minimum_time: minimum time before question can be moved on
+        :json maximum_time: maximum time before question is automatically moved on
         :statuscode 201: no error
         :statuscode 400: bad request
     '''
@@ -1263,8 +1260,10 @@ def api_edit_proposal(question_id, proposal_id):
               "message": "Proposal updated"
             }
 
-        :param question_id: question id
-        :param proposal_id: proposal id
+        :param question_id: question ID
+        :type question_id: int
+        :param proposal_id: proposal ID
+        :type proposal_id: int
         :json title: title
         :json blurb: question content
         :json abstract: optional abstract
@@ -1322,7 +1321,7 @@ def api_edit_proposal(question_id, proposal_id):
         return jsonify(message), 400
 
 
-# Get Proposal Endorsers
+# Get Proposal Endorsers HERE
 @app.route('/api/v1/questions/<int:question_id>/proposals/' +
            '<int:proposal_id>/endorsers',
            methods=['GET'])
@@ -1381,6 +1380,7 @@ def api_get_question_proposal_endorsers(question_id=None, proposal_id=None):
         :type question_id: int
         :param proposal_id: proposal id
         :type proposal_id: int
+        :query generation: question generation, default is 1
         :statuscode 200: no error
         :statuscode 400: bad request
     '''
@@ -1515,7 +1515,7 @@ def api_question_key_players(question_id=None):
     '''
     .. http:post:: /questions/(int:question_id)/key_players
 
-        A user or list of users.
+        A list of the Key Players for this round.
 
         **Example request**:
 
@@ -1780,6 +1780,8 @@ def api_question_graph(question_id):
              "url": "/maps/map_Q42_G4_all_1_1.svg"
             }
 
+        :param question_id: question ID
+        :type question_id: int
         :query map_type: map type. default is all generation proposals
         :type map_type: string: either "all" or "pareto", defaults to "all"
         :query generation: question generation
@@ -2000,9 +2002,9 @@ def api_get_invitations(question_id):
               "pages": "2"
             }
 
-        :json username: username
-        :json email: email address
-        :json password: password
+        :param question_id: question ID
+        :type question_id: int
+        :query page: results page number, default is 1
         :statuscode 201: no error
         :statuscode 400: bad request
     '''
@@ -2066,7 +2068,6 @@ def api_create_invitation(question_id):
         :param question_id: question id
         :type question_id: int
         :json invite_user_ids: list of user ids to invite
-        :type invite_user_ids: list of int
         :statuscode 201: no error
         :statuscode 400: bad request
     '''
@@ -2164,7 +2165,6 @@ def api_get_user_subscriptions(user_id, question_id=None):
         :param question_id: question id
         :type question_id: int
         :query page: page number, defaults to 1
-        :type page: int
         :statuscode 200: no error
         :statuscode 400: bad request
     '''
@@ -2326,9 +2326,7 @@ def api_update_user_subscriptions(user_id):
         :param user_id: user id
         :type user_id: int
         :json question_id: question id
-        :type question_id: int
         :json how: one of daily, weekly, or asap
-        :type how: string
         :statuscode 201: no error
         :statuscode 400: bad request
         :statuscode 401: unauthorized
