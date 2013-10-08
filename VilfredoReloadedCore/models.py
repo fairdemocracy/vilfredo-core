@@ -147,7 +147,7 @@ class User(db.Model, UserMixin):
 
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False)
-    email = db.Column(db.String(120))
+    email = db.Column(db.String(120), unique=True)
     password = db.Column(db.String(60), nullable=False)
     registered = db.Column(db.DateTime)
     last_seen = db.Column(db.DateTime)
@@ -549,7 +549,7 @@ class Question(db.Model):
     minimum_time = db.Column(db.Integer)
     maximum_time = db.Column(db.Integer)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    # 1:M
+
     proposals = db.relationship('Proposal', backref='question', lazy='dynamic',
                                 cascade="all, delete-orphan")
     history = db.relationship('QuestionHistory', lazy='dynamic',
@@ -565,17 +565,17 @@ class Question(db.Model):
 
         Creates a Question object.
 
-        :param author: author of the question
+        :param author: question author
         :type author: User
-        :param title: author of the question
+        :param title: question title
         :type title: string
-        :param blurb: author of the question
+        :param blurb: uestion content
         :type blurb: string
-        :param minimum_time: author of the question
-        :type minimum_time: db.Integer
-        :param maximum_time: author of the question
-        :type maximum_time: db.Integer
-        :param room: room associated with the question
+        :param minimum_time: minimum time before a question can be moved on
+        :type minimum_time: integer
+        :param maximum_time: time until the author will be asked to move the question on
+        :type maximum_time: integer
+        :param room: question room
         :type room: string
         '''
         self.user_id = author.id
@@ -2927,6 +2927,7 @@ class Proposal(db.Model):
                 'blurb': self.blurb,
                 'abstract': self.abstract,
                 'generation_created': str(self.generation_created),
+                'source': str(self.source),
                 'created': str(self.created),
                 'author_url': url_for('api_get_users', user_id=self.user_id),
                 'question_url': url_for('api_get_questions',
@@ -2936,12 +2937,11 @@ class Proposal(db.Model):
     title = db.Column(db.String(120), nullable=False)
     blurb = db.Column(db.Text, nullable=False)
     abstract = db.Column(db.Text)
-    #generation = db.Column(db.Integer, default=1)
     generation_created = db.Column(db.Integer, default=1)
     created = db.Column(db.DateTime)
+    source = db.Column(db.Integer, default=0)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     question_id = db.Column(db.Integer, db.ForeignKey('question.id'))
-    #dominated_by = db.Column(db.Integer, default=0)
     # 1:M
     endorsements = db.relationship('Endorsement', backref="proposal",
                                    lazy='dynamic',
@@ -2951,7 +2951,7 @@ class Proposal(db.Model):
                               backref=db.backref("proposal", lazy="joined"),
                               lazy='joined', cascade="all, delete-orphan")
 
-    def __init__(self, author, question, title, blurb, abstract=None):
+    def __init__(self, author, question, title, blurb, abstract=None, source=0):
         self.user_id = author.id
         self.question_id = question.id
         self.title = title
@@ -2960,6 +2960,26 @@ class Proposal(db.Model):
         self.created = datetime.datetime.utcnow()
         self.abstract = abstract
         self.question = question
+        self.source = source
+        '''
+        .. function:: __init__(author, question, title, blurb
+                [, abstract=None, source=0])
+
+        Creates a Proposal object.
+
+        :param author: author of the question
+        :type author: User
+        :param question: unique ID of the related question
+        :type question: integer
+        :param title: question title
+        :type title: string
+        :param blurb: question content
+        :type blurb: string
+        :param abstract: question abstract
+        :type abstract: string
+        :param source: the id of its parent proposal if one exists, or 0
+        :type source: integer
+        '''
 
     def __marshallable__(self):
         # return {"id": self.author.id, "username": self.author.username}
