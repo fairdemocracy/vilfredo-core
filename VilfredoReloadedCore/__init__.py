@@ -23,7 +23,7 @@
 Vilfredo Reloaded Core
 ======================
 
-:copyright: (c) 2013 by Daniele Pizzolli
+:copyright: © 2009-2013 Pietro Speroni di Fenizio & Derek Paterson
 :license: AGPL 3, see LICENSE.txt for more details
 
 
