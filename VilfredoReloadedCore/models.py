@@ -86,6 +86,13 @@ def make_map_filename(question_id,
            "_" + str(user_level_type)
 
 
+# Proposal comments supported by a user
+user_comments = db.Table(
+    'user_comments',
+    db.Column('user_id', db.Integer, db.ForeignKey('user.id')),
+    db.Column('comment_id', db.Integer, db.ForeignKey('comment.id')))
+
+
 class Update(db.Model):
     '''
     Stores user question subscription data
@@ -173,6 +180,58 @@ class User(db.Model, UserMixin):
                               backref="sender", lazy='dynamic',
                               cascade="all, delete-orphan")
 
+    comments = db.relationship(
+        'Comment',
+        secondary=user_comments,
+        primaryjoin="user_comments.c.user_id == User.id",
+        backref=db.backref('supporters', lazy='dynamic'),
+        lazy='dynamic')
+
+    def support_comments(self, comments):
+        '''
+        .. function:: support_comments(comments)
+
+        Get all comments for a particular generation of the propsal.
+
+        :param comments: list of comments to support
+        :type comments: list
+        :rtype: None
+        '''
+        if (comments):
+            for comment in comments:
+                self.comments.append(comment)
+
+    def unsupport_comments(self, comments):
+        '''
+        .. function:: unsupport_comments(comments)
+
+        Get all comments for a particular generation of the propsal.
+
+        :param comments: list of comments to stop supporting
+        :type comments: list
+        :rtype: None
+        '''
+        if (comments):
+            for comment in comments:
+                self.comments.remove(comment)
+
+    def get_supported_comments(self, proposal, generation=None):
+        '''
+        .. function:: get_supported_comments(proposal[, generation=None])
+
+        Get all proposl comments supported by this user.
+
+        :param proposal: proposal
+        :type proposal: Proposal
+        :param generation: proposal generation, defaults to current
+        :type generation: int
+        :rtype: list
+        '''
+        generation = generation or proposal.question.generation
+        return self.comments.filter(and_(
+            Comment.proposal_id == proposal.id,
+            Comment.generation == generation)).all()
+
     def invite(self, receiver, question):
         # Only author can invite to own question and cannot invite himself
         '''
@@ -249,7 +308,7 @@ class User(db.Model, UserMixin):
         :param question: associated question
         :type question: Question
         :param generation: question generation
-        :type generation: db.Integer or None
+        :type generation: int or None
         :rtype: set
         '''
         generation = generation or question.generation
@@ -258,7 +317,8 @@ class User(db.Model, UserMixin):
             join(Endorsement.proposal).filter(and_(
                 Endorsement.user_id == self.id,
                 Proposal.question_id == question.id,
-                Endorsement.generation == generation)
+                Endorsement.generation == generation,
+                Endorsement.endorsement_type == 'endorse')
             ).all()
         proposal_ids = set()
         for endorsement in endorsements:
@@ -274,7 +334,7 @@ class User(db.Model, UserMixin):
 
         :param question: associated question
         :param generation: question generation
-        :type generation: db.Integer or None
+        :type generation: int or None
         :rtype: list of proposals
         '''
         generation = generation or question.generation
@@ -283,7 +343,8 @@ class User(db.Model, UserMixin):
             join(Endorsement.proposal).filter(and_(
                 Endorsement.user_id == self.id,
                 Proposal.question_id == question.id,
-                Endorsement.generation == generation)
+                Endorsement.generation == generation,
+                Endorsement.endorsement_type == 'endorse')
             ).all()
         proposals = set()
         for endorsement in endorsements:
@@ -299,7 +360,7 @@ class User(db.Model, UserMixin):
 
         :param question: associated question
         :param generation: question generation
-        :type generation: db.Integer or None
+        :type generation: int or None
         :rtype: list of proposals
         '''
         generation = generation or question.generation
@@ -320,7 +381,7 @@ class User(db.Model, UserMixin):
 
         :param question: associated question
         :param generation: question generation
-        :type generation: db.Integer or None
+        :type generation: int or None
         :rtype: list of proposals
         '''
         generation = generation or question.generation
@@ -340,7 +401,7 @@ class User(db.Model, UserMixin):
 
         :param question: associated question
         :param generation: question generation
-        :type generation: db.Integer or None
+        :type generation: int or None
         :rtype: list of proposals
         '''
         generation = generation or question.generation
@@ -364,7 +425,7 @@ class User(db.Model, UserMixin):
         of the generation in which the proposal is created.
 
         :param prop: the proposal object to delete
-        :rtype: bool
+        :rtype: boolean
         '''
         proposal = self.proposals.filter(and_(
             Proposal.id == prop.id,
@@ -572,9 +633,9 @@ class Question(db.Model):
         :param blurb: uestion content
         :type blurb: string
         :param minimum_time: minimum time before a question can be moved on
-        :type minimum_time: integer
+        :type minimum_time: int
         :param maximum_time: time until the author will be asked to move the question on
-        :type maximum_time: integer
+        :type maximum_time: int
         :param room: question room
         :type room: string
         '''
@@ -768,7 +829,7 @@ class Question(db.Model):
         for the selected generation of the question.
 
         :param generation: question generation.
-        :type generation: db.Integer
+        :type generation: int
         :rtype: list
         '''
         generation = generation or self.generation
@@ -787,7 +848,7 @@ class Question(db.Model):
         of this question indexed by the peoposal ID.
 
         :param generation: question generation.
-        :type generation: db.Integer
+        :type generation: int
         :rtype: dict
         '''
         generation = generation or self.generation
@@ -810,7 +871,7 @@ class Question(db.Model):
         the question.
 
         :param generation: question generation.
-        :type generation: db.Integer
+        :type generation: int
         :rtype: set
         '''
         generation = generation or self.generation
@@ -829,7 +890,7 @@ class Question(db.Model):
         the question.
 
         :param generation: question generation.
-        :type generation: db.Integer
+        :type generation: int
         :rtype: set
         '''
         generation = generation or self.generation
@@ -850,7 +911,7 @@ class Question(db.Model):
         element it calculates which dominates and which are dominated.
 
         :param generation: question generation.
-        :type generation: db.Integer
+        :type generation: int
         :rtype: dict
         '''
         generation = generation or self.generation
@@ -902,10 +963,10 @@ class Question(db.Model):
             - -1 if the sets of endorsers are the same
 
         :param element1: element 1
-        :type element1: set of db.Integers
+        :type element1: set of int
         :param element2: element 2
-        :type element2: set of db.Integers
-        :rtype: interger or set of db.Integers
+        :type element2: set of int
+        :rtype: interger or set of int
         '''
         # If element1 and element2 are the same return -1
         if (element1 == element2):
@@ -934,7 +995,7 @@ class Question(db.Model):
         it calculates which dominate and which are dominated.
 
         :param generation: question generation.
-        :type generation: db.Integer
+        :type generation: int
         :rtype: dict
         '''
         generation = generation or self.generation
@@ -981,7 +1042,7 @@ class Question(db.Model):
         it calculates which dominate and which are dominated.
 
         :param generation: question generation.
-        :type generation: db.Integer
+        :type generation: int
         :rtype: dict
         '''
         generation = generation or self.generation
@@ -1039,7 +1100,7 @@ class Question(db.Model):
         :param exclude_user: user to exclude from the calculation
         :type exclude_user: User
         :param generation: question generation.
-        :type generation: db.Integer
+        :type generation: int
         :param save: save the domination info in the DB
         :type save: boolean
         :rtype: set of proposal objects
@@ -1118,7 +1179,7 @@ class Question(db.Model):
         then the set of IDs of the newly calculated pareto is returned.
 
         :param generation: question generation.
-        :type generation: db.Integer
+        :type generation: int
         :rtype: set or boolean.
         '''
         generation = generation or self.generation
@@ -1143,7 +1204,7 @@ class Question(db.Model):
             domination if missing
         :type calculate_if_missing: boolean
         :param generation: question generation.
-        :type generation: db.Integer
+        :type generation: int
         :rtype: set or boolean.
         '''
         generation = generation or self.generation
@@ -1173,7 +1234,7 @@ class Question(db.Model):
         the question.
 
         :param generation: question generation.
-        :type generation: db.Integer
+        :type generation: int
         :rtype: set
         '''
         generation = generation or self.generation
@@ -1193,7 +1254,7 @@ class Question(db.Model):
         What proposals has he forced into the pareto?
 
         :param generation: question generation.
-        :type generation: db.Integer
+        :type generation: int
         :rtype: dict
         '''
         generation = generation or self.generation
@@ -1226,7 +1287,7 @@ class Question(db.Model):
         What proposals has he forced into the pareto?
 
         :param generation: question generation.
-        :type generation: db.Integer
+        :type generation: int
         :rtype: dict
         '''
         generation = generation or self.generation
@@ -1294,7 +1355,7 @@ class Question(db.Model):
         :param user: the user to exclude from the calculation
         :type user: User
         :param generation: the generation
-        :type generation: db.Integer or None
+        :type generation: int or None
         :rtype: set
         '''
 
@@ -1408,7 +1469,8 @@ class Question(db.Model):
                 dot_file.close()
 
                 if not os.path.isfile(filepath + '.dot'):
-                    app.logger.debug('Failed to create dot file %s.dot', filepath)
+                    app.logger.debug('Failed to create dot file %s.dot',
+                                     filepath)
                     return False
 
             # Generate svg file from the dot file using "dot"
@@ -1417,7 +1479,8 @@ class Question(db.Model):
             graph.write_svg(filepath+'.svg')
 
             if not os.path.isfile(filepath + '.svg'):
-                app.logger.debug('Failed to create svg file %s.svg', filepath)
+                app.logger.debug('Failed to create svg file %s.svg',
+                                 filepath)
                 return False
 
         # Return voting graph file path
@@ -1448,7 +1511,7 @@ class Question(db.Model):
         :param proposals: set of proposals
         :type proposals: set or None
         :param generation: the generation
-        :type generation: db.Integer or None
+        :type generation: int or None
         :param internal_links:
         :type internal_links: boolean or None
         :param proposal_level_type: required layout of user nodes
@@ -2850,27 +2913,86 @@ class KeyPlayer(db.Model):
                                                       self.question_id)
 
 
-class VotingComments(db.Model):
+class Comment(db.Model):
     '''
-    Holds comments made during voting when disagreeing with a proposal or
-    not understanding one enough.
+    Holds comments made during voting when a user opposes a proposal or
+    does not understand one.
     '''
 
-    __tablename__ = 'voting_comments'
+    __tablename__ = 'comment'
+
+    def get_public(self):
+        '''
+        .. function:: get_public()
+
+        Return public propoerties as string values for REST responses.
+
+        :rtype: dict
+        '''
+        return {'id': str(self.id),
+                'url': url_for('api_get_proposal_comments',
+                               question_id=self.question_id,
+                               proposal_id=self.proposal_id,
+                               comment_id=self.id),
+                'comment': self.comment,
+                'comment_type': self.comment_type,
+                'generation': str(self.generation),
+                'created': str(self.created),
+                'author_url': url_for('api_get_users', user_id=self.user_id),
+                'proposal_url': url_for('api_get_question_proposals',
+                                        question_id=self.question_id,
+                                        proposal_id=self.proposal_id),
+                'question_url': url_for('api_get_questions',
+                                        question_id=self.question_id)}
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer)
-    proposal_id = db.Column(db.Integer)
+    proposal_id = db.Column(db.Integer, db.ForeignKey('proposal.id'))
+    question_id = db.Column(db.Integer, db.ForeignKey('question.id'))
+    generation = db.Column(db.Integer)
     created = db.Column(db.DateTime)
     comment = db.Column(db.Text, nullable=False)
-    comment_type = db.Column(db.Enum('confused', 'disagree'), nullable=False)
+    comment_type = db.Column(db.Enum('endorse', 'oppose', 'confused'),
+                             nullable=False)
 
     def __init__(self, user, proposal, comment, comment_type):
         self.user_id = user.id
         self.proposal_id = proposal.id
+        self.question_id = proposal.question.id
+        self.generation = proposal.question.generation
         self.created = datetime.datetime.utcnow()
         self.comment = comment
         self.comment_type = comment_type
+
+    @staticmethod
+    def fetch_if_exists(proposal, comment, comment_type, generation=None):
+        '''
+        .. function:: fetch_if_exists(proposal, comment, comment_type[, generation])
+
+        Returns the comment which matches new_comment,
+            or False if no match.
+
+        :param proposal: proposal
+        :type comment: Proposal
+        :param comment: comment text
+        :type comment: string
+        :param comment_type: type of comment
+        :type comment_type: string
+        :param generation: generation qustion was asked
+        :type generation: int or None
+        :rtype: Comment or boolean
+        '''
+        generation = generation or proposal.question.generation
+        existing_comment = db_session.query(Comment).filter(and_(
+            Comment.proposal_id == proposal.id,
+            Comment.generation == generation,
+            Comment.comment_type == comment_type,
+            Comment.comment == comment)
+        ).first()
+        if (existing_comment):
+            return existing_comment
+        else:
+            return False
 
 
 class QuestionHistory(db.Model):
@@ -2951,7 +3073,14 @@ class Proposal(db.Model):
                               backref=db.backref("proposal", lazy="joined"),
                               lazy='joined', cascade="all, delete-orphan")
 
-    def __init__(self, author, question, title, blurb, abstract=None, source=0):
+    comments = db.relationship(
+        'Comment',
+        backref=db.backref('proposal'),
+        primaryjoin="Comment.proposal_id == Proposal.id",
+        lazy='dynamic')
+
+    def __init__(self, author, question, title, blurb,
+                 abstract=None, source=0):
         self.user_id = author.id
         self.question_id = question.id
         self.title = title
@@ -2970,7 +3099,7 @@ class Proposal(db.Model):
         :param author: author of the question
         :type author: User
         :param question: unique ID of the related question
-        :type question: integer
+        :type question: int
         :param title: question title
         :type title: string
         :param blurb: question content
@@ -2978,8 +3107,21 @@ class Proposal(db.Model):
         :param abstract: question abstract
         :type abstract: string
         :param source: the id of its parent proposal if one exists, or 0
-        :type source: integer
+        :type source: int
         '''
+
+    def get_comments(self, generation=None):
+        '''
+        .. function:: get_comments([generation=None])
+
+        Get all comments for a particular generation of the propsal.
+
+        :param generation: proposal generation, defaults to current
+        :type generation: int
+        :rtype: list
+        '''
+        generation = generation or self.question.generation
+        return self.comments.filter(Comment.generation == generation).all()
 
     def __marshallable__(self):
         # return {"id": self.author.id, "username": self.author.username}
@@ -3038,17 +3180,46 @@ class Proposal(db.Model):
         else:
             return False
 
-    def endorse(self, endorser):
+    def endorse(self, endorser, endorsement_type="endorse", comments=[]):
         '''
-        .. function:: endorse(endorser)
+        .. function:: endorse(endorser, endorsement_type="endorse"[, comments=[]])
 
         Add a user's endorsement to this proposal.
 
         :param endorser: user
         :type endorser: User object
+        :param endorsement_type: type of endorsement
+        :type endorsement_type: string
+        :param comments: list of comments to support
+        :type comments: list
         '''
-        self.endorsements.append(Endorsement(endorser, self))
+        self.endorsements.append(Endorsement(endorser,
+                                             self,
+                                             endorsement_type,
+                                             comments))
         return self
+
+    def update_endorsement(self, endorser, endorsement_type):
+        '''
+        .. function:: update_endorsement(endorser, endorsement_type)
+
+        Update a user's endorsement for this proposal.
+
+        :param endorser: user endorsing the proposal
+        :type endorser: User object
+        :param endorsement_type: one of enbdorse, oppose or confused
+        :type endorsement_type: string
+        :rtype: boolean
+        '''
+        endorsement = self.endorsements.filter(and_(
+            Endorsement.user_id == endorser.id,
+            Endorsement.proposal_id == self.id)).first()
+        if endorsement:
+            endorsement.endorsement_type = endorsement_type
+            db_session.commit()
+            return True
+        else:
+            return False
 
     def remove_endorsement(self, endorser):
         '''
@@ -3077,15 +3248,16 @@ class Proposal(db.Model):
 
         :param user: user
         :param generation: question generation
-        :type generation: db.Integer or None
-        :rtype: bool
+        :type generation: int or None
+        :rtype: boolean
         '''
         generation = generation or self.question.generation
 
         return self.endorsements.filter(and_(
             Endorsement.user_id == user.id,
             Endorsement.proposal_id == self.id,
-            Endorsement.generation == generation)
+            Endorsement.generation == generation,
+            Endorsement.endorsement_type == 'endorse')
         ).count() == 1
 
     def endorsers(self, generation=None):
@@ -3096,14 +3268,15 @@ class Proposal(db.Model):
             - Defaults to current generation
 
         :param generation: question generation
-        :type generation: db.Integer or None
+        :type generation: int or None
         :rtype: set
         '''
         generation = generation or self.question.generation
         current_endorsements = list()
         current_endorsements = self.endorsements.filter(and_(
             Endorsement.proposal_id == self.id,
-            Endorsement.generation == generation)
+            Endorsement.generation == generation,
+            Endorsement.endorsement_type == 'endorse')
         ).all()
         endorsers = set()
         for e in current_endorsements:
@@ -3118,8 +3291,8 @@ class Proposal(db.Model):
         this generation.
 
         :param generation: proposal generation
-        :type generation: db.Integer or None
-        :rtype: set of db.Integers
+        :type generation: int or None
+        :rtype: set of int
         '''
         generation = generation or self.question.generation
         endorsers = self.endorsers(generation)
@@ -3141,10 +3314,10 @@ class Proposal(db.Model):
             - -1 if the sets of endorsers are the same
 
         :param proposal1: set of voters for proposal 1
-        :type proposal1: set of db.Integers
+        :type proposal1: set of int
         :param proposal2: set of voters for proposal 2
-        :type proposal2: set of db.Integers
-        :rtype: interger or set of db.Integers
+        :type proposal2: set of int
+        :rtype: interger or set of int
         '''
         # If proposal1 and proposal2 are the same return -1
         if (proposal1 == proposal2):
@@ -3197,12 +3370,20 @@ class Endorsement(db.Model):
     proposal_id = db.Column(db.Integer, db.ForeignKey('proposal.id'))
     generation = db.Column(db.Integer, nullable=False)
     endorsement_date = db.Column(db.DateTime)
+    endorsement_type = db.Column(db.Enum('endorse', 'oppose', 'confused'),
+                                 default='endorse')
 
-    def __init__(self, endorser, proposal):
+    def __init__(self, endorser, proposal, 
+                 endorsement_type='endorse', comments=None):
         self.user_id = endorser.id
         self.proposal_id = proposal.id
         self.generation = proposal.question.generation
         self.endorsement_date = datetime.datetime.utcnow()
+        self.endorsement_type = endorsement_type
+        # Add optional comments
+        if (comments):
+            for comment in comments:
+                self.comments.append(comment)
 
 
 @event.listens_for(Proposal, "after_insert")

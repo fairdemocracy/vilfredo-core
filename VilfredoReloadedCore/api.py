@@ -49,6 +49,10 @@ MAX_LEN_PROPOSAL_ABSTRACT = 1000
 MAX_LEN_PROPOSAL_BLURB = 1000
 MAX_LEN_QUESTION_TITLE = 100
 MAX_LEN_QUESTION_BLURB = 1000
+MAX_LEN_PROPOSAL_COMMENT = 300
+MAX_LEN_PROPOSAL_QUESTION = 300
+MAX_LEN_PROPOSAL_QUESTION_ANSWER = 300
+ENDORSEMENT_TYPES = ['endorse', 'oppose', 'confused']
 
 
 def authenticate():
@@ -767,10 +771,496 @@ def api_get_question_proposals(question_id=None, proposal_id=None):
                        objects=results), 200
 
 
-# Create Endorsement
+# Support Comment
+@app.route(
+    '/api/v1/questions/<int:question_id>/proposals/' +
+    '<int:proposal_id>/comments/<int:comment_id>/support',
+    methods=['POST'])
+@requires_auth
+def api_support_proposal_comment(question_id, proposal_id, comment_id):
+    '''
+    .. http:post:: /questions/(int:question_id)/proposals/(int:proposal_id)/comments/(int:comment_id)/support
+
+        Update a comment.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            POST /questions/45/proposals/47/comments/77/support HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+            {
+                 "message": "Support Added"
+            }
+
+        :param question_id: question ID
+        :type question_id: int
+        :param proposal_id: proposal ID
+        :type proposal_id: int
+        :param comment_id: comment ID
+        :type comment_id: int
+        :statuscode 200: no error
+        :statuscode 400: bad request
+        :statuscode 401: unauthorized
+        :statuscode 404: not found
+    '''
+    app.logger.debug("api_support_proposal_comment called...\n")
+
+    user = get_authenticated_user(request)
+    if not user:
+        abort(401)
+
+    app.logger.debug("Authenticated User = %s\n", user.id)
+
+    if question_id is None or proposal_id is None or comment_id is None:
+        return jsonify("URI parameters missing"), 400
+
+    question = models.Question.query.get(int(question_id))
+    if question is None:
+        return jsonify("Question not found"), 404
+
+    proposal = models.Proposal.query.get(int(proposal_id))
+    if proposal is None:
+        return jsonify("Proposal not found"), 404
+
+    comment = models.Comment.query.get(int(comment_id))
+    if comment is None:
+        return jsonify("Comment not found"), 404
+
+    # Support comment
+    user.support_comments([comment])
+    db_session.add(user)
+    db_session.commit()
+
+    return jsonify(message="Support added"), 201
+
+
+# Unsupport Comment
+@app.route(
+    '/api/v1/questions/<int:question_id>/proposals/' +
+    '<int:proposal_id>/comments/<int:comment_id>/support',
+    methods=['DELETE'])
+@requires_auth
+def api_unsupport_proposal_comment(question_id, proposal_id, comment_id):
+    '''
+    .. http:delete:: /questions/(int:question_id)/proposals/(int:proposal_id)/comments/(int:comment_id)/support
+
+        Update a comment.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            DELETE /questions/45/proposals/47/comments/77/support HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+            {
+                 "message": "Support Removed"
+            }
+
+        :param question_id: question ID
+        :type question_id: int
+        :param proposal_id: proposal ID
+        :type proposal_id: int
+        :param comment_id: comment ID
+        :type comment_id: int
+        :statuscode 200: no error
+        :statuscode 400: bad request
+        :statuscode 401: unauthorized
+        :statuscode 404: not found
+    '''
+    app.logger.debug("api_unsupport_proposal_comment called...\n")
+
+    user = get_authenticated_user(request)
+    if not user:
+        abort(401)
+
+    app.logger.debug("Authenticated User = %s\n", user.id)
+
+    if question_id is None or proposal_id is None or comment_id is None:
+        return jsonify("URI parameters missing"), 400
+
+    question = models.Question.query.get(int(question_id))
+    if question is None:
+        return jsonify("Question not found"), 404
+
+    proposal = models.Proposal.query.get(int(proposal_id))
+    if proposal is None:
+        return jsonify("Proposal not found"), 404
+
+    comment = models.Comment.query.get(int(comment_id))
+    if comment is None:
+        return jsonify("Comment not found"), 404
+
+    # Support comment
+    user.unsupport_comments([comment])
+    db_session.add(user)
+    db_session.commit()
+
+    return jsonify(message="Support removed"), 201
+
+
 #
-# @app.route('/api/v1/proposals/<int:proposal_id>/endorsements',
-#   methods=['POST'])
+# Get Comments
+#
+@app.route(
+    '/api/v1/questions/<int:question_id>/proposals/' +
+    '<int:proposal_id>/comments',
+    methods=['GET'])
+@app.route(
+    '/api/v1/questions/<int:question_id>/proposals/' +
+    '<int:proposal_id>/comments/<int:comment_id>',
+    methods=['GET'])
+@requires_auth
+def api_get_proposal_comments(question_id, proposal_id, comment_id=None):
+    '''
+    .. http:get:: /questions/(int:question_id)/proposals/(int:proposal_id)/comments/(int:comment_id)
+
+        A user or list of comments.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET /questions/45/proposals/47/comments HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+            {
+               "total_items": 2,
+                "items": "2",
+                "objects": [
+                    {
+                      "comment": "This is terrible!",
+                      "generation": "1",
+                      "question_url": "/api/v1/questions/1",
+                      "author_url": "/api/v1/users/1",
+                      "comment_type": "oppose",
+                      "created": "2013-10-21 15:43:17.558333",
+                      "url": "/api/v1/questions/1/proposals/4/comments/1",
+                      "proposal_url": "/api/v1/questions/1/proposals/4",
+                      "id": "1"
+                    },
+                    {
+                      "comment": "I feel very confused!",
+                      "generation": "1",
+                      "question_url": "/api/v1/questions/1",
+                      "author_url": "/api/v1/users/3",
+                      "comment_type": "confused",
+                      "created": "2013-10-21 15:43:17.695875",
+                      "url": "/api/v1/questions/1/proposals/4/comments/2",
+                      "proposal_url": "/api/v1/questions/1/proposals/4",
+                      "id": "2"
+                    }
+                ]
+            }
+
+        :param question_id: question id
+        :type question_id: int
+        :param proposal_id: proposal id
+        :type proposal_id: int
+        :param comment_id: comment id
+        :type comment_id: int or None
+        :statuscode 200: no error
+        :statuscode 404: there's no user
+    '''
+    app.logger.debug("api_get_comments called...\n")
+
+    # Get authenticated user or None
+    user = get_authenticated_user(request)
+    if not user:
+        abort(401)
+
+    if question_id is None or proposal_id is None:
+        message = {"message": "Question or proposal ids not set"}
+        return jsonify(message), 400
+
+    question = models.Question.query.get(int(question_id))
+    if question is None:
+        message = {"message": "Question not found"}
+        return jsonify(message), 404
+
+    proposal = models.Proposal.query.get(int(proposal_id))
+    if proposal is None:
+        message = {"message": "Proposal not found"}
+        return jsonify(message), 404
+
+    if comment_id is not None:
+        comment = models.Comment.query.get(int(comment_id))
+        if comment is None:
+            message = {"message": "Comment not found"}
+            return jsonify(message), 404
+
+        results = comment.get_public()
+
+        return jsonify(object=results), 200
+
+    else:
+        generation = int(request.args.get('generation', question.generation))
+        comments = proposal.get_comments(generation)
+
+        items = len(comments)
+        total_items = len(comments)
+
+        results = []
+        for c in comments:
+            results.append(c.get_public())
+
+        return jsonify(total_items=total_items, items=str(items),
+                       objects=results), 200
+
+
+# Update comment if no other support
+#
+@app.route(
+    '/api/v1/questions/<int:question_id>/proposals/' +
+    '<int:proposal_id>/comments/<int:comment_id>',
+    methods=['PATCH'])
+@requires_auth
+def api_update_proposal_comment(question_id, proposal_id, comment_id):
+    '''
+    .. http:patch:: /questions/(int:question_id)/proposals/(int:proposal_id)/comments/(int:comment_id)
+
+        Update a comment.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            PATCH /questions/45/proposals/47/comments/77 HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+            {
+                 "message": "Comment Updated"
+            }
+
+        :param question_id: question ID
+        :type question_id: int
+        :param proposal_id: proposal ID
+        :type proposal_id: int
+        :param comment_id: comment ID
+        :type comment_id: int
+        :json comment_type: one of endorse, oppose or confused
+        :json new_comment: text for new comment
+        :statuscode 200: no error
+        :statuscode 400: bad request
+    '''
+    app.logger.debug("api_add_proposal_comment called...\n")
+
+    user = get_authenticated_user(request)
+    if not user:
+        abort(401)
+
+    app.logger.debug("Authenticated User = %s\n", user.id)
+
+    if question_id is None or proposal_id is None:
+        abort(404)
+
+    question = models.Question.query.get(int(question_id))
+    if question is None:
+        abort(400)
+
+    proposal = models.Proposal.query.get(int(proposal_id))
+    if proposal is None:
+        abort(400)
+
+    comment = models.Comment.query.get(int(comment_id))
+    if comment is None:
+        return jsonify("Comment not found"), 400
+
+    # Only the author can edit a comment
+    if comment.user_id != user.id:
+        return jsonify("Only the author can edit a comment"), 403
+
+    # Make sure there are no other supportes (other than author)
+    supporters = comment.supporters.all()
+    if len(supporters) != 1 and supporters[0] != user:
+        return jsonify("Comment supported by other users cannot be edited."), 403
+
+    app.logger.debug("request.json = %s\n", request.json)
+
+    if not 'comment_type' in request.json or not request.json['comment_type'] in ENDORSEMENT_TYPES:
+        message = {"message": "comment_type must be one of endorse, oppose or confused"}
+        return jsonify(message), 400
+
+    comment_type = request.json['comment_type']
+
+    new_comment_text = None
+    if 'new_comment_text' in request.json:
+        if request.json['new_comment_text'] == '' \
+                or len(request.json['new_comment_text']) > MAX_LEN_PROPOSAL_COMMENT:
+            message = {"message": "Comment text must be no longer than " + MAX_LEN_PROPOSAL_COMMENT + " characters"}
+            return jsonify(message), 400
+        else:
+            new_comment_text = request.json['new_comment_text']
+
+    app.logger.debug("comment_type = %s\n", comment_type)
+    app.logger.debug("new_comment_text = %s\n", new_comment_text)
+
+    # Check if update details are identical to existing details
+    if comment_type == comment.comment_type and comment.comment == new_comment_text:
+        return jsonify("Update matches original"), 409
+
+    # Check if duplcate comment already exists
+    existing_comment = models.Comment.fetch_if_exists(proposal, new_comment_text, comment_type)
+    if (existing_comment and existing_comment.id != comment.id):
+        return jsonify("Identical comment found"), 400
+
+    # Everything OK - update comment
+    comment.comment = new_comment_text
+    comment.comment_type = comment_type
+    db_session.commit()
+    return jsonify(message="Comment updated"), 201
+
+
+# Create Comment
+#
+@app.route(
+    '/api/v1/questions/<int:question_id>/proposals/' +
+    '<int:proposal_id>/comments',
+    methods=['POST'])
+@requires_auth
+def api_add_proposal_comment(question_id, proposal_id):
+    '''
+    .. http:post:: /questions/(int:question_id)/proposals/(int:proposal_id)/comments
+
+        Add a comment.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            POST /questions/45/proposals/47/comments HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+            {
+                 "message": "Comment added"
+            }
+
+        :param question_id: question ID
+        :type question_id: int
+        :param proposal_id: proposal ID
+        :type proposal_id: int
+        :json comment_type: one of endorse, oppose or confused
+        :json new_comment: text for new comment
+        :statuscode 200: no error
+        :statuscode 400: bad request
+    '''
+    app.logger.debug("api_add_proposal_comment called...\n")
+
+    user = get_authenticated_user(request)
+    if not user:
+        abort(401)
+
+    app.logger.debug("Authenticated User = %s\n", user.id)
+
+    if question_id is None or proposal_id is None:
+        abort(404)
+
+    question = models.Question.query.get(int(question_id))
+    if question is None:
+        abort(400)
+
+    # Consider allowing comments during writing
+    elif question.phase != 'voting':
+        message = {"message": "The question is not in the voting phase"}
+        return jsonify(message), 403
+
+    proposal = models.Proposal.query.get(int(proposal_id))
+    if proposal is None:
+        abort(400)
+
+    app.logger.debug("request.json = %s\n", request.json)
+
+    if not 'comment_type' in request.json or not request.json['comment_type'] in ENDORSEMENT_TYPES:
+            message = {"message": "comment_type must be one of endorse, oppose or confused"}
+            return jsonify(message), 400
+
+    comment_type = request.json['comment_type']
+
+    new_comment_text = None
+    if 'new_comment_text' in request.json:
+        if request.json['new_comment_text'] == '' \
+                or len(request.json['new_comment_text']) > MAX_LEN_PROPOSAL_COMMENT:
+            message = {"message": "Comment text must be no longer than " + MAX_LEN_PROPOSAL_COMMENT + " characters"}
+            return jsonify(message), 400
+        else:
+            new_comment_text = request.json['new_comment_text']
+
+    app.logger.debug("comment_type = %s\n", comment_type)
+    app.logger.debug("new_comment_text = %s\n", new_comment_text)
+
+    # List of supported comments
+    endorsement_comments = []
+    comment_id = None
+
+    # Fetch the comment which matches comemnt text or create new one
+    if (new_comment_text):
+        existing_comment = models.Comment.fetch_if_exists(proposal, new_comment_text, comment_type)
+        if (existing_comment):
+            endorsement_comments.append(existing_comment)
+            comment_id = existing_comment.id
+        else:
+            new_comment = models.Comment(user, proposal, new_comment_text, comment_type)
+            if (new_comment is False):
+                return jsonify(message="Could not create comment"), 500
+            else:
+                db_session.add(new_comment)
+                db_session.commit()
+                endorsement_comments.append(new_comment)
+                comment_id = new_comment.id
+
+    # Support comment
+    user.support_comments(endorsement_comments)
+    db_session.commit()
+
+    response = {'url': url_for('api_get_proposal_comments',
+                question_id=question_id, proposal_id=proposal.id, comment_id=comment_id)}
+    return jsonify(response), 201
+
+
+# Create Endorsement with optional comments
+#
 @app.route(
     '/api/v1/questions/<int:question_id>/proposals/' +
     '<int:proposal_id>/endorsements',
@@ -805,6 +1295,9 @@ def api_add_proposal_endorsement(question_id, proposal_id):
         :type question_id: int
         :param proposal_id: proposal ID
         :type proposal_id: int
+        :json endorsement_type: one of endorse, oppose or confused
+        :json comments: ids of supported comments
+        :json new_comment: text for new comment
         :statuscode 200: no error
         :statuscode 400: bad request
     '''
@@ -835,17 +1328,151 @@ def api_add_proposal_endorsement(question_id, proposal_id):
         message = {"message": "User has already endorsed this proposal"}
         return jsonify(message), 400
 
-    proposal.endorse(user)
+    app.logger.debug("request.json = %s\n", request.json)
+
+    endorsement_type = 'endorse'
+    if 'endorsement_type' in request.json:
+        if not request.json['endorsement_type'] in ENDORSEMENT_TYPES:
+            message = {"message": "endorsement_type must be one of endorse, oppose or confused"}
+            return jsonify(message), 400
+        else:
+            endorsement_type = request.json['endorsement_type']
+
+    new_comment_text = None
+    if 'new_comment_text' in request.json:
+        if request.json['new_comment_text'] == '' \
+                or len(request.json['new_comment_text']) > MAX_LEN_PROPOSAL_COMMENT:
+            message = {"message": "Comment text must be no longer than " + MAX_LEN_PROPOSAL_COMMENT + " characters"}
+            return jsonify(message), 400
+        else:
+            new_comment_text = request.json['new_comment_text']
+
+    supported_comment_ids = []
+    if 'supported_comment_ids' in request.json and all(isinstance(x, int) for x in request.json['supported_comment_ids']):
+        supported_comment_ids = request.json['supported_comment_ids']
+
+    app.logger.debug("endorsement_type = %s\n", endorsement_type)
+    app.logger.debug("new_comment_text = %s\n", new_comment_text)
+
+    # List of supported comments
+    endorsement_comments = []
+
+    # Fetch supported comments, if any
+    if (supported_comment_ids):
+        endorsement_comments = db_session.query(models.Comment).filter(models.Comment.id.in_(supported_comment_ids)).all()
+
+    # Fetch the comment which matches comemnt text or create new one
+    if (new_comment_text):
+        existing_comment = models.Comment.fetch_if_exists(proposal, new_comment_text, endorsement_type)
+        if (existing_comment):
+            endorsement_comments.append(existing_comment)
+        else:
+            new_comment = models.Comment(user, proposal, new_comment_text, endorsement_type)
+            if (new_comment):
+                db_session.add(new_comment)
+                db_session.commit()
+                endorsement_comments.append(new_comment)
+
+    # Add user endorsement
+    proposal.endorse(user, endorsement_type)
+    user.support_comments(endorsement_comments)
     db_session.commit()
 
-    return jsonify(message="Endorsement added"), 201
+    # Lets see if we can get the users comments for this proposal
+    # users_comments = user.get_supported_comments(proposal)
+    all_comments = proposal.get_comments()
+    app.logger.debug("All comments for prop %d = %s\n", proposal.id, all_comments)
+
+    if (len(endorsement_comments) > 0):
+        return jsonify(message="Endorsement and comments added"), 201
+    else:
+        return jsonify(message="Endorsement added"), 201
 
 
-# Remove Endorsement
+# Update Endorsement
 #
 @app.route('/api/v1/questions/<int:question_id>/proposals/' +
            '<int:proposal_id>/endorsements',
-           methods=['DELETE'])
+           methods=['PATCH'])
+@requires_auth
+def api_update_proposal_endorsement(question_id, proposal_id):
+    '''
+    .. http:post:: /questions/(int:question_id)/proposals/(int:proposal_id)/endorsements
+
+        Update an endorsement.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            DELETE /questions/45/proposals/47/endorsements HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+            {
+              "message": "Endorsement updated"
+            }
+
+        :param question_id: question ID
+        :type question_id: int
+        :param proposal_id: proposal ID
+        :type proposal_id: int
+        :json endorsement_type: one of endorse, oppose or confused
+        :statuscode 200: no error
+        :statuscode 400: bad request
+        :statuscode 500: server error
+    '''
+    app.logger.debug("api_update_proposal_endorsement called...\n")
+
+    user = get_authenticated_user(request)
+    if not user:
+        abort(401)
+
+    app.logger.debug("Authenticated User = %s\n", user.id)
+
+    if question_id is None or proposal_id is None:
+        message = {"message": "Your request is missing parameters"}
+        return jsonify(message), 404
+
+    question = models.Question.query.get(int(question_id))
+    if question is None:
+        abort(400)
+    elif question.phase != 'voting':
+        message = {"message": "The question is not in the voting phase"}
+        return jsonify(message), 403
+
+    proposal = models.Proposal.query.get(int(proposal_id))
+    if proposal is None:
+        abort(400)
+
+    if not proposal.is_endorsed_by(user):
+        message = {"message": "User has not yet endorsed this proposal"}
+        return jsonify(message), 400
+
+    if not 'endorsement_type' in request.json or not request.json['endorsement_type'] in ENDORSEMENT_TYPES:
+        message = {"message": "endorsement_type must be one of endorse, oppose or confused"}
+        return jsonify(message), 400
+
+    update_proposal = proposal.update_endorsement(user, request.json['endorsement_type'])
+
+    if update_proposal:
+        return jsonify(message="Endorsement updated"), 200
+    else:
+        return jsonify(message="Failed to update endorsement"), 500
+
+
+# Remove Endorsement - TO REMOVE
+#
+# @app.route('/api/v1/questions/<int:question_id>/proposals/' +
+#           '<int:proposal_id>/endorsements',
+#           methods=['DELETE'])
 @requires_auth
 def api_remove_proposal_endorsement(question_id, proposal_id):
     '''
@@ -946,6 +1573,7 @@ def api_create_proposal(question_id):
         :json title: proposal title
         :json blurb: proposal content
         :json abstract: proposal abstract
+        :json source: parent proposal ID
         :statuscode 201: no error
         :statuscode 400: bad request
     '''
@@ -985,7 +1613,18 @@ def api_create_proposal(question_id):
     blurb = request.json.get('blurb')
     abstract = request.json.get('abstract', None)
 
-    proposal = models.Proposal(user, question, title, blurb, abstract)
+    source = 0
+    if 'source' in request.json:
+        if not isinstance(request.json['source'], int):
+            message = {"message": "source parameter invalid"}
+            return jsonify(message), 400
+        elif not models.Proposal.query.get(int(request.json['source'])):
+            message = {"message": "source proposal not found"}
+            return jsonify(message), 400
+        else:
+            source = request.json['source']
+
+    proposal = models.Proposal(user, question, title, blurb, abstract, source)
     db_session.add(proposal)
     db_session.commit()
 
@@ -1786,9 +2425,9 @@ def api_question_graph(question_id):
         :type map_type: string: either "all" or "pareto", defaults to "all"
         :query generation: question generation
         :type generation: int
-        :query proposal_level_type: define the layout of the proposal nodes, defaults to "layers"
+        :query proposal_level_type: proposal node layout, defaults to "layers"
         :type proposal_level_type: string: one of "layers", "num_votes" or "flat"
-        :query user_level_type: define the layout of the user nodes, defaults to "layers"
+        :query user_level_type: user node layout, defaults to "layers"
         :type user_level_type: string: one of "layers", "num_votes" or "flat"
 
         :statuscode 200: no error

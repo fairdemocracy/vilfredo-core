@@ -39,7 +39,7 @@ import base64
 import json
 import os
 
-DELETE_DB_ON_EXIT = True
+DELETE_DB_ON_EXIT = False
 MAKE_GRAPH = True
 
 
@@ -513,6 +513,62 @@ class RESTAPITestCase(unittest.TestCase):
             'test123')
         self.assertEqual(rv.status_code, 201)
 
+        #
+        # Comments, oppose, confused
+        #
+        rv = self.open_with_json_auth(
+            '/api/v1/questions/1/proposals/4/endorsements',
+            'POST',
+            dict(
+                endorsement_type="oppose",
+                supported_comment_ids=[],
+                new_comment_text="This is terrible!"),
+            'john',
+            'test123')
+        app.logger.debug("Data retrieved from Oppose Proposal = %s\n",
+                         rv.data)
+        self.assertEqual(rv.status_code, 201, rv.status_code)
+
+        # Add OPPOSED endorsement and comment
+        rv = self.open_with_json_auth(
+            '/api/v1/questions/1/proposals/4/endorsements',
+            'POST',
+            dict(
+                endorsement_type="oppose",
+                new_comment_text="This is terrible!"),
+            'harry',
+            'test123')
+        app.logger.debug("Data retrieved from Oppose Proposal = %s\n",
+                         rv.data)
+        self.assertEqual(rv.status_code, 201, rv.status_code)
+
+        # Add CONFUSED endorsement and comment
+        rv = self.open_with_json_auth(
+            '/api/v1/questions/1/proposals/4/endorsements',
+            'POST',
+            dict(
+                endorsement_type="confused",
+                supported_comment_ids=[1],
+                new_comment_text="I feel very confused!"),
+            'bill',
+            'test123')
+        app.logger.debug("Data retrieved from Confused by Proposal = %s\n",
+                         rv.data)
+        self.assertEqual(rv.status_code, 201, rv.status_code)
+
+        #
+        # Get comments
+        #
+        rv = self.open_with_json_auth(
+            '/api/v1/questions/1/proposals/4/comments',
+            'GET',
+            dict(),
+            'john',
+            'test123')
+        self.assertEqual(rv.status_code, 200)
+        # Log data received
+        app.logger.debug("Data retrieved from Get Comments = %s\n", rv.data)
+
         # bills_prop1.endorse(john)
         rv = self.open_with_json_auth(
             '/api/v1/questions/1/proposals/1/endorsements',
@@ -658,9 +714,9 @@ class RESTAPITestCase(unittest.TestCase):
                           "File URL not returned")
 
         #
-        # Remove Endorsements
+        # Update Endorsements
         #
-        # John endorses proposal 2
+        # John ID=1 endorses proposal 2
         rv = self.open_with_json_auth(
             '/api/v1/questions/1/proposals/2/endorsements',
             'POST',
@@ -669,20 +725,21 @@ class RESTAPITestCase(unittest.TestCase):
             'test123')
         self.assertEqual(rv.status_code, 201)
         #
-        # john removes endorsement from proposal 2
+        # Updates endorsement to OPPOSE
+        app.logger.debug("John updates his endopsement to OPPOSE")
         rv = self.open_with_json_auth(
             '/api/v1/questions/1/proposals/2/endorsements',
-            'DELETE',
-            dict(),
+            'PATCH',
+            dict(endorsement_type='oppose'),
             'john',
             'test123')
         self.assertEqual(rv.status_code, 200, self.get_message(rv))
-        self.assertEqual("Endorsement removed",
+        self.assertEqual("Endorsement updated",
                          self.get_message(rv),
                          self.get_message(rv))
         app.logger.debug("Response message: %s", self.get_message(rv))
         # Log data received
-        app.logger.debug("Data retrieved from Remove Endorsement = %s\n",
+        app.logger.debug("Data retrieved from Update Endorsement = %s\n",
                          rv.data)
 
         #
