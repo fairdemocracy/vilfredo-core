@@ -29,17 +29,17 @@ with open('requirements/test.txt') as f:
     requirements_test = f.read().splitlines()
 
 setup(
-    name='VilfredoReloadedCore',
+    name='VilfredoCore',
     version=open('version.txt').read().strip(),
-    author = 'Daniele Pizzolli',
-    author_email='daniele@ahref.eu',
+    author = 'Derek Paterson, Pietro speroni',
+    author_email='athens_code@gmx.com, 2013@pietrosperoni.it',
     packages=['VilfredoReloadedCore', 'VilfredoReloadedCore.test'],
     # namespace_packages=['VilfredoReloadedCore'],
     keywords = 'Vilfredo Pareto, Decision Making, e-democracy',
-    url='http://gitlab.ahref.eu/vilfredo/VilfredoReloadedCore',
+    url='https://github.com/fairdemocracy/vilfredo-core',
     license='GNU AFFERO GENERAL PUBLIC LICENSE (AGPL) Version 3',
     # long_description=open('README.rst').read(),
-    description = ('VilfredoReloadedCore the core of vilfredo-reloaded, a'
+    description = ('VilfredoReloadedCore the core of vilfredo, a'
                    ' consensus-building and decision-making tool'),
     entry_points='''
         [console_scripts]
