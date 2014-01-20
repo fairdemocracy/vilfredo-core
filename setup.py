@@ -31,7 +31,7 @@ with open('requirements/test.txt') as f:
 setup(
     name='VilfredoCore',
     version=open('version.txt').read().strip(),
-    author = 'Derek Paterson, Pietro speroni',
+    author = 'Derek Paterson, Pietro Speroni',
     author_email='athens_code@gmx.com, 2013@pietrosperoni.it',
     packages=['VilfredoReloadedCore', 'VilfredoReloadedCore.test'],
     # namespace_packages=['VilfredoReloadedCore'],
