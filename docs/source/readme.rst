@@ -1,14 +1,14 @@
 .. -*- coding: utf-8 -*-
 
 ======================
-vilfredo-reloaded-core
+vilfredo-core
 ======================
 
-Vilfredo (Reloaded)
+Vilfredo
 ===================
 
 
-Vilfredo (Reloaded) is a collaborative consensus-building and decision-making tool for generating 
+Vilfredo is a collaborative consensus-building and decision-making tool for generating 
 universally supported solutions to open questions (questions which cannot be answered with
 a simple 'yes' or 'no'). 
 
