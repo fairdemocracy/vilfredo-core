@@ -87,6 +87,9 @@ db = SQLAlchemy(app)
 
 mail = Mail(app)
 
+from flask_util_js import FlaskUtilJs
+fujs = FlaskUtilJs(app)
+
 # Logging
 import logging
 import logging.config
@@ -115,3 +118,11 @@ for lh in logger.handlers:
 
 login_manager = LoginManager()
 login_manager.init_app(app)
+
+#Login_serializer used to encryt and decrypt the cookie token for the remember
+#me option of flask-login
+from itsdangerous import URLSafeTimedSerializer
+try:
+    login_serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'], app.config['SALT'])
+except Exception:
+    print 'Failed to create login_serializer'
