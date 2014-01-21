@@ -24,11 +24,11 @@
 The database Bases
 '''
 
-from sqlalchemy import and_, event
+from sqlalchemy import and_, or_, event
 
 from database import db_session
 
-import datetime
+import datetime, math, time
 
 import copy
 
@@ -52,6 +52,26 @@ QuestionPhaseType = enum(writing=1, voting=2, archive=3)
 
 map_path = app.config['MAP_PATH']
 
+def get_timestamp():
+    return int(math.floor(time.time()))
+
+def make_map_filename_hashed(question,
+                             generation=None,
+                             map_type="all",
+                             proposal_level_type=GraphLevelType.layers,
+                             user_level_type=GraphLevelType.layers):
+    generation = generation or question.generation
+    import hashlib, json, pickle
+    from flask import jsonify
+    m = hashlib.md5()
+    m.update(str(question.id) + str(generation) + map_type)
+    m.update(str(proposal_level_type) + str(user_level_type))
+    m.update(str(app.config['ANONYMIZE_GRAPH']))
+    proposal_endorsers = question.get_proposal_endorsers(generation)
+    app.logger.debug('*******************make_map_filename_hashed::proposal_endorsers ==> %s', proposal_endorsers)
+    app.logger.debug('make_map_filename_hashed::json ==> %s', json.dumps(proposal_endorsers))
+    m.update(json.dumps(proposal_endorsers))
+    return m.hexdigest()
 
 def make_map_filename(question_id,
                       generation,
@@ -91,6 +111,18 @@ user_comments = db.Table(
     'user_comments',
     db.Column('user_id', db.Integer, db.ForeignKey('user.id')),
     db.Column('comment_id', db.Integer, db.ForeignKey('comment.id')))
+
+
+def get_ids_from_proposals(proposals): # fix?
+    ids = set()
+    for prop in proposals:
+        ids.add(prop.id)
+    return ids
+
+
+def get_ids_as_string_from_proposals(proposals): # fix?
+    proposal_ids = get_ids_from_proposals(proposals)
+    return '(' + ', '.join(str(id) for id in proposal_ids) + ')'
 
 
 class Update(db.Model):
@@ -187,6 +219,42 @@ class User(db.Model, UserMixin):
         backref=db.backref('supporters', lazy='dynamic'),
         lazy='dynamic')
 
+    def get_auth_token(self):
+        """
+        Encode a secure token for cookie
+        """
+        data = [str(self.id), self.password]
+        from . import login_serializer
+        return login_serializer.dumps(data)
+
+    @staticmethod
+    def get(userid):
+        return User.query.filter_by(id=userid).first()
+
+    def support_comment(self, comment):
+        '''
+        .. function:: support_comments(comments)
+
+        Get all comments for a particular generation of the propsal.
+
+        :param comments: list of comments to support
+        :type comments: list
+        :rtype: None
+        '''
+        self.comments.append(comment)
+    
+    def unsupport_comment(self, comment):
+        '''
+        .. function:: unsupport_comments(comments)
+
+        Get all comments for a particular generation of the propsal.
+
+        :param comments: list of comments to stop supporting
+        :type comments: list
+        :rtype: None
+        '''
+        self.comments.remove(comment)
+    
     def support_comments(self, comments):
         '''
         .. function:: support_comments(comments)
@@ -324,6 +392,40 @@ class User(db.Model, UserMixin):
         for endorsement in endorsements:
             proposal_ids.add(endorsement.proposal_id)
         return proposal_ids
+
+    def get_endorsed_proposal_ids_new(self, question, generation=None, all_proposal_ids=None):
+        '''
+        .. function:: get_endorsed_proposal_ids(question[, generation=None])
+
+        Fetch a set of the IDs of the proposals endorsed by the
+        user for this generation of this question.
+
+        :param question: associated question
+        :type question: Question
+        :param generation: question generation
+        :type generation: int or None
+        :rtype: set
+        '''
+        generation = generation or question.generation
+
+        endorsements = self.endorsements.join(User.endorsements).\
+            join(Endorsement.proposal).filter(and_(
+                Endorsement.user_id == self.id,
+                Proposal.question_id == question.id,
+                Endorsement.generation == generation,
+                Endorsement.endorsement_type == 'endorse')
+            ).all()
+
+        proposal_ids = set()
+        if all_proposal_ids:
+            for endorsement in endorsements:
+                if endorsement.proposal_id in all_proposal_ids:
+                    proposal_ids.add(endorsement.proposal_id)
+            return proposal_ids
+        else:
+            for endorsement in endorsements:
+                proposal_ids.add(endorsement.proposal_id)
+            return proposal_ids
 
     def get_endorsed_proposals(self, question, generation=None):
         '''
@@ -596,6 +698,12 @@ class Question(db.Model):
                 "minimum_time": str(self.minimum_time),
                 "maximum_time": str(self.maximum_time),
                 'phase': self.phase,
+                'author': self.author.username,
+                'author_id': self.author.id,
+                'proposal_count': str(self.get_proposal_count()),
+                'new_proposal_count': str(self.get_new_proposal_count()),
+                'new_proposer_count': str(self.get_new_proposer_count()),
+                'inherited_proposal_count' : str(self.get_inherited_proposal_count()),
                 'author_url': url_for('api_get_users', user_id=self.user_id)}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -603,10 +711,12 @@ class Question(db.Model):
     blurb = db.Column(db.Text, nullable=False)
     generation = db.Column(db.Integer, default=1, nullable=False)
     room = db.Column(db.String(20))
-    phase = db.Column(db.Enum('writing', 'voting', 'archived'),
+    phase = db.Column(db.Enum('writing', 'voting', 'archived', 'consensus'),
                       default='writing')
-    created = db.Column(db.DateTime)
-    last_move_on = db.Column(db.DateTime)
+    # created = db.Column(db.DateTime)
+    # last_move_on = db.Column(db.DateTime)
+    created = db.Column(db.Integer)
+    last_move_on = db.Column(db.Integer)
     minimum_time = db.Column(db.Integer)
     maximum_time = db.Column(db.Integer)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
@@ -643,11 +753,55 @@ class Question(db.Model):
         self.title = title
         self.blurb = blurb
         self.room = room or ''
-        self.created = datetime.datetime.utcnow()
-        self.last_move_on = datetime.datetime.utcnow()
+        self.created = get_timestamp()
+        self.last_move_on = get_timestamp()
         self.phase = 'writing'
         self.minimum_time = minimum_time
         self.maximum_time = maximum_time
+
+    def get_inherited_proposal_count(self, generation=None):
+        generation = generation or self.generation
+        if generation < 2:
+            return 0
+        else:
+            return db_session.query(Proposal).join(QuestionHistory)\
+                        .filter(QuestionHistory.question_id == self.id)\
+                        .filter(QuestionHistory.generation == generation)\
+                        .filter(Proposal.generation_created < self.generation)\
+                        .count()
+
+    def get_new_proposal_count(self):
+        return db_session.query(Proposal).join(QuestionHistory)\
+                    .filter(QuestionHistory.question_id == self.id)\
+                    .filter(QuestionHistory.generation == self.generation)\
+                    .filter(Proposal.generation_created == self.generation)\
+                    .count()
+
+    def get_new_proposer_count(self):
+        proposals = db_session.query(Proposal).join(QuestionHistory)\
+                    .filter(QuestionHistory.question_id == self.id)\
+                    .filter(QuestionHistory.generation == self.generation)\
+                    .filter(Proposal.generation_created == self.generation)\
+                    .all()
+        proposers = set()
+        for proposal in proposals:
+            proposers.add(proposal.user_id)
+        return len(proposers)
+
+    def get_proposer_count(self, generation=None):
+        generation = generation or self.generation
+        proposals = self.get_proposals_list()
+        proposers = set()
+        for proposal in proposals:
+            proposers.add(proposal.user_id)
+        return len(proposers)
+
+    def get_proposal_count(self, generation=None):
+        generation = generation or self.generation
+        return self.history\
+            .filter(QuestionHistory.generation == generation)\
+            .filter(QuestionHistory.question_id == self.id)\
+            .count()
 
     def save_history(self):
         '''
@@ -671,16 +825,28 @@ class Question(db.Model):
 
         :rtype: String or Boolean
         '''
-        if self.minimum_time_passed():
-            if self.phase == 'writing':
-                self.phase = 'voting'
-
-            elif self.phase == 'voting':
-                self.phase = 'writing'
-
-            return self.phase
-        else:
+        if not self.minimum_time_passed():
             return False
+
+         # Record timestamp of phase change
+        self.last_move_on = get_timestamp()
+        if self.phase == 'writing':
+            self.phase = 'voting'
+            db_session.commit()
+
+        elif self.phase in {'voting', 'archive'}:
+            pareto = self.calculate_pareto_front()
+            self.phase = 'writing'
+            self.generation = self.generation + 1
+            db_session.commit()
+            # Copy pareto to next generation
+            app.logger.debug('auto_move_on copying pareto proposals to QH table %s', pareto)
+            for proposal in pareto:
+                self.history.append(QuestionHistory(proposal))
+            db_session.commit()
+
+        app.logger.debug('auto_move_on question now generation %s', self.generation)
+        return self.phase
 
     def author_move_on(self, user_id):
         '''
@@ -697,12 +863,24 @@ class Question(db.Model):
         if user_id != self.user_id or not self.minimum_time_passed():
             return False
 
+        # Record timestamp of phase change
+        self.last_move_on = get_timestamp()
         if self.phase == 'writing':
             self.phase = 'voting'
+            db_session.commit()
 
         elif self.phase in {'voting', 'archive'}:
+            pareto = self.calculate_pareto_front()
             self.phase = 'writing'
+            self.generation = self.generation + 1
+            db_session.commit()
+            # Copy pareto to next generation
+            app.logger.debug('author_move_on copying pareto proposals to QH table %s', pareto)
+            for proposal in pareto:
+                self.history.append(QuestionHistory(proposal))
+            db_session.commit()
 
+        app.logger.debug('author_move_on question now generation %s', self.generation)
         return self.phase
 
     def move_to_writing(self):
@@ -719,6 +897,8 @@ class Question(db.Model):
             return False
         else:
             self.phase = 'writing'
+            # Record timestamp of phase change
+            self.last_move_on = get_timestamp()
             return True
 
     def move_to_voting(self):
@@ -735,6 +915,8 @@ class Question(db.Model):
             return False
         else:
             self.phase = 'voting'
+            # Record timestamp of phase change
+            self.last_move_on = get_timestamp()
             return True
 
     def get_generation(self, generation=None):
@@ -755,8 +937,9 @@ class Question(db.Model):
 
         :rtype: boolean
         '''
-        return (datetime.datetime.utcnow() - self.last_move_on)\
-            .total_seconds() > self.minimum_time
+        # return (datetime.datetime.utcnow() - self.last_move_on)\
+        #    .total_seconds() > self.minimum_time
+        return get_timestamp() - self.last_move_on > self.minimum_time
 
     def maximum_time_passed(self):
         '''
@@ -766,8 +949,9 @@ class Question(db.Model):
 
         :rtype: boolean
         '''
-        return (datetime.datetime.utcnow() - self.last_move_on)\
-            .total_seconds() > self.maximum_time
+        # return (datetime.datetime.utcnow() - self.last_move_on)\
+        #    .total_seconds() > self.maximum_time
+        return get_timestamp() - self.last_move_on > self.maximum_time
 
     @staticmethod
     def time_passed_dhm(utc_date_time):
@@ -863,6 +1047,26 @@ class Question(db.Model):
             history_data[entry.proposal_id] = entry
         return history_data
 
+    def get_proposals_list(self, generation=None):
+        '''
+        .. function:: get_proposals()
+
+        Returns a set of proposals for the current generation of
+        the question.
+
+        :param generation: question generation.
+        :type generation: int
+        :rtype: set
+        '''
+        generation = generation or self.generation
+
+        proposals = db_session.query(Proposal).join(QuestionHistory).\
+            filter(QuestionHistory.question_id == self.id).\
+            filter(QuestionHistory.generation == generation).\
+            order_by(Proposal.id).\
+            all()
+        return proposals
+
     def get_proposals(self, generation=None):
         '''
         .. function:: get_proposals()
@@ -881,6 +1085,27 @@ class Question(db.Model):
             filter(QuestionHistory.generation == generation).\
             all()
         return set(proposals)
+
+    def has_endorsememnts(self, generation=None):
+        generation = generation or self.generation
+        ids = list(self.get_proposal_ids())
+        app.logger.debug('has_endorsememnts: ids ==> %s', ids)
+        if len(ids) == 0:
+            return 0
+        else:
+            return db_session.query(Endorsement)\
+                .filter(Endorsement.proposal_id.in_(x for x in ids))\
+                .filter(Endorsement.generation == generation)\
+                .count()
+
+    def get_proposal_ids_new(self, generation=None):
+        generation = generation or self.generation
+        ids = self.history\
+            .with_entities(QuestionHistory.question_id)\
+            .filter(QuestionHistory.generation == generation)\
+            .filter(QuestionHistory.question_id == self.id)\
+            .all()
+        return set(ids)
 
     def get_proposal_ids(self, generation=None):
         '''
@@ -1034,7 +1259,7 @@ class Question(db.Model):
 
         return endorser_relations
 
-    def calculate_proposal_relations(self, generation=None):
+    def calculate_proposal_relations(self, generation=None, proposals=None): # UMM
         '''
         .. function:: calculate_proposal_relations([generation=None])
 
@@ -1049,7 +1274,10 @@ class Question(db.Model):
 
         proposal_relations = dict()
         props = dict()
-        all_proposals = self.get_proposals(generation)
+
+        # all_proposals = self.get_proposals(generation)
+        all_proposals = proposals or self.get_proposals(generation)
+
         for p in all_proposals:
             props[p.id] = p.set_of_endorser_ids(generation)
 
@@ -1434,6 +1662,17 @@ class Question(db.Model):
                                      map_type,
                                      proposal_level_type,
                                      user_level_type)
+
+
+        filename_hashed = make_map_filename_hashed(self,
+                                            generation,
+                                            map_type,
+                                            proposal_level_type,
+                                            user_level_type)
+        app.logger.debug('Filename: %s hashed: %s', filename, filename_hashed)
+
+        filename = filename_hashed
+
         filepath = map_path + filename
         app.logger.debug("Filepath = %s", filepath)
 
@@ -1451,12 +1690,18 @@ class Question(db.Model):
             # Create DOT file if it doesn't exist
             if not os.path.isfile(filepath + '.dot'):
                 # Create the dot specification of the map
+                app.logger.debug("dot file not found: create")
                 if map_type == 'pareto':
-                    map_proposals = self.\
-                        get_pareto_front(generation=generation)
+                    app.logger.debug("Generating pareto graph...")
+                    #map_proposals = self.\
+                    #   get_pareto_front(generation=generation, calculate_if_missing=True)
+                    map_proposals = self.calculate_pareto_front(generation=generation)
                 else:
                     map_proposals = self.\
                         get_proposals(generation=generation)
+
+                app.logger.debug("Generating map with proposals...")
+                app.logger.debug("Generating map with proposals %s...", map_proposals)
 
                 voting_graph = self.make_graphviz_map(
                     proposals=map_proposals,
@@ -1473,6 +1718,9 @@ class Question(db.Model):
                                      filepath)
                     return False
 
+            else:
+                app.logger.debug("dot file found...")
+
             # Generate svg file from the dot file using "dot"
             import pydot
             graph = pydot.graph_from_dot_file(filepath+'.dot')
@@ -1484,8 +1732,21 @@ class Question(db.Model):
                 return False
 
         # Return voting graph file path
-        return filepath + ".svg"
+        return filename + ".svg"
 
+    def get_proposal_endorsers(self,
+                               generation=None):
+        generation = generation or self.generation
+        proposals = self.get_proposals_list(generation)
+        # app.logger.debug('get_proposal_endorsers: proposals: %s', proposals)
+        proposal_endorsers = dict()
+        for proposal in proposals:
+            proposal_endorsers[str(proposal.id)] =\
+                str(proposal.endorsers_list(generation))
+        # app.logger.debug('get_proposal_endorsers: proposal_endorsers: %s', proposal_endorsers)
+        return proposal_endorsers
+
+    # fix graph
     def make_graphviz_map(self,
                           proposals=None,
                           generation=None,
@@ -1533,6 +1794,8 @@ class Question(db.Model):
         app.logger.debug("all proposals %s\n",
                          proposals)
 
+        proposal_ids = get_ids_from_proposals(proposals)
+
         # get pareto
         pareto = self.calculate_pareto_front(proposals=proposals,
                                              generation=generation)
@@ -1559,7 +1822,7 @@ class Question(db.Model):
         endorser_proposals = dict()
         for endorser in endorsers:
             endorser_proposals[endorser] =\
-                endorser.get_endorsed_proposal_ids(self, generation)
+                endorser.get_endorsed_proposal_ids_new(self, generation, proposal_ids) # fix?
         app.logger.debug("endorser_proposals %s\n",
                          endorser_proposals)
 
@@ -1570,7 +1833,7 @@ class Question(db.Model):
         app.logger.debug("pareto proposals => endorsers %s\n",
                          pareto_endorsers)
 
-        proposal_relations = self.calculate_proposal_relations(generation)
+        proposal_relations = self.calculate_proposal_relations(generation=generation, proposals=proposals) # fix?
         app.logger.debug("proposal_relations %s\n",
                          proposal_relations)
 
@@ -1668,48 +1931,19 @@ class Question(db.Model):
         proposal_levels_keys = proposal_levels.keys()
         user_levels_keys = user_levels.keys()
 
-        if (proposal_level_type == "num_votes"):
-            full_size_note = max(proposal_levels_keys)
-        else:
-            # default to "layers"
-            full_size_note = 0
-
-        all_graphs_note = max(user_levels_keys)
-
         # Begin creation of Graphviz string
         title = self.string_safe(self.title)
         voting_graph = 'digraph "%s" {\n' % (title)
 
         for l in proposal_levels_keys:
-            if (l == full_size_note):
-                voting_graph += ' "pl' + str(full_size_note) +\
-                    '" [label="Full\\nSize" shape=circle style=filled ' +\
-                    'color=Black peripheries=1 fillcolor=palegoldenrod ' +\
-                    'tooltip="Look at this image in full size"' +\
-                    ' fontsize=10 URL="' + address_image +\
-                    '" target="_top" width=.75 height=.75 ]; \n'
-            else:
-                voting_graph += ' "pl' + str(l) +\
-                    '" [shape=point fontcolor=white ' +\
-                    'color=white fontsize=1]; \n'
+            voting_graph += ' "pl' + str(l) +\
+                '" [shape=point fontcolor=white ' +\
+                'color=white fontsize=1]; \n'
 
         for l in user_levels_keys:
-            if (l == all_graphs_note):
-                all_graph_url = 'http://view_gen.html'
-                voting_graph += ' "ul' + str(all_graphs_note) +\
-                    '" [label="All\\nGraphs" ' +\
-                    'shape=circle style=filled color=Black ' +\
-                    'peripheries=1  ' +\
-                    'fillcolor=palegoldenrod ' +\
-                    'tooltip="Look at all the ' +\
-                    'alternative views of this information" ' +\
-                    'fontsize=9 URL="' +\
-                    all_graph_url + '" target="_top" width=.75 ' +\
-                    'height=.75 ]; \n'
-            else:
-                voting_graph += ' "ul' + str(l) + '" [shape=point ' +\
-                    'fontcolor=white ' +\
-                    'color=white fontsize=1]; \n'
+            voting_graph += ' "ul' + str(l) + '" [shape=point ' +\
+                'fontcolor=white ' +\
+                'color=white fontsize=1]; \n'
 
         for l in proposal_levels_keys:
             if (l != proposal_levels_keys[0]):
@@ -1899,8 +2133,7 @@ class Question(db.Model):
                         ' shape=box fillcolor=' + fillcolor +\
                         ' style=filled color=' + color + ' peripheries=' +\
                         str(peripheries) + ' tooltip="' + tooltip +\
-                        '"  fontsize=11 URL="' + app.config['SITE_DOMAIN'] +\
-                        '/viewproposal.py/' + urlquery + '" target="_top"]'
+                        '"  fontsize=11]'
                 else:
                     urlquery = self.create_internal_proposal_url(p)
                     voting_graph += str(p.id) +\
@@ -1917,16 +2150,12 @@ class Question(db.Model):
                 if (not internal_links):
                     urlquery = self.create_proposal_url(p, self.room)
                     tooltip = self.create_proposal_tooltip(p)
-                    # internal_proposal_url =\
-                      # self.create_internal_proposal_url(p)
                     voting_graph += str(p.id) +\
                         ' [id=p' + str(p.id) + ' label=' + str(p.id) +\
-                        ' shape=box color=' + color + ' peripheries=' +\
+                        ' shape=box fillcolor="white" style="filled" color=' + color + ' peripheries=' +\
                         str(peripheries) + ' tooltip="' +\
                         tooltip +\
-                        '"  fontsize=11 URL="' + app.config['SITE_DOMAIN'] +\
-                        '/viewproposal.py/' + urlquery +\
-                        '" target="_top"]'
+                        '"  fontsize=11]'
                 else:
                     urlquery = self.create_internal_proposal_url(p)
                     voting_graph += str(p.id) +\
@@ -1955,14 +2184,14 @@ class Question(db.Model):
                 if (pc in bundled_proposals):
                     continue
 
-                if (highlight_user1 in proposal_endorsers[pc]):
+                if (highlight_user1 and highlight_user1 in proposal_endorsers[pc]):
                     color = "red"
 
                 # An empty array is trivially dominated by everything.
                 #
                 # But that is so trivial that it simplifies the graph
                 # if we just do not show those lines.
-                if (len(proposal_endorsers[pc]) == 0):
+                if (pc in proposal_endorsers and len(proposal_endorsers[pc]) == 0):
                     color = "white"
 
                 if (highlight_proposal1 and
@@ -1997,7 +2226,7 @@ class Question(db.Model):
                     p,
                     combined_proposals)
 
-                edge_id = 'id="' + left_prop_id + '&#45;' + '&#45;' +\
+                edge_id = 'id="' + left_prop_id + '&#45;&#45;' +\
                     right_prop_id + '"'
 
                 voting_graph += ' ' + str(pc.id) + ' -> ' + str(p.id) +\
@@ -2024,8 +2253,26 @@ class Question(db.Model):
                 if (highlight_proposal1 in endorser_proposals[ec]):
                     color = "red"
 
-                edge_id = 'id="u' + str(e.id) + '&#45;' + '&#45;' +\
-                    'u' + str(ec.id) + '"'
+                #
+                # Calculate left and right user ids
+                #
+                left_usernode_id = self.calculate_user_node_id(
+                    e,
+                    combined_users)
+
+                right_usernode_id = self.calculate_user_node_id(
+                    ec,
+                    combined_users)
+
+                if e.id == 2:
+                    app.logger.debug("left_usernode_id ==> %s", left_usernode_id)
+                    app.logger.debug("right_usernode_id ==> %s", right_usernode_id)
+
+                # edge_id = 'id="u' + str(e.id) + '&#45;&#45;' +\
+                #    'u' + str(ec.id) + '"'
+                
+                edge_id = 'id="' + left_usernode_id + '&#45;&#45;' +\
+                    right_usernode_id + '"'
 
                 voting_graph += '"' + e.username + '" -> "' + ec.username +\
                     '"' +\
@@ -2085,10 +2332,22 @@ class Question(db.Model):
                          p in proposals_below[highlight_proposal1])):
                     color = "red"
 
+                usernode_id = self.calculate_user_node_id(
+                    e,
+                    combined_users)
+
                 propnode_id = self.calculate_propsal_node_id(
                     p,
                     combined_proposals)
-                edge_id = 'id="u' + str(e.id) + '&#45;' + '&#45;' +\
+
+                # if p.id == 1:
+                #    app.logger.debug("propnode_id ==> %s", propnode_id)
+                #    app.logger.debug("usernode_id ==> %s", usernode_id)
+
+                # edge_id = 'id="u' + str(e.id) + '&#45;&#45;' +\
+                #    propnode_id + '"'
+
+                edge_id = 'id="' + usernode_id + '&#45;&#45;' +\
                     propnode_id + '"'
 
                 voting_graph += ' "' + e.username + '" -> ' + str(p.id) +\
@@ -2134,6 +2393,7 @@ class Question(db.Model):
         :type combined_users: dict
         :rtype: string
         '''
+        app.logger.debug("calculate_user_node_id for user %s", user.id)
         user_id = ''
         if (user in combined_users):
             for usr in combined_users[user]:
@@ -2202,7 +2462,8 @@ class Question(db.Model):
             app.logger.debug("proposal_endorsers[b] INSIDE ==> %s\n",
                 proposal_endorsers[b])
             '''
-            voters_known.update(proposal_endorsers[b])
+            if b in proposal_endorsers:
+                voters_known.update(proposal_endorsers[b])
 
         # app.logger.debug("voters_known INSIDE ==> %s\n", voters_known)
 
@@ -2252,10 +2513,8 @@ class Question(db.Model):
                 to_add = ' BGCOLOR="red" '
 
             if (not internal_links):
-                bundle += '<TD ' + to_add + ' HREF="HTTP://' +\
-                    app.config['SITE_DOMAIN'] +\
-                    '/viewproposal.py/' +\
-                    urlquery + '" tooltip="' + tooltip + '" target="_top">' +\
+                bundle += '<TD ' + to_add +\
+                    ' tooltip="' + tooltip + '">' +\
                     str(p.id) + '</TD>'
             else:
                 urlquery = self.create_internal_proposal_url(p)
@@ -2280,6 +2539,10 @@ class Question(db.Model):
                 node_id += '_'
             node_id += 'u' + str(user.id)
 
+        app.logger.debug("write_bundled_users...")
+        app.logger.debug("node_id ===> %s", node_id)
+        app.logger.debug("bundle_name == %s", bundle_name)
+        
         # ' [shape=plaintext ' +\
         bundle = '"' + bundle_name + '" ' +\
             ' [id=' + node_id + ' shape=plaintext ' +\
@@ -2310,14 +2573,13 @@ class Question(db.Model):
 
             urlquery = str(u.id)
             tooltip = u.username
-            bundle += '<TR><TD ' + ' HREF="http://' +\
-                app.config['SITE_DOMAIN'] +\
-                '/user/u=' + urlquery +\
-                '" tooltip="' + tooltip + '" target="_top">' +\
+            bundle += '<TR><TD ' +\
+                'tooltip="' + tooltip + '" target="' + str(u.id) + '">' +\
                 u.username + '</TD></TR>'
 
         bundle += '</TABLE>>]'
         bundle += "\n"
+        app.logger.debug("bundled_users ==> %s", bundle)
         return bundle
 
     def strip_tags(self, html):
@@ -2391,8 +2653,9 @@ class Question(db.Model):
         :type elements: set
         :rtype: dict
         '''
-        # app.logger.debug("find_levels called...\n")
+        app.logger.debug("find_levels called...\n")
 
+        elements = set(elements)
         elements_to_test = copy.copy(elements)
         # app.logger.debug("elements_to_test = %s\n", elements_to_test)
         levels = dict()
@@ -2597,294 +2860,6 @@ class Question(db.Model):
                                                     self.phase)
 
 
-class Generation():
-    _question = None
-    _generation = None
-    _pareto_front = None
-    _key_players = None
-    _endorsers = None
-    _endorser_effects = None
-    _proposals = None
-
-    @property
-    def question(self):
-        return self._question
-
-    @property
-    def generation(self):
-        return self._generation
-
-    @property
-    def proposals(self):
-        '''
-        Proposals
-
-        The list of the proposals for this generation.
-
-        :rtype: list
-        '''
-        if (self._proposals is not None):
-            return self._proposals
-        else:
-            result = self.question.history.filter(and_(
-                QuestionHistory.question_id == self.question.id,
-                QuestionHistory.generation == self.generation
-            )).all()
-            self._proposals = set()
-            for entry in result:
-                self._proposals.add(entry.proposal)
-            return self._proposals
-
-    @property
-    def proposal_ids(self):
-        '''
-        Proposals
-
-        The list of the proposals for this generation.
-
-        :rtype: list
-        '''
-        proposals = self.proposals
-        proposal_ids = set()
-        for proposal in proposals:
-            proposal_ids.add(proposal.id)
-        return proposal_ids
-
-    def calculate_pareto_front(self):
-        self._pareto_front = self.question.calculate_pareto_front(
-            proposals=self.proposals,
-            generation=self.generation,
-            save=True)
-        return self._pareto_front
-
-    def calculate_pareto_front_ids(self):
-        self.calculate_pareto_front()
-        return self.pareto_front_ids
-
-    @property
-    def pareto_front(self):
-        '''
-        Pareto front
-
-        The pareto front for this generation.
-
-        :rtype: set
-        '''
-        if (self._pareto_front is not None):
-            return self._pareto_front
-        else:
-            pareto_history = self.question.history.filter(and_(
-                QuestionHistory.question_id == self.question.id,
-                QuestionHistory.generation == self.generation,
-                QuestionHistory.dominated_by == 0
-            )).all()
-            self._pareto_front = set()
-            for entry in pareto_history:
-                self._pareto_front.add(entry.proposal)
-            return self._pareto_front
-
-    @property
-    def pareto_front_ids(self):
-        pareto_front = self.pareto_front
-        pareto_front_ids = set()
-        for proposal in pareto_front:
-            pareto_front_ids.add(proposal.id)
-        return pareto_front_ids
-
-    @property
-    def endorsers(self):
-        '''
-        Endorsers
-
-        The list of endorsers for this generation.
-
-        :rtype: list of Users
-        '''
-        proposals = self.proposals
-        self._endorsers = set()
-        for proposal in proposals:
-            self._endorsers.update(proposal.endorsers(self.generation))
-        return self._endorsers
-
-    @property
-    def key_players(self):
-        '''
-        key_players
-
-        The list of endorsers identified as being key players for
-        this generation.
-
-        :rtype: list of Users
-        '''
-        if (self._key_players is not None):
-            return self._key_players
-        else:
-            key_player_history = self.question.key_players.\
-                order_by(KeyPlayer.user_id).filter(and_(
-                    KeyPlayer.question_id == self.question.id,
-                    KeyPlayer.generation == self.generation,
-                )).all()
-            self._key_players = dict()
-            for entry in key_player_history:
-                if (entry.user_id not in self._key_players):
-                    self._key_players[entry.user_id] = set()
-                self._key_players[entry.user_id].add(entry.proposal)
-            return self._key_players
-
-    def calculate_proposal_relations(self):
-        '''
-        .. function:: calculate_proposal_relations()
-
-        Calculates the complete map of dominations. For each proposal
-        it calculates which proposals dominate and which are dominated.
-
-        :rtype: dict
-        '''
-        proposal_relations = dict()
-        props = dict()
-        all_proposals = self.proposals
-        for p in all_proposals:
-            props[p.id] = p.set_of_endorser_ids(self.generation)
-
-        for proposal1 in all_proposals:
-            dominating = set()
-            dominated = set()
-            proposal_relations[proposal1] = dict()
-
-            for proposal2 in all_proposals:
-                if (proposal1 == proposal2):
-                    continue
-                who_dominates = Proposal.\
-                    who_dominates_who(props[proposal1.id],
-                                      props[proposal2.id])
-                '''
-                app.logger.debug("Comparing props %s %s and %s %s\n",
-                                 proposal1.id, props[proposal1.id],
-                                 proposal2.id, props[proposal2.id])
-                app.logger.debug("   ===> WDW Result = %s\n",
-                                 who_dominates)
-                '''
-                if (who_dominates == props[proposal1.id]):
-                    dominating.add(proposal2)
-                elif (who_dominates == props[proposal2.id]):
-                    dominated.add(proposal2)
-
-            proposal_relations[proposal1]['dominating'] = dominating
-            proposal_relations[proposal1]['dominated'] = dominated
-
-        return proposal_relations
-
-    def calculate_key_players(self):
-        '''
-        .. function:: calculate_key_players()
-
-        Calculates the effects each endorser has on the pareto.
-        What would be the effects if he didn't vote?
-        What proposals has he forced into the pareto?
-
-        :rtype: dict
-        '''
-        key_players = dict()
-
-        app.logger.debug("+++++++++++ calculate_key_players() +++++++++++")
-
-        all_endorsers = self.endorsers
-        pareto = self.pareto_front
-        if (len(pareto) == 0):
-            return dict()
-
-        for user in all_endorsers:
-            app.logger.debug("+++++++++++ Checking User +++++++++++ %s\n",
-                             user.id)
-
-            users_endorsed_proposal_ids =\
-                user.get_endorsed_proposal_ids(self.question, self.generation)
-
-            app.logger.debug(">>>>>>>>>> Users endorsed proposal IDs %s\n",
-                             users_endorsed_proposal_ids)
-            app.logger.debug("Calc PF excluding %s\n", user.id)
-
-            new_pareto = self.question.calculate_pareto_front(
-                proposals=pareto,
-                generation=self.generation,
-                exclude_user=user)
-            app.logger.debug(">>>>>>> NEW PARETO = %s\n", new_pareto)
-
-            if (pareto != new_pareto):
-                app.logger.debug("%s is a key player\n", user.id)
-
-                users_pareto_proposals = pareto.difference(new_pareto)
-
-                app.logger.debug(">>>>>>>>>users_pareto_proposals %s\n",
-                                 users_pareto_proposals)
-
-                key_players[user.id] = set()
-                for users_proposal in users_pareto_proposals:
-                    key_players[user.id].update(
-                        Question.who_dominates_this_excluding(users_proposal,
-                                                              pareto,
-                                                              user,
-                                                              self.generation))
-                    app.logger.debug(
-                        "Pareto Props that could dominate PID %s %s\n",
-                        users_proposal.id,
-                        key_players[user.id])
-            else:
-                app.logger.debug("%s is not a key player\n", user.id)
-
-        #self.question.save_key_players(key_players)
-        app.logger.debug("Generation.calc_key_players: %s", key_players)
-        return key_players
-
-    @property
-    def endorser_effects(self):
-        '''
-        .. function:: endorser_effects()
-
-        Calculates the effects each endorser has on the pareto.
-        What would be the effects if he didn't vote?
-        What proposals has he forced into the pareto?
-
-        To do: Will propbably store these calculations in a table
-
-        :rtype: dict
-        '''
-        if (self._endorser_effects is not None):
-            return self._endorser_effects
-        else:
-            all_endorsers = self.endorsers
-            app.logger.debug("All Endorsers: %s\n", all_endorsers)
-            pareto = self.pareto_front
-            self._endorser_effects = dict()
-            for endorser in all_endorsers:
-                PF_excluding_endorser = self.question.calculate_pareto_front(
-                    proposals=self.proposals,
-                    generation=self.generation,
-                    exclude_user=endorser)
-                PF_plus = PF_excluding_endorser - pareto
-                PF_minus = pareto - PF_excluding_endorser
-                if (len(PF_plus) or len(PF_minus)):
-                    self._endorser_effects[endorser] = {
-                        'PF_excluding': PF_excluding_endorser,
-                        'PF_plus': PF_plus,
-                        'PF_minus': PF_minus}
-                else:
-                    self._endorser_effects[endorser] = None
-            return self._endorser_effects
-
-    def __init__(self, question, generation):
-        self._question = question
-        self._generation = generation or question.generation
-
-    def __repr__(self):
-        return "<Generation(G'%s', Q'%s')>" % (self.generation,
-                                               self.question.id)
-
-    def __str__(self):
-        return "Generation %s for Question %s" % (self.generation,
-                                                  self.question.id)
-
-
 class KeyPlayer(db.Model):
     '''
     Stores key player information for each geenration
@@ -2929,6 +2904,8 @@ class Comment(db.Model):
 
         :rtype: dict
         '''
+        supporters = self.fetch_supporter_ids()
+
         return {'id': str(self.id),
                 'url': url_for('api_get_proposal_comments',
                                question_id=self.question_id,
@@ -2936,14 +2913,17 @@ class Comment(db.Model):
                                comment_id=self.id),
                 'comment': self.comment,
                 'comment_type': self.comment_type,
+                'reply_to': str(self.reply_to),
                 'generation': str(self.generation),
                 'created': str(self.created),
+                'author_id': str(self.user_id),
                 'author_url': url_for('api_get_users', user_id=self.user_id),
                 'proposal_url': url_for('api_get_question_proposals',
                                         question_id=self.question_id,
                                         proposal_id=self.proposal_id),
                 'question_url': url_for('api_get_questions',
-                                        question_id=self.question_id)}
+                                        question_id=self.question_id),
+                'supporters': str(supporters)}
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer)
@@ -2952,10 +2932,11 @@ class Comment(db.Model):
     generation = db.Column(db.Integer)
     created = db.Column(db.DateTime)
     comment = db.Column(db.Text, nullable=False)
-    comment_type = db.Column(db.Enum('endorse', 'oppose', 'confused'),
+    comment_type = db.Column(db.Enum('for', 'against', 'question', 'answer'),
                              nullable=False)
+    reply_to =  db.Column(db.Integer, default=0)
 
-    def __init__(self, user, proposal, comment, comment_type):
+    def __init__(self, user, proposal, comment, comment_type, reply_to=0):
         self.user_id = user.id
         self.proposal_id = proposal.id
         self.question_id = proposal.question.id
@@ -2963,6 +2944,14 @@ class Comment(db.Model):
         self.created = datetime.datetime.utcnow()
         self.comment = comment
         self.comment_type = comment_type
+        self.reply_to = reply_to
+
+    def fetch_supporter_ids(self):
+        user_list = self.supporters.all()
+        ids = list()
+        for user in user_list:
+            ids.append(user.id)
+        return ids
 
     @staticmethod
     def fetch_if_exists(proposal, comment, comment_type, generation=None):
@@ -3033,7 +3022,7 @@ class Proposal(db.Model):
 
     __tablename__ = 'proposal'
 
-    def get_public(self):
+    def get_public(self, user=None):
         '''
         .. function:: get_public()
 
@@ -3041,8 +3030,8 @@ class Proposal(db.Model):
 
         :rtype: dict
         '''
-        return {'id': str(self.id),
-                'url': url_for('api_get_question_proposals',
+        public = {'id': str(self.id),
+                'uri': url_for('api_get_question_proposals',
                                question_id=self.question.id,
                                proposal_id=self.id),
                 'title': self.title,
@@ -3051,9 +3040,19 @@ class Proposal(db.Model):
                 'generation_created': str(self.generation_created),
                 'source': str(self.source),
                 'created': str(self.created),
+                'author': self.author.username,
+                'question_count': str(self.get_question_count()),
+                'comment_count': str(self.get_comment_count()),
+                'author_id': str(self.author.id),
                 'author_url': url_for('api_get_users', user_id=self.user_id),
                 'question_url': url_for('api_get_questions',
                                         question_id=self.question_id)}
+        if user:
+            public['endorse_type'] = self.get_endorsement_type(user)
+        else:
+            public['endorse_type'] = 'notvoted'
+
+        return public
 
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(120), nullable=False)
@@ -3110,6 +3109,42 @@ class Proposal(db.Model):
         :type source: int
         '''
 
+    def get_question_count(self, generation=None):
+        '''
+        .. function:: get_comments([generation=None])
+
+        Get all comments for a particular generation of the propsal.
+
+        :param generation: proposal generation, defaults to current
+        :type generation: int
+        :rtype: list
+        '''
+        if generation:
+            comments = self.comments.filter(Comment.generation == generation,
+                                            Comment.comment_type == 'question').order_by(Comment.id).count()
+        else:
+            comments = self.comments.filter(Comment.comment_type == 'question').order_by(Comment.id).count()
+        return comments
+
+    def get_comment_count(self, generation=None):
+        '''
+        .. function:: get_comments([generation=None])
+
+        Get all comments for a particular generation of the propsal.
+
+        :param generation: proposal generation, defaults to current
+        :type generation: int
+        :rtype: list
+        '''
+        if generation:
+            comments = self.comments.filter(Comment.generation == generation,
+                                            or_(Comment.comment_type == 'for',
+                                                Comment.comment_type == 'against')).order_by(Comment.id).count()
+        else:
+            comments = self.comments.filter(or_(Comment.comment_type == 'for',
+                                                Comment.comment_type == 'against')).order_by(Comment.id).count()
+        return comments
+
     def get_comments(self, generation=None):
         '''
         .. function:: get_comments([generation=None])
@@ -3120,12 +3155,11 @@ class Proposal(db.Model):
         :type generation: int
         :rtype: list
         '''
-        generation = generation or self.question.generation
-        return self.comments.filter(Comment.generation == generation).all()
-
-    def __marshallable__(self):
-        # return {"id": self.author.id, "username": self.author.username}
-        return {"id": 10, "username": 'Bob'}
+        if generation:
+            comments = self.comments.filter(Comment.generation == generation).order_by(Comment.id).all()
+        else:
+            comments = self.comments.order_by(Comment.id).all()
+        return comments
 
     def publish(self):
         self.history.append(QuestionHistory(self))
@@ -3193,10 +3227,13 @@ class Proposal(db.Model):
         :param comments: list of comments to support
         :type comments: list
         '''
-        self.endorsements.append(Endorsement(endorser,
-                                             self,
-                                             endorsement_type,
-                                             comments))
+        if self.is_endorsed_by(endorser):
+            self.update_endorsement(endorser, endorsement_type)
+        else:
+            self.endorsements.append(Endorsement(endorser,
+                                                 self,
+                                                 endorsement_type,
+                                                 comments))
         return self
 
     def update_endorsement(self, endorser, endorsement_type):
@@ -3239,7 +3276,7 @@ class Proposal(db.Model):
             self.endorsements.remove(endorsement)
         return self
 
-    def is_endorsed_by(self, user, generation=None):
+    def is_supported_by(self, user, generation=None):
         '''
         .. function:: is_endorsed_by(user[, generation=None])
 
@@ -3259,6 +3296,77 @@ class Proposal(db.Model):
             Endorsement.generation == generation,
             Endorsement.endorsement_type == 'endorse')
         ).count() == 1
+
+    def is_endorsed_by(self, user, generation=None):
+        '''
+        .. function:: is_endorsed_by(user[, generation=None])
+
+        Check if the user has endorsed this proposal.
+        Takes an optional generation value to check historic endorsements.
+
+        :param user: user
+        :param generation: question generation
+        :type generation: int or None
+        :rtype: boolean
+        '''
+        generation = generation or self.question.generation
+
+        return self.endorsements.filter(and_(
+            Endorsement.user_id == user.id,
+            Endorsement.proposal_id == self.id,
+            Endorsement.generation == generation)
+        ).count() == 1
+
+    def get_endorsement_type(self, user, generation=None):
+        '''
+        .. function:: is_endorsed_by(user[, generation=None])
+
+        Check if the user has endorsed this proposal.
+        Takes an optional generation value to check historic endorsements.
+
+        :param user: user
+        :param generation: question generation
+        :type generation: int or None
+        :rtype: Endorsement or Boolean
+        '''
+        generation = generation or self.question.generation
+
+        app.logger.debug('get_endorsement_type called with user %s', user.username)
+
+        endorsement = self.endorsements.filter(and_(
+            Endorsement.user_id == user.id,
+            Endorsement.proposal_id == self.id,
+            Endorsement.generation == generation)
+        ).first()
+
+        if not endorsement:
+            return 'notvoted'
+        else:
+            return endorsement.endorsement_type
+
+    def endorsers_list(self, generation=None):
+        '''
+        .. function:: endorsers([generation=None])
+
+        Returns a set of the current endorsers
+            - Defaults to current generation
+
+        :param generation: question generation
+        :type generation: int or None
+        :rtype: set
+        '''
+        generation = generation or self.question.generation
+        current_endorsements = list()
+        current_endorsements = self.endorsements.filter(and_(
+            Endorsement.proposal_id == self.id,
+            Endorsement.generation == generation,
+            Endorsement.endorsement_type == 'endorse')
+        ).all()
+        endorsers = list()
+        for e in current_endorsements:
+            endorsers.append(e.endorser)
+        endorsers.sort(key=lambda x: x.id, reverse=False)
+        return endorsers
 
     def endorsers(self, generation=None):
         '''
@@ -3363,7 +3471,8 @@ class Endorsement(db.Model):
                 'endorser_username': self.endorser.username,
                 'endorser_email': self.endorser.email,
                 'generation': str(self.generation),
-                'endorsement_date': str(self.endorsement_date)}
+                'endorsement_date': str(self.endorsement_date),
+                'endorsement_type': endorsement_type}
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
@@ -3373,7 +3482,7 @@ class Endorsement(db.Model):
     endorsement_type = db.Column(db.Enum('endorse', 'oppose', 'confused'),
                                  default='endorse')
 
-    def __init__(self, endorser, proposal, 
+    def __init__(self, endorser, proposal,
                  endorsement_type='endorse', comments=None):
         self.user_id = endorser.id
         self.proposal_id = proposal.id

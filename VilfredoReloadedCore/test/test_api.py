@@ -40,7 +40,9 @@ import json
 import os
 
 DELETE_DB_ON_EXIT = False
+DELETE_DB_ON_START = True
 MAKE_GRAPH = True
+MOVE_TO_GENERATION_2 = False
 
 
 class RESTAPITestCase(unittest.TestCase):
@@ -50,7 +52,7 @@ class RESTAPITestCase(unittest.TestCase):
         # For SQLite development DB only
         if 'vr.db' in app.config['SQLALCHEMY_DATABASE_URI']:
             # Drop existing DB first
-            if os.path.isfile('/var/tmp/vr.db'):
+            if os.path.isfile('/var/tmp/vr.db') and DELETE_DB_ON_START:
                 app.logger.debug("Dropping existing sqlite db\n")
                 drop_db()
             # Create empty SQLite test DB
@@ -79,6 +81,14 @@ class RESTAPITestCase(unittest.TestCase):
             data=json.dumps(data),
             headers={'Authorization': 'Basic ' +
                      base64.b64encode(username + ":" + password)})
+    
+    def open_with_json_authtoken(self, url, method, data, authtoken):
+        return self.app.open(
+            url,
+            content_type='application/json',
+            method=method,
+            data=json.dumps(data),
+            headers={'Authorization': 'access_token:' + authtoken})
 
     def open_with_json(self, url, method, data):
         return self.app.open(url,
@@ -99,6 +109,73 @@ class RESTAPITestCase(unittest.TestCase):
             return data['message']
         else:
             return "No error message returned"
+
+    def get_key_value(self, rv, key):
+        data = json.loads(rv.data)
+        if key in data:
+            return data[key]
+        else:
+            return None
+
+    def get_token(self, rv):
+        data = json.loads(rv.data)
+        app.logger.debug("data => %s", data)
+        if 'token' in data['objects']:
+            return data['objects']['token']
+        else:
+            return None
+
+    def get_authtoken(self):
+        #
+        # Don't run against histroical data DB
+        #
+        if not 'vr.db' in app.config['SQLALCHEMY_DATABASE_URI']:
+            return
+
+        rv = self.open_with_json_auth('/api/v1/authtoken',
+                                      'GET',
+                                      dict(),
+                                      'john',
+                                      'test123')
+        # Log data received
+        app.logger.debug("Data retrieved from get Auth Token = %s\n", rv.data)
+        token = self.get_token(rv)
+        app.logger.debug("Auth Token = %s\n", token)
+
+        if token:
+            # Now authorize with token
+            #
+            # Create A Question using token to authenticate
+            #
+            rv = self.open_with_json_authtoken('/api/v1/questions',
+                                     'POST',
+                                      dict(title='My Token Question',
+                                           blurb='My token blurb written while under the influence of an authentication token.',
+                                           room='test',
+                                           minimum_time=60),
+                                           token)
+            self.assertEqual(rv.status_code, 201)
+            data = json.loads(rv.data)
+            app.logger.debug("New question at = %s\n", data['question']['url'])
+            new_question_url = data['question']['url']
+        else:
+            app.logger.debug('No token returned')
+
+        #
+        # Get Question
+        #
+        # question_url = data['url']
+        question_url = '/api/v1/questions/1'
+        rv = self.open_with_json_auth(question_url,
+                                      'GET',
+                                      dict(),
+                                      'john',
+                                      'test123')
+        self.assertEqual(rv.status_code, 200)
+        data = json.loads(rv.data)
+        # Log data received
+        app.logger.debug("Data retrieved from Get Question = %s\n",
+                         rv.data)
 
     def test_rest_api(self):
         #
@@ -200,19 +277,48 @@ class RESTAPITestCase(unittest.TestCase):
         #
         # Create Question
         #
+        blurb = """Right now there is no limit to the size of the answer that users can write. On the one side this is good, as it permit to users to spell out their idea in details, on the other it is a problem, as some users tend to write very long essays, making the partecipation difficult for everybody.<br>
+<br>
+From a certain point of view the problem is not massive, the more an answer is long the more people that do not understand it might not vote for it, generating a <i>de facto</i>, intrinsic push toward shorter answers.<br>
+<br>
+Yet many people feel a sense of duty to read all answers, and when confronted with too long answers they might simply pospone their voting process. With the result that they risk to fall out from the discussion cycle.<br>
+<br>
+What limit, if any, there should be to the length of the answer that the users are allowed to write?<br>
+And how should this limit be imposed?<br>
+Should this limit be decided once and for all, or should each person that asks the question decides the limit for that question?<br>
+If this is the case, should the questioner be allowed to change this limit later in time?<br>
+<br>
+Sometimes it is possible to impose intrinsic limits, like the one said above. For example making the edit box smaller. And others are possible as well. If you have an idea about a soft limit that we could install, please share that too."""
+
         rv = self.open_with_json_auth('/api/v1/questions',
                                       'POST',
-                                      dict(title='My question',
-                                           blurb='My blurb',
+                                      dict(title='Wall of Text',
+                                           blurb=blurb,
                                            room='vilfredo',
                                            minimum_time=0),
                                       'john',
                                       'test123')
-        self.assertEqual(rv.status_code, 201)
         data = json.loads(rv.data)
-        app.logger.debug("New question at = %s\n", data['url'])
         # Log data received
         app.logger.debug("Data retrieved from Create Question = %s\n",
+                         rv.data)
+        app.logger.debug("New question at = %s\n", data['question']['url'])
+        self.assertEqual(rv.status_code, 201)
+
+        #
+        # Get Question
+        #
+        question_url = data['question']['url']
+        # question_url = '/api/v1/questions/1'
+        rv = self.open_with_json_auth(question_url,
+                                      'GET',
+                                      dict(),
+                                      'john',
+                                      'test123')
+        self.assertEqual(rv.status_code, 200)
+        data = json.loads(rv.data)
+        # Log data received
+        app.logger.debug("Data retrieved from Get Question = %s\n",
                          rv.data)
 
         #
@@ -223,7 +329,7 @@ class RESTAPITestCase(unittest.TestCase):
                                       dict(title='Another Question',
                                            blurb='Blah blah Blah blah Blah',
                                            room='vilfredo',
-                                           minimum_time=0),
+                                           minimum_time=60),
                                       'john',
                                       'test123')
         self.assertEqual(rv.status_code, 201)
@@ -233,7 +339,7 @@ class RESTAPITestCase(unittest.TestCase):
                                       dict(title='Too Many Chefs',
                                            blurb='How to Spoil the broth?',
                                            room='vilfredo',
-                                           minimum_time=0),
+                                           minimum_time=60),
                                       'harry',
                                       'test123')
         self.assertEqual(rv.status_code, 201)
@@ -351,11 +457,13 @@ class RESTAPITestCase(unittest.TestCase):
         #
         # Create Proposals
         #
+        bills_blurb = '''<p>I have never written anything so comprehensive on a website before.</p><p>It makes me realise how much fun this can be.</p>
+        '''
         rv = self.open_with_json_auth(
             '/api/v1/questions/1/proposals',
             'POST',
             dict(title='Bills First Proposal',
-                 blurb='Bills blurb of varying interest'),
+                 blurb=bills_blurb),
             'bill',
             'test123')
         self.assertEqual(rv.status_code, 201)
@@ -363,11 +471,12 @@ class RESTAPITestCase(unittest.TestCase):
         app.logger.debug("Data retrieved from Create Proposal = %s\n",
                          rv.data)
 
+        bills_other_blurb = '''<p>This is a much better proposal than my first one.</p><p>It makes me realise how personal growth continues even while using the internet.</p>'''
         rv = self.open_with_json_auth(
             '/api/v1/questions/1/proposals',
             'POST',
             dict(title='Bills Second Proposal',
-                 blurb='Bills blurb of varying disinterest',
+                 blurb=bills_other_blurb,
                  abstract='This is too abstract for an abstract'),
             'bill',
             'test123')
@@ -394,12 +503,12 @@ class RESTAPITestCase(unittest.TestCase):
         self.assertEqual(rv.status_code, 201)
 
         data = json.loads(rv.data)
-        new_proposal_url = data['url']
-        app.logger.debug("New propoal URL = %s", new_proposal_url)
+        new_proposal_uri = data['proposal']['uri']
+        app.logger.debug("New propoal URI = %s", new_proposal_uri)
 
         # Harry edits his proposal
         rv = self.open_with_json_auth(
-            new_proposal_url,
+            new_proposal_uri,
             'PATCH',
             dict(
                 title='Harrys Cooler Proposal',
@@ -412,7 +521,7 @@ class RESTAPITestCase(unittest.TestCase):
                          rv.data)
 
         #
-        # Get Question Proposals
+        # Get Proposals
         #
         rv = self.open_with_json_auth(
             '/api/v1/questions/1/proposals',
@@ -443,7 +552,7 @@ class RESTAPITestCase(unittest.TestCase):
         app.logger.debug("Data retrieved = %s\n", rv.data)
 
         #
-        # Author move question on
+        # Author moves question on to VOTING phase
         #
         rv = self.open_with_json_auth('/api/v1/questions/1',
                                       'PATCH',
@@ -471,14 +580,14 @@ class RESTAPITestCase(unittest.TestCase):
                          rv.data)
         self.assertEqual(rv.status_code, 201)
         data = json.loads(rv.data)
-        harrys_proposal_url = data['url']
+        harrys_proposal_uri = data['proposal']['uri']
         #
         # Delete the proposal
         #
-        app.logger.debug("Harry deletes his proposal with url: %s",
-                         harrys_proposal_url)
+        app.logger.debug("Harry deletes his proposal with uri: %s",
+                         harrys_proposal_uri)
         rv = self.open_with_json_auth(
-            harrys_proposal_url,
+            harrys_proposal_uri,
             'DELETE',
             dict(),
             'harry',
@@ -513,9 +622,11 @@ class RESTAPITestCase(unittest.TestCase):
             'test123')
         self.assertEqual(rv.status_code, 201)
 
+
         #
         # Comments, oppose, confused
         #
+        '''
         rv = self.open_with_json_auth(
             '/api/v1/questions/1/proposals/4/endorsements',
             'POST',
@@ -528,7 +639,21 @@ class RESTAPITestCase(unittest.TestCase):
         app.logger.debug("Data retrieved from Oppose Proposal = %s\n",
                          rv.data)
         self.assertEqual(rv.status_code, 201, rv.status_code)
+        '''
+        # Add a comment only
+        rv = self.open_with_json_auth(
+            '/api/v1/questions/1/proposals/4/comments',
+            'POST',
+            dict(
+                comment_type="against",
+                comment="This is terrible!"),
+                'john',
+                'test123')
+        app.logger.debug("Data retrieved from Confused by Proposal = %s\n",
+                         rv.data)
+        self.assertEqual(rv.status_code, 201, rv.status_code)
 
+        '''
         # Add OPPOSED endorsement and comment
         rv = self.open_with_json_auth(
             '/api/v1/questions/1/proposals/4/endorsements',
@@ -541,7 +666,32 @@ class RESTAPITestCase(unittest.TestCase):
         app.logger.debug("Data retrieved from Oppose Proposal = %s\n",
                          rv.data)
         self.assertEqual(rv.status_code, 201, rv.status_code)
+        '''
+        # Add a comment only
+        rv = self.open_with_json_auth(
+            '/api/v1/questions/1/proposals/4/comments',
+            'POST',
+            dict(
+                comment_type="against",
+                comment="This is terrible!"),
+                'harry',
+                'test123')
+        app.logger.debug("Data retrieved from Confused by Proposal = %s\n",
+                         rv.data)
+        self.assertEqual(rv.status_code, 400, rv.status_code)
 
+        # Add support to comment
+        rv = self.open_with_json_auth(
+            '/api/v1/questions/1/proposals/4/comments/1/support',
+            'POST',
+            dict(),
+            'harry',
+            'test123')
+        app.logger.debug("Data retrieved from supporting comment 1 = %s\n",
+                         rv.data)
+        self.assertEqual(rv.status_code, 201, rv.status_code)
+
+        '''
         # Add CONFUSED endorsement and comment
         rv = self.open_with_json_auth(
             '/api/v1/questions/1/proposals/4/endorsements',
@@ -552,6 +702,58 @@ class RESTAPITestCase(unittest.TestCase):
                 new_comment_text="I feel very confused!"),
             'bill',
             'test123')
+        app.logger.debug("Data retrieved from Confused by Proposal = %s\n",
+                         rv.data)
+        self.assertEqual(rv.status_code, 201, rv.status_code)
+        '''
+        # Add a comment only
+        rv = self.open_with_json_auth(
+            '/api/v1/questions/1/proposals/4/comments',
+            'POST',
+            dict(
+                comment_type="question",
+                comment="This is rubbish! How much would this cost?"),
+                'susan',
+                'test123')
+        app.logger.debug("Data retrieved from Confused by Proposal = %s\n",
+                         rv.data)
+        self.assertEqual(rv.status_code, 201, rv.status_code)
+
+        # Add a comment only
+        rv = self.open_with_json_auth(
+            '/api/v1/questions/1/proposals/4/comments',
+            'POST',
+            dict(
+                comment_type="answer",
+                comment="About 1.2 bitcoins, more or less.",
+                reply_to=2),
+                'john',
+                'test123')
+        app.logger.debug("Data retrieved from Confused by Proposal = %s\n",
+                         rv.data)
+        self.assertEqual(rv.status_code, 201, rv.status_code)
+
+        # Add a comment only
+        rv = self.open_with_json_auth(
+            '/api/v1/questions/1/proposals/4/comments',
+            'POST',
+            dict(
+                comment_type="against",
+                comment="I think this sucks bigtime, baby! It would cost too much and we will all go broke."),
+                'bill',
+                'test123')
+        app.logger.debug("Data retrieved from Confused by Proposal = %s\n",
+                         rv.data)
+        self.assertEqual(rv.status_code, 201, rv.status_code)
+
+        rv = self.open_with_json_auth(
+            '/api/v1/questions/1/proposals/3/comments',
+            'POST',
+            dict(
+                comment_type="for",
+                comment="This will work bigtime. It could be coded in python."),
+                'john',
+                'test123')
         app.logger.debug("Data retrieved from Confused by Proposal = %s\n",
                          rv.data)
         self.assertEqual(rv.status_code, 201, rv.status_code)
@@ -568,6 +770,7 @@ class RESTAPITestCase(unittest.TestCase):
         self.assertEqual(rv.status_code, 200)
         # Log data received
         app.logger.debug("Data retrieved from Get Comments = %s\n", rv.data)
+
 
         # bills_prop1.endorse(john)
         rv = self.open_with_json_auth(
@@ -622,6 +825,20 @@ class RESTAPITestCase(unittest.TestCase):
             'harry',
             'test123')
         self.assertEqual(rv.status_code, 201)
+
+        #
+        # Get Proposals
+        #
+        rv = self.open_with_json_auth(
+            '/api/v1/questions/1/proposals',
+            'GET',
+            dict(),
+            'bill',
+            'test123')
+        self.assertEqual(rv.status_code, 200)
+        # Log data received
+        app.logger.debug("Data retrieved from Get Question Proposals after endorsements = %s\n",
+                         rv.data)
 
         #
         # Get Proposal Endorsers
@@ -697,6 +914,21 @@ class RESTAPITestCase(unittest.TestCase):
         app.logger.debug("Data retrieved from Get Proposal Relations = %s\n",
                          rv.data)
 
+        if MOVE_TO_GENERATION_2:
+            #
+            # Author moves question on to WRITING phase and GENERATION 2
+            #
+            app.logger.debug("Move question on to next generation")
+            rv = self.open_with_json_auth('/api/v1/questions/1',
+                                          'PATCH',
+                                          dict(move_on=True),
+                                          'john',
+                                          'test123')
+            self.assertEqual(rv.status_code, 200, self.get_message(rv))
+            # Log data received
+            app.logger.debug("Data retrieved from Edit Question (Move On) = %s\n",
+                             rv.data)
+
         if (MAKE_GRAPH):
             #
             # Create Voting Map
@@ -710,8 +942,23 @@ class RESTAPITestCase(unittest.TestCase):
             self.assertEqual(rv.status_code, 200)
             data = json.loads(rv.data)
             app.logger.debug("Data retrieved from get graph = %s\n", data)
-            self.assertIn('map_Q1_G1_all_1_1.svg', data['url'],
-                          "File URL not returned")
+            # self.assertIn('map_Q1_G1_all_1_1.svg', data['url'],
+            #              "File URL not returned")
+
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/graph?generation=1&map_type=pareto',
+                'GET',
+                dict(),
+                'harry',
+                'test123')
+            self.assertEqual(rv.status_code, 200)
+            data = json.loads(rv.data)
+            app.logger.debug("Data retrieved from get graph = %s\n", data)
+            # self.assertIn('map_Q1_G1_all_1_1.svg', data['url'],
+            #              "File URL not returned")
+            
+            # Stop here while debugging graph
+            return
 
         #
         # Update Endorsements
@@ -724,6 +971,8 @@ class RESTAPITestCase(unittest.TestCase):
             'john',
             'test123')
         self.assertEqual(rv.status_code, 201)
+        
+        '''
         #
         # Updates endorsement to OPPOSE
         app.logger.debug("John updates his endopsement to OPPOSE")
@@ -741,6 +990,7 @@ class RESTAPITestCase(unittest.TestCase):
         # Log data received
         app.logger.debug("Data retrieved from Update Endorsement = %s\n",
                          rv.data)
+        '''
 
         #
         # Create Another Question
@@ -750,13 +1000,13 @@ class RESTAPITestCase(unittest.TestCase):
                                       dict(title='My boring question',
                                            blurb='My boring blurb',
                                            room='test',
-                                           minimum_time=0),
+                                           minimum_time=60),
                                       'john',
                                       'test123')
         self.assertEqual(rv.status_code, 201)
         data = json.loads(rv.data)
-        app.logger.debug("New question at = %s\n", data['url'])
-        new_question_url = data['url']
+        app.logger.debug("New question at = %s\n", data['question']['url'])
+        new_question_url = data['question']['url']
 
         #
         # Author Deletes Question
