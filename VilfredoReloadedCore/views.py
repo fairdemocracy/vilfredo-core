@@ -30,11 +30,21 @@ from . import app, models
 
 from . database import db_session
 
+from flask import render_template
 
-@app.route('/', methods=['GET', 'POST'])
-@app.route('/index', methods=['GET', 'POST'])
+
+# @app.route('/', methods=['GET', 'POST'])
+# @app.route('/index', methods=['GET', 'POST'])
+# def index():
+#    return "No questions here so far"
+@app.route('/')
+@app.route('/index')
 def index():
-    return "No questions here so far"
+    return render_template("index.html")
+
+@app.route('/question/<int:question_id>')
+def display_question(question_id):
+    return render_template("question.html")
 
 
 @app.route('/register', methods=['GET', 'POST'])

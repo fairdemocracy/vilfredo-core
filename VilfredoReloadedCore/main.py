@@ -28,6 +28,7 @@ Convenience module to run vilfredo-reloaded-core
 
 from . import app
 from . import api  # NOQA
+from . import views
 
 
 def main():
