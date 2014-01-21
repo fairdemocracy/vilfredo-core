@@ -33,6 +33,7 @@ DEBUG = True
 
 # WARNNG: must be changed in production!
 SECRET_KEY = 'ai4ohngaek4ohchaesheeY2Xee2jishe'
+SALT = 'vilfredoiscool'
 
 # mail server settings - ARNNG: must be changed to False in production!
 MAIL_SERVER = 'localhost'
@@ -41,6 +42,9 @@ MAIL_USERNAME = 'admin'
 MAIL_PASSWORD = None
 MAIL_SUPPRESS_SEND = True
 
+from datetime import timedelta
+REMEMBER_COOKIE_DURATION = timedelta(days=3)
+
 # administrator list
 ADMINS = ['admin@example.com']
 
@@ -48,7 +52,11 @@ ADMINS = ['admin@example.com']
 LOG_CONFIG_FILE = 'logging_debug.conf'
 
 # Probably don't need this
-SITE_DOMAIN = 'localhost'
+SITE_DOMAIN = '0.0.0.0:8080'
+
+ANONYMIZE_GRAPH = False
 
 # Directory to put the voting maps - it will be created if not found
-MAP_PATH = 'maps/'
+# MAP_PATH = 'maps/'
+MAP_PATH = 'VilfredoReloadedCore/static/maps/'
+EXTERNAL_MAP_PATH = 'static/maps/'
