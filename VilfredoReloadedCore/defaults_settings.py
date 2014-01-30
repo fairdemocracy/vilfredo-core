@@ -60,3 +60,5 @@ ANONYMIZE_GRAPH = False
 # MAP_PATH = 'maps/'
 MAP_PATH = 'VilfredoReloadedCore/static/maps/'
 EXTERNAL_MAP_PATH = 'static/maps/'
+# MAP_PATH = 'maps/'
+# EXTERNAL_MAP_PATH = 'maps/'
