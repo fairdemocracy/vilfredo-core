@@ -66,8 +66,6 @@ except ImportError:
 
 from flask.ext.mail import Mail
 
-from flask_login import LoginManager
-
 
 def config_app(app):
     # Load setting using various methods
@@ -119,8 +117,9 @@ logger.propagate = False
 for lh in logger.handlers:
     app.logger.addHandler(lh)
 
-login_manager = LoginManager()
-login_manager.init_app(app)
+#from flask_login import LoginManager
+#login_manager = LoginManager()
+#login_manager.init_app(app)
 
 #Login_serializer used to encryt and decrypt the cookie token for the remember
 #me option of flask-login

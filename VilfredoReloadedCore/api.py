@@ -57,8 +57,11 @@ MAX_LEN_PROPOSAL_QUESTION_ANSWER = 300
 ENDORSEMENT_TYPES = ['endorse', 'oppose', 'confused']
 COMMENT_TYPES = ['for', 'against', 'question', 'answer']
 
+from flask_login import LoginManager
+login_manager = LoginManager()
+login_manager.init_app(app)
 
-@app.login_manager.token_loader
+@login_manager.token_loader
 def load_token(token):
     """
     Flask-Login token_loader callback.
