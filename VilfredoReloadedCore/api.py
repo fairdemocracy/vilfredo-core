@@ -2891,7 +2891,6 @@ def api_question_graph(question_id):
                    graph_generation=str(generation),
                    current_generation=str(question.generation),
                    url='http://' + app.config['SITE_DOMAIN'] + '/' + app.config['EXTERNAL_MAP_PATH'] +
-                   # url='http://0.0.0.0:8080/static/maps/' +
                        graph_svg,
                    proposal_level_type=proposal_level_type,
                    user_level_type=user_level_type), 200

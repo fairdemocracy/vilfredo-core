@@ -1178,7 +1178,7 @@ class Question(db.Model):
     @staticmethod
     def which_element_dominates_which(element1, element2):
         '''
-        .. function:: who_dominateselement_who(element1, element2)
+        .. function:: which_element_dominates_which(element1, element2)
 
         Takes 2 SETS and calulates which element if any
         domiantes the other.
