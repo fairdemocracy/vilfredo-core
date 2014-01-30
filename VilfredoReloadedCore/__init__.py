@@ -85,6 +85,8 @@ config_app(app)
 #from flask.ext.sqlalchemy import SQLAlchemy
 #db = SQLAlchemy(app)
 
+import VilfredoReloadedCore.views
+
 mail = Mail(app)
 
 from flask_util_js import FlaskUtilJs
