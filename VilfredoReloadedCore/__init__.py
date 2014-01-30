@@ -82,8 +82,8 @@ def config_app(app):
 app = Flask(__name__)
 config_app(app)
 
-from flask.ext.sqlalchemy import SQLAlchemy
-db = SQLAlchemy(app)
+#from flask.ext.sqlalchemy import SQLAlchemy
+#db = SQLAlchemy(app)
 
 mail = Mail(app)
 
@@ -106,6 +106,7 @@ if os.path.isfile('/var/tmp/vr.log'):
         os.remove('/var/tmp/vr.log')
     except IOError:
         print 'Failed to delete log file /var/tmp/vr.log'
+
 
 logging.config.fileConfig(config_file)
 # create logger

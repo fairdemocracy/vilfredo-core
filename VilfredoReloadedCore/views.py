@@ -28,7 +28,7 @@ from flask import session, request
 
 from . import app, models
 
-from . database import db_session
+from .database import db_session
 
 from flask import render_template
 

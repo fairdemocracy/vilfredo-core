@@ -26,7 +26,7 @@ The database Bases
 
 from sqlalchemy import and_, or_, event
 
-from database import db_session
+from database import db_session, db
 
 import datetime, math, time
 
@@ -36,7 +36,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from flask.ext.login import UserMixin
 
-from . import app, db
+from . import app
 
 from HTMLParser import HTMLParser
 

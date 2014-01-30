@@ -26,8 +26,9 @@ This file contains code related to the database
 # from sqlalchemy.orm import create_session, scoped_session
 # from sqlalchemy.ext.declarative import declarative_base
 
-from . import db
-
+from VilfredoReloadedCore import app
+from flask.ext.sqlalchemy import SQLAlchemy
+db = SQLAlchemy(app)
 db_session = db.session
 
 # engine = None
@@ -73,7 +74,7 @@ def init_db():
     # they will be registered properly on the metadata.  Otherwise
     # you will have to import them first before calling init_db()
     # pylint: disable=W0611 flake8: noqa
-    from . import models, db
+    #from . import models, db
     db.create_all()
     # Base.metadata.create_all(bind=engine)
     
@@ -87,5 +88,5 @@ def drop_db():
     # meta = MetaData(engine)
     # meta.reflect()
     # meta.drop_all()
-    from . import models, db
+    #from . import models, db
     db.drop_all()

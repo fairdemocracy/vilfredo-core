@@ -294,7 +294,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                       'POST',
                                       dict(title='Wall of Text',
                                            blurb=blurb,
-                                           room='vilfredo',
+                                           room='',
                                            minimum_time=0),
                                       'john',
                                       'test123')
@@ -328,7 +328,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                       'POST',
                                       dict(title='Another Question',
                                            blurb='Blah blah Blah blah Blah',
-                                           room='vilfredo',
+                                           room='',
                                            minimum_time=60),
                                       'john',
                                       'test123')
@@ -338,7 +338,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                       'POST',
                                       dict(title='Too Many Chefs',
                                            blurb='How to Spoil the broth?',
-                                           room='vilfredo',
+                                           room='',
                                            minimum_time=60),
                                       'harry',
                                       'test123')
