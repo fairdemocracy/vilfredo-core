@@ -94,10 +94,9 @@ fujs = FlaskUtilJs(app)
 import logging
 import logging.config
 
+# Set logging
 import os
 basedir = os.path.abspath(os.path.dirname(__file__))
-
-# Set logging
 config_file = os.path.join(basedir, app.config['LOG_CONFIG_FILE'])
 
 # Passing mode='w' to file handler not causing overwrite
@@ -117,14 +116,15 @@ logger.propagate = False
 for lh in logger.handlers:
     app.logger.addHandler(lh)
 
-#from flask_login import LoginManager
-#login_manager = LoginManager()
-#login_manager.init_app(app)
+# from flask_login import LoginManager
+# login_manager = LoginManager()
+# login_manager.init_app(app)
 
-#Login_serializer used to encryt and decrypt the cookie token for the remember
-#me option of flask-login
-from itsdangerous import URLSafeTimedSerializer
-try:
-    login_serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'], app.config['SALT'])
-except Exception:
-    print 'Failed to create login_serializer'
+# Login_serializer used to encryt and decrypt the cookie token for the remember
+# me option of flask-login
+
+# from itsdangerous import URLSafeTimedSerializer
+# try:
+#     login_serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'], app.config['SALT'])
+# except Exception:
+#     print 'Failed to create login_serializer'

@@ -224,7 +224,7 @@ class User(db.Model, UserMixin):
         Encode a secure token for cookie
         """
         data = [str(self.id), self.password]
-        from . import login_serializer
+        from .auth import login_serializer
         return login_serializer.dumps(data)
 
     @staticmethod

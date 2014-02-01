@@ -29,7 +29,8 @@ REST API
 from flask import request,\
     url_for, jsonify, make_response, abort
 from . import app, models
-from . database import db_session
+from .auth import login_manager, login_serializer
+from .database import db_session
 from sqlalchemy import and_
 from functools import wraps
 from flask import Response
@@ -57,9 +58,18 @@ MAX_LEN_PROPOSAL_QUESTION_ANSWER = 300
 ENDORSEMENT_TYPES = ['endorse', 'oppose', 'confused']
 COMMENT_TYPES = ['for', 'against', 'question', 'answer']
 
+'''
 from flask_login import LoginManager
 login_manager = LoginManager()
 login_manager.init_app(app)
+# Login_serializer used to encryt and decrypt the cookie token for the remember
+# me option of flask-login
+from itsdangerous import URLSafeTimedSerializer
+try:
+    login_serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'], app.config['SALT'])
+except Exception:
+    print 'Failed to create login_serializer'
+'''
 
 @login_manager.token_loader
 def load_token(token):
@@ -83,8 +93,8 @@ def load_token(token):
     max_age = app.config["REMEMBER_COOKIE_DURATION"].total_seconds()
  
     #Decrypt the Security Token, data = [username, hashpass]
-    from . import login_serializer
-    
+    #from . import login_serializer
+
     try:
         data = login_serializer.loads(token, max_age=max_age)
     except:
@@ -100,13 +110,43 @@ def load_token(token):
     return None
 
 def authenticate():
-    """Sends a 401 response that enables basic auth"""
+    """Sends a 403 response that enables basic auth"""
     return Response(
         'You have to login to make this request', 403,
         {'WWW-Authenticate': 'Basic realm="Login Required"'})
 
 
 def requires_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        app.logger.debug("Request authorization = %s\n", request.authorization)
+        auth = request.authorization
+        if not auth:
+            #return authenticate()
+            return jsonify(message='auth not defined'), 403
+        if auth.username == '':
+            #return authenticate()
+            return jsonify(message='no username received'), 403
+        if auth.password == '':
+            app.logger.debug('requires_auth: Token set')
+            token_valid = load_token(auth.username)
+            if token_valid:
+                app.logger.debug('requires_auth: Token is valid')
+                return f(*args, **kwargs)
+            else:
+                app.logger.debug('requires_auth: Token is not valid')
+                # return authenticate()
+                return jsonify(message='no password received, incorrect token supplied'), 403
+        elif check_auth(auth.username, auth.password):
+            app.logger.debug('requires_auth: username and password valid')
+            return f(*args, **kwargs)
+        else:
+            app.logger.debug('requires_auth: username and password not valid')
+            # return authenticate()
+            return jsonify(message='username and password not valid'), 403
+    return decorated
+
+def requires_auth_off(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         auth = request.authorization
