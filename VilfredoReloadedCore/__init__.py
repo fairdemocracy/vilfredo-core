@@ -84,6 +84,7 @@ config_app(app)
 #db = SQLAlchemy(app)
 
 import VilfredoReloadedCore.views
+import VilfredoReloadedCore.api
 
 mail = Mail(app)
 
