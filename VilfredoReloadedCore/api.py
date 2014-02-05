@@ -94,7 +94,7 @@ def load_token(token):
  
     #Decrypt the Security Token, data = [username, hashpass]
     #from . import login_serializer
-
+    
     try:
         data = login_serializer.loads(token, max_age=max_age)
     except:
@@ -2602,6 +2602,89 @@ def api_question_pareto(question_id=None):
 
 @app.route('/api/v1/questions/<int:question_id>/key_players', methods=['GET'])
 def api_question_key_players(question_id=None):
+    '''
+    .. http:post:: /questions/(int:question_id)/key_players
+
+        A list of the Key Players for this round.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            POST /questions/44/key_players HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+            {
+              "query_generation": "1",
+              "current_generation": "1",
+              "key_players": [
+                {
+                  "3": [
+                    "/api/v1/questions/1/proposals/4",
+                    "/api/v1/questions/1/proposals/3"
+                  ]
+                },
+                {
+                  "4": [
+                    "/api/v1/questions/1/proposals/3"
+                  ]
+                }
+              ],
+              "num_items": "2",
+              "question_id": "1"
+            }
+
+        :param question_id: question id
+        :json username: username
+        :json email: email address
+        :json password: password
+        :statuscode 200: no error
+        :statuscode 400: bad request
+    '''
+    app.logger.debug("api_question_key_players called with %s...\n",
+                     question_id)
+
+    if question_id is None:
+        app.logger.debug("ERROR: question_id is None!\n")
+        abort(404)
+
+    question = models.Question.query.get(int(question_id))
+
+    if question is None:
+        app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
+        jsonify(message="Question not found"), 404
+
+    generation = int(request.args.get('generation', question.generation))
+    key_players = question.calculate_key_players(generation=generation)
+
+    app.logger.debug("calculate_key_players returned: %s", key_players)
+    # {3: set([<Proposal('3', Q:'1')>, <Proposal('4', Q:'1')>]), 4: set([<Proposal('3', Q:'1')>])}
+
+    results = []
+    for (endorser, vote_for) in key_players.iteritems():
+        proposals = []
+        for proposal in vote_for:
+            proposals.append(proposal.id)
+        kp = {endorser: proposals}
+        kp = {'user': endorser.get_public(), 'add_vote': proposals}
+        results.append(kp)
+
+    return jsonify(question_id=str(question.id),
+                   query_generation=str(generation),
+                   current_generation=str(question.generation),
+                   num_items=str(len(key_players)), key_players=results), 200
+
+
+#@app.route('/api/v1/questions/<int:question_id>/key_players', methods=['GET'])
+def api_question_key_players_v1(question_id=None):
     '''
     .. http:post:: /questions/(int:question_id)/key_players
 

@@ -1547,6 +1547,66 @@ class Question(db.Model):
                 users_pareto_proposals = pareto.difference(new_pareto)
                 app.logger.debug(">>>>>>>>>users_pareto_proposals %s\n",
                                  users_pareto_proposals)
+                key_players[user] = set()
+                for users_proposal in users_pareto_proposals:
+                    key_players[user].update(
+                        Question.who_dominates_this_excluding(
+                            users_proposal,
+                            pareto,
+                            user,
+                            generation))
+                    app.logger.debug(
+                        "Pareto Props that could dominate PID %s %s\n",
+                        users_proposal.id,
+                        key_players[user])
+            else:
+                app.logger.debug("%s is not a key player\n", user.id)
+
+        # self.save_key_players(key_players)
+        app.logger.debug("Question.calc_key_players: %s", key_players)
+        return key_players
+    
+    def calculate_key_players_v1(self, generation=None):
+        '''
+        .. function:: calculate_key_players([generation=None])
+
+        Calculates the effects each endorser has on the pareto.
+        What would be the effects if he didn't vote?
+        What proposals has he forced into the pareto?
+
+        :param generation: question generation.
+        :type generation: int
+        :rtype: dict
+        '''
+        generation = generation or self.generation
+
+        key_players = dict()
+        pareto = self.calculate_pareto_front(generation=generation)
+        if (len(pareto) == 0):
+            return dict()
+
+        app.logger.debug("+++++++++++ CALCULATE  KEY  PLAYERS ++++++++++\n")
+        app.logger.debug("@@@@@@@@@@ PARETO FRONT @@@@@@@@@@ %s\n", pareto)
+        current_endorsers = self.get_endorsers(generation)
+        app.logger.debug("++++++++++ CURRENT ENDORSERS %s\n",
+                         current_endorsers)
+        for user in current_endorsers:
+            app.logger.debug("+++++++++++ Checking User +++++++++++ %s\n",
+                             user.id)
+            users_endorsed_proposal_ids =\
+                user.get_endorsed_proposal_ids(self, generation)
+            app.logger.debug(">>>>>>>>>> Users endorsed proposal IDs %s\n",
+                             users_endorsed_proposal_ids)
+            app.logger.debug("Calc PF excluding %s\n", user.id)
+            new_pareto = self.calculate_pareto_front(proposals=pareto,
+                                                     exclude_user=user,
+                                                     generation=generation)
+            app.logger.debug(">>>>>>> NEW PARETO = %s\n", new_pareto)
+            if (pareto != new_pareto):
+                app.logger.debug("%s is a key player\n", user.id)
+                users_pareto_proposals = pareto.difference(new_pareto)
+                app.logger.debug(">>>>>>>>>users_pareto_proposals %s\n",
+                                 users_pareto_proposals)
                 key_players[user.id] = set()
                 for users_proposal in users_pareto_proposals:
                     key_players[user.id].update(
@@ -2547,10 +2607,10 @@ class Question(db.Model):
                 node_id += '_'
             node_id += 'u' + str(user.id)
 
-        app.logger.debug("write_bundled_users...")
-        app.logger.debug("node_id ===> %s", node_id)
-        app.logger.debug("bundle_name == %s", bundle_name)
-        
+        # app.logger.debug("write_bundled_users...")
+        # app.logger.debug("node_id ===> %s", node_id)
+        # app.logger.debug("bundle_name == %s", bundle_name)
+
         # ' [shape=plaintext ' +\
         bundle = '"' + bundle_name + '" ' +\
             ' [id=' + node_id + ' shape=plaintext ' +\
