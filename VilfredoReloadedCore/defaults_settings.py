@@ -22,8 +22,29 @@
 
 # WARNNG: must be changed in production!
 
+# Set site domain
+SITE_DOMAIN = '0.0.0.0:8080'
+
 # DATABASE_URI = 'sqlite:////var/tmp/vr.db'
 development_db = 'sqlite:////var/tmp/vr.db'
+
+# Set path to log file
+LOG_FILE_PATH = '/var/tmp/vr.log'
+
+# name of logger configuration file
+LOG_CONFIG_FILE = 'logging_debug.conf'
+
+# On some systems (Dreamhost, perhaps because they use Passenger) it is required to 
+# manually set the path to the Graphviz dot executible, eg
+# GRAPHVIZ_DOT_PATH = '/home/vilfredo/local/bin/dot'
+GRAPHVIZ_DOT_PATH = None
+
+# Directory to put the voting maps - it will be created if not found
+# MAP_PATH = 'maps/'
+MAP_PATH = 'VilfredoReloadedCore/static/maps/'
+EXTERNAL_MAP_PATH = 'static/maps/'
+# MAP_PATH = 'maps/'
+# EXTERNAL_MAP_PATH = 'maps/'
 
 # DATABASE_URI = development_db
 SQLALCHEMY_DATABASE_URI = development_db
@@ -48,17 +69,4 @@ REMEMBER_COOKIE_DURATION = timedelta(days=3)
 # administrator list
 ADMINS = ['admin@example.com']
 
-# name of logger configuration file
-LOG_CONFIG_FILE = 'logging_debug.conf'
-
-# Probably don't need this
-SITE_DOMAIN = '0.0.0.0:8080'
-
 ANONYMIZE_GRAPH = False
-
-# Directory to put the voting maps - it will be created if not found
-# MAP_PATH = 'maps/'
-MAP_PATH = 'VilfredoReloadedCore/static/maps/'
-EXTERNAL_MAP_PATH = 'static/maps/'
-# MAP_PATH = 'maps/'
-# EXTERNAL_MAP_PATH = 'maps/'
