@@ -1724,6 +1724,14 @@ class Question(db.Model):
             # Generate svg file from the dot file using "dot"
             import pydot
             graph = pydot.graph_from_dot_file(filepath+'.dot')
+
+            # It is required on some systems to set the path to the Graphviz
+            # dot file (Dreamhost, possibly because it uses Passenger)
+            if app.config['GRAPHVIZ_DOT_PATH'] is not None:
+                app.logger.debug('Setting Graphviz path to %s', app.config['GRAPHVIZ_DOT_PATH'])
+                path = {'dot': app.config['GRAPHVIZ_DOT_PATH']}
+                graph.set_graphviz_executables(path)
+
             graph.write_svg(filepath+'.svg')
 
             if not os.path.isfile(filepath + '.svg'):
