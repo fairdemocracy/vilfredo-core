@@ -52,6 +52,7 @@ Module documentation
 import pkg_resources
 pkg_resources.declare_namespace(__name__)
 
+import os
 
 # The __init__.py must contain the app
 # http://flask.pocoo.org/docs/patterns/packages/
@@ -95,37 +96,21 @@ fujs = FlaskUtilJs(app)
 import logging
 import logging.config
 
-# Set logging
-import os
+# Passing mode='w' to file handler not causing overwrite
+if os.path.isfile(app.config['LOG_FILE_PATH']):
+    try:
+        os.remove(app.config['LOG_FILE_PATH'])
+    except IOError:
+        print 'Failed to delete log file ' + app.config['LOG_FILE_PATH']
+
+# Set logger
 basedir = os.path.abspath(os.path.dirname(__file__))
 config_file = os.path.join(basedir, app.config['LOG_CONFIG_FILE'])
 
-# Passing mode='w' to file handler not causing overwrite
-if os.path.isfile('/var/tmp/vr.log'):
-    try:
-        os.remove('/var/tmp/vr.log')
-    except IOError:
-        print 'Failed to delete log file /var/tmp/vr.log'
-
-
 logging.config.fileConfig(config_file)
-# create logger
 logger = logging.getLogger('vilfredo_logger')
 logger.propagate = False
 
 # Apply the logger.handlers to the flask application
 for lh in logger.handlers:
     app.logger.addHandler(lh)
-
-# from flask_login import LoginManager
-# login_manager = LoginManager()
-# login_manager.init_app(app)
-
-# Login_serializer used to encryt and decrypt the cookie token for the remember
-# me option of flask-login
-
-# from itsdangerous import URLSafeTimedSerializer
-# try:
-#     login_serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'], app.config['SALT'])
-# except Exception:
-#     print 'Failed to create login_serializer'
