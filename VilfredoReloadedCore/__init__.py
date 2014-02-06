@@ -73,16 +73,16 @@ def config_app(app):
     # TODO: do relative o package import
     app.config.from_object('VilfredoReloadedCore.defaults_settings')
     # TODO: document the VCR_VARIABLE
-    app.config.from_envvar('VRC_SETTINGS', silent=True)
-
-    # from .database import init_engine
-    # init_engine(app.config['DATABASE_URI'])
+    if 'VILFREDO_SETTINGS' in os.environ:
+	    config = os.path.join(os.environ['VILFREDO_SETTINGS'], 'settings.cfg')
+	    if os.path.isfile(config):
+	        app.config.from_pyfile(config, silent=True)
+    #app.config.from_envvar('VILFREDO_SETTINGS', silent=True)
+    #config = os.path.join(app.root_path, 'settings.cfg')
+    #app.config.from_pyfile(config, silent=True)
 
 app = Flask(__name__)
 config_app(app)
-
-#from flask.ext.sqlalchemy import SQLAlchemy
-#db = SQLAlchemy(app)
 
 import VilfredoReloadedCore.views
 import VilfredoReloadedCore.api
@@ -92,10 +92,6 @@ mail = Mail(app)
 from flask_util_js import FlaskUtilJs
 fujs = FlaskUtilJs(app)
 
-# Logging
-import logging
-import logging.config
-
 # Passing mode='w' to file handler not causing overwrite
 if os.path.isfile(app.config['LOG_FILE_PATH']):
     try:
@@ -103,10 +99,18 @@ if os.path.isfile(app.config['LOG_FILE_PATH']):
     except IOError:
         print 'Failed to delete log file ' + app.config['LOG_FILE_PATH']
 
-# Set logger
+# Logging
+import logging
+import logging.config
 basedir = os.path.abspath(os.path.dirname(__file__))
-config_file = os.path.join(basedir, app.config['LOG_CONFIG_FILE'])
+# config_file = os.path.join(basedir, app.config['LOG_CONFIG_FILE'])
 
+# Check if environment variable VILFREDO_SETTINGS is set
+if 'VILFREDO_SETTINGS' in os.environ\
+        and os.path.isfile(os.path.join(os.environ['VILFREDO_SETTINGS'], app.config['LOG_CONFIG_FILE'])):
+    config_file = os.path.join(os.environ['VILFREDO_SETTINGS'], app.config['LOG_CONFIG_FILE'])
+else:
+    config_file = os.path.join(basedir, app.config['LOG_CONFIG_FILE'])
 logging.config.fileConfig(config_file)
 logger = logging.getLogger('vilfredo_logger')
 logger.propagate = False
