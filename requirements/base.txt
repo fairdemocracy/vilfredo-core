@@ -9,3 +9,4 @@ pyparsing == 1.5.7
 pydot == 1.0.28
 flask-util-js == 0.2.19
 itsdangerous == 0.23
+MySQL-python == 1.2.5
