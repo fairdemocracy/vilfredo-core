@@ -58,19 +58,24 @@ class RESTAPITestCase(unittest.TestCase):
             # Create empty SQLite test DB
             app.logger.debug("Initializing sqlite db\n")
             init_db()
-
             app.config['TESTING'] = True
             self.app = app.test_client()
         else:
-            app.logger.debug("Using historical db: skipping test %s.... ",
-                             __name__)
-            print "Using historical db: skipping test %s.... " % (__name__)
+            if DELETE_DB_ON_START:
+                app.logger.debug("Dropping existing DB\n")
+                drop_db()
+            app.logger.debug("Initializing DB\n")
+            init_db()
+            app.config['TESTING'] = True
+            self.app = app.test_client()
 
     def tearDown(self):
         # For SQLite development DB only
-        if 'vr.db' in app.config['SQLALCHEMY_DATABASE_URI'] \
-                and DELETE_DB_ON_EXIT:
+        if 'vr.db' in app.config['SQLALCHEMY_DATABASE_URI'] and DELETE_DB_ON_EXIT:
             app.logger.debug("Dropping sqlite db\n")
+            drop_db()
+        elif DELETE_DB_ON_EXIT:
+            app.logger.debug("Dropping DB\n")
             drop_db()
 
     def open_with_json_auth(self, url, method, data, username, password):
@@ -81,7 +86,7 @@ class RESTAPITestCase(unittest.TestCase):
             data=json.dumps(data),
             headers={'Authorization': 'Basic ' +
                      base64.b64encode(username + ":" + password)})
-    
+
     def open_with_json_authtoken(self, url, method, data, authtoken):
         return self.app.open(
             url,
@@ -126,17 +131,11 @@ class RESTAPITestCase(unittest.TestCase):
             return None
 
     def get_authtoken(self):
-        #
-        # Don't run against histroical data DB
-        #
-        if not 'vr.db' in app.config['SQLALCHEMY_DATABASE_URI']:
-            return
-
         rv = self.open_with_json_auth('/api/v1/authtoken',
                                       'GET',
                                       dict(),
                                       'john',
-                                      'test123')
+                                      'john123')
         # Log data received
         app.logger.debug("Data retrieved from get Auth Token = %s\n", rv.data)
         token = self.get_token(rv)
@@ -170,7 +169,7 @@ class RESTAPITestCase(unittest.TestCase):
                                       'GET',
                                       dict(),
                                       'john',
-                                      'test123')
+                                      'john123')
         self.assertEqual(rv.status_code, 200)
         data = json.loads(rv.data)
         # Log data received
@@ -178,12 +177,6 @@ class RESTAPITestCase(unittest.TestCase):
                          rv.data)
 
     def test_rest_api(self):
-        #
-        # Don't run against histroical data DB
-        #
-        if not 'vr.db' in app.config['SQLALCHEMY_DATABASE_URI']:
-            return
-
         #
         # Create Users
         #
@@ -193,7 +186,7 @@ class RESTAPITestCase(unittest.TestCase):
                                  'POST',
                                  dict(username='john',
                                       email='john@example.com',
-                                      password='test123'))
+                                      password='john123'))
         # Log data received
         app.logger.debug("Data retrieved from Create User = %s\n", rv.data)
         self.assertEqual(rv.status_code, 201)
@@ -205,7 +198,7 @@ class RESTAPITestCase(unittest.TestCase):
                                  'POST',
                                  dict(username='john',
                                       email='john@example.com',
-                                      password='test123'))
+                                      password='john123'))
         self.assertEqual(rv.status_code, 400)
         self.assertEqual('Username not available',
                          self.get_message(rv),
@@ -221,7 +214,7 @@ class RESTAPITestCase(unittest.TestCase):
                                  'POST',
                                  dict(username='keith',
                                       email='john@example.com',
-                                      password='test123'))
+                                      password='john123'))
         self.assertEqual(rv.status_code, 400)
         self.assertEqual('Email not available', self.get_message(rv),
                          self.get_message(rv))
@@ -250,28 +243,28 @@ class RESTAPITestCase(unittest.TestCase):
                                  'POST',
                                  dict(username='susan',
                                       email='susan@example.com',
-                                      password='test123'))
+                                      password='susan123'))
         self.assertEqual(rv.status_code, 201)
 
         rv = self.open_with_json('/api/v1/users',
                                  'POST',
                                  dict(username='bill',
                                       email='bill@example.com',
-                                      password='test123'))
+                                      password='bill123'))
         self.assertEqual(rv.status_code, 201)
 
         rv = self.open_with_json('/api/v1/users',
                                  'POST',
                                  dict(username='jack',
                                       email='jack@example.com',
-                                      password='test123'))
+                                      password='jack123'))
         self.assertEqual(rv.status_code, 201)
 
         rv = self.open_with_json('/api/v1/users',
                                  'POST',
                                  dict(username='harry',
                                       email='harry@example.com',
-                                      password='test123'))
+                                      password='harry123'))
         self.assertEqual(rv.status_code, 201)
 
         #
@@ -297,7 +290,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                            room='',
                                            minimum_time=0),
                                       'john',
-                                      'test123')
+                                      'john123')
         data = json.loads(rv.data)
         # Log data received
         app.logger.debug("Data retrieved from Create Question = %s\n",
@@ -314,7 +307,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                       'GET',
                                       dict(),
                                       'john',
-                                      'test123')
+                                      'john123')
         self.assertEqual(rv.status_code, 200)
         data = json.loads(rv.data)
         # Log data received
@@ -331,7 +324,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                            room='',
                                            minimum_time=60),
                                       'john',
-                                      'test123')
+                                      'john123')
         self.assertEqual(rv.status_code, 201)
 
         rv = self.open_with_json_auth('/api/v1/questions',
@@ -341,7 +334,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                            room='',
                                            minimum_time=60),
                                       'harry',
-                                      'test123')
+                                      'harry123')
         self.assertEqual(rv.status_code, 201)
 
         #
@@ -351,7 +344,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                       'POST',
                                       dict(invite_user_ids=[2, 3, 4, 5]),
                                       'john',
-                                      'test123')
+                                      'john123')
         self.assertEqual(rv.status_code, 201)
         # Log data received
         app.logger.debug("Data retrieved from Create Invite = %s\n", rv.data)
@@ -363,7 +356,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                       'GET',
                                       dict(),
                                       'john',
-                                      'test123')
+                                      'john123')
         self.assertEqual(rv.status_code, 200)
         # Log data received
         app.logger.debug("Data retrieved from Get Invites = %s\n", rv.data)
@@ -375,7 +368,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                       'POST',
                                       dict(question_id=1, how='asap'),
                                       'john',
-                                      'test123')
+                                      'john123')
         self.assertEqual(rv.status_code, 201)
         # Log data received
         app.logger.debug("Data retrieved from Create Subscription = %s\n",
@@ -385,21 +378,21 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                       'POST',
                                       dict(question_id=2, how='asap'),
                                       'john',
-                                      'test123')
+                                      'john123')
         self.assertEqual(rv.status_code, 201)
 
         rv = self.open_with_json_auth('/api/v1/users/1/subscriptions',
                                       'POST',
                                       dict(question_id=3, how='weekly'),
                                       'john',
-                                      'test123')
+                                      'john123')
         self.assertEqual(rv.status_code, 201)
 
         rv = self.open_with_json_auth('/api/v1/users/5/subscriptions',
                                       'POST',
                                       dict(question_id=3, how='daily'),
                                       'harry',
-                                      'test123')
+                                      'harry123')
         self.assertEqual(rv.status_code, 201)
 
         #
@@ -409,7 +402,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                       'PATCH',
                                       dict(question_id=3, how='asap'),
                                       'harry',
-                                      'test123')
+                                      'harry123')
         # Log data received
         app.logger.debug("Data retrieved from Update Subscriptions = %s\n",
                          rv.data)
@@ -422,7 +415,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                       'GET',
                                       dict(),
                                       'john',
-                                      'test123')
+                                      'john123')
         self.assertEqual(rv.status_code, 200)
         # Log data received
         app.logger.debug("Data retrieved from Get Subscriptions = %s\n",
@@ -435,7 +428,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                       'GET',
                                       dict(),
                                       'john',
-                                      'test123')
+                                      'john123')
         self.assertEqual(rv.status_code, 200)
         # Log data received
         app.logger.debug("Data retrieved from Get Question Subscribers = %s\n",
@@ -448,7 +441,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                       'DELETE',
                                       dict(),
                                       'john',
-                                      'test123')
+                                      'john123')
         self.assertEqual(rv.status_code, 200)
         # Log data received
         app.logger.debug("Data retrieved from Delete Subscription = %s\n",
@@ -465,7 +458,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             dict(title='Bills First Proposal',
                  blurb=bills_blurb),
             'bill',
-            'test123')
+            'bill123')
         self.assertEqual(rv.status_code, 201)
         # Log data received
         app.logger.debug("Data retrieved from Create Proposal = %s\n",
@@ -479,7 +472,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                  blurb=bills_other_blurb,
                  abstract='This is too abstract for an abstract'),
             'bill',
-            'test123')
+            'bill123')
         self.assertEqual(rv.status_code, 201)
 
         rv = self.open_with_json_auth(
@@ -489,7 +482,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                  blurb='My blub is cool',
                  abstract='Blah blah blah'),
             'susan',
-            'test123')
+            'susan123')
         self.assertEqual(rv.status_code, 201)
 
         rv = self.open_with_json_auth(
@@ -499,7 +492,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 title='Harrys Cool Proposal',
                 blurb='Harry wrties like a champ'),
             'harry',
-            'test123')
+            'harry123')
         self.assertEqual(rv.status_code, 201)
 
         data = json.loads(rv.data)
@@ -514,7 +507,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 title='Harrys Cooler Proposal',
                 blurb='Harry edits like a champ'),
             'harry',
-            'test123')
+            'harry123')
         self.assertEqual(rv.status_code, 200, self.get_message(rv))
         # Log data received
         app.logger.debug("Data retrieved from Edit Proposal = %s\n",
@@ -528,7 +521,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             'GET',
             dict(),
             'bill',
-            'test123')
+            'bill123')
         self.assertEqual(rv.status_code, 200)
         # Log data received
         app.logger.debug("Data retrieved from Get Question Proposals = %s\n",
@@ -542,7 +535,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                       'DELETE',
                                       dict(),
                                       'john',
-                                      'test123')
+                                      'john123')
         self.assertEqual(rv.status_code, 403, self.get_message(rv))
         self.assertIn("This question has proposals",
                       self.get_message(rv),
@@ -558,7 +551,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                       'PATCH',
                                       dict(move_on=True),
                                       'john',
-                                      'test123')
+                                      'john123')
         self.assertEqual(rv.status_code, 200, self.get_message(rv))
         # Log data received
         app.logger.debug("Data retrieved from Edit Question (Move On) = %s\n",
@@ -575,7 +568,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 title="My less than stirling proposal",
                 blurb="This is not very good. Think I'll delete it."),
             'harry',
-            'test123')
+            'harry123')
         app.logger.debug("Data retrieved from Create Proposal = %s\n",
                          rv.data)
         self.assertEqual(rv.status_code, 201)
@@ -591,7 +584,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             'DELETE',
             dict(),
             'harry',
-            'test123')
+            'harry123')
         app.logger.debug("Harry deletes his proposal - message: %s",
                          self.get_message(rv))
         app.logger.debug("Data retrieved from Delete Proposal = %s\n",
@@ -607,7 +600,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             'POST',
             dict(),
             'susan',
-            'test123')
+            'susan123')
         self.assertEqual(rv.status_code, 201)
         # Log data received
         app.logger.debug("Data retrieved from Create Endorsement = %s\n",
@@ -619,7 +612,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             'POST',
             dict(),
             'john',
-            'test123')
+            'john123')
         self.assertEqual(rv.status_code, 201)
 
 
@@ -635,7 +628,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 supported_comment_ids=[],
                 new_comment_text="This is terrible!"),
             'john',
-            'test123')
+            'john123')
         app.logger.debug("Data retrieved from Oppose Proposal = %s\n",
                          rv.data)
         self.assertEqual(rv.status_code, 201, rv.status_code)
@@ -648,7 +641,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 comment_type="against",
                 comment="This is terrible!"),
                 'john',
-                'test123')
+                'john123')
         app.logger.debug("Data retrieved from Confused by Proposal = %s\n",
                          rv.data)
         self.assertEqual(rv.status_code, 201, rv.status_code)
@@ -662,7 +655,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 endorsement_type="oppose",
                 new_comment_text="This is terrible!"),
             'harry',
-            'test123')
+            'harry123')
         app.logger.debug("Data retrieved from Oppose Proposal = %s\n",
                          rv.data)
         self.assertEqual(rv.status_code, 201, rv.status_code)
@@ -675,7 +668,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 comment_type="against",
                 comment="This is terrible!"),
                 'harry',
-                'test123')
+                'harry123')
         app.logger.debug("Data retrieved from Confused by Proposal = %s\n",
                          rv.data)
         self.assertEqual(rv.status_code, 400, rv.status_code)
@@ -686,7 +679,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             'POST',
             dict(),
             'harry',
-            'test123')
+            'harry123')
         app.logger.debug("Data retrieved from supporting comment 1 = %s\n",
                          rv.data)
         self.assertEqual(rv.status_code, 201, rv.status_code)
@@ -701,7 +694,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 supported_comment_ids=[1],
                 new_comment_text="I feel very confused!"),
             'bill',
-            'test123')
+            'bill123')
         app.logger.debug("Data retrieved from Confused by Proposal = %s\n",
                          rv.data)
         self.assertEqual(rv.status_code, 201, rv.status_code)
@@ -714,7 +707,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 comment_type="question",
                 comment="This is rubbish! How much would this cost?"),
                 'susan',
-                'test123')
+                'susan123')
         app.logger.debug("Data retrieved from Confused by Proposal = %s\n",
                          rv.data)
         self.assertEqual(rv.status_code, 201, rv.status_code)
@@ -728,7 +721,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 comment="About 1.2 bitcoins, more or less.",
                 reply_to=2),
                 'john',
-                'test123')
+                'john123')
         app.logger.debug("Data retrieved from Confused by Proposal = %s\n",
                          rv.data)
         self.assertEqual(rv.status_code, 201, rv.status_code)
@@ -741,7 +734,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 comment_type="against",
                 comment="I think this sucks bigtime, baby! It would cost too much and we will all go broke."),
                 'bill',
-                'test123')
+                'bill123')
         app.logger.debug("Data retrieved from Confused by Proposal = %s\n",
                          rv.data)
         self.assertEqual(rv.status_code, 201, rv.status_code)
@@ -753,7 +746,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 comment_type="for",
                 comment="This will work bigtime. It could be coded in python."),
                 'john',
-                'test123')
+                'john123')
         app.logger.debug("Data retrieved from Confused by Proposal = %s\n",
                          rv.data)
         self.assertEqual(rv.status_code, 201, rv.status_code)
@@ -766,7 +759,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             'GET',
             dict(),
             'john',
-            'test123')
+            'john123')
         self.assertEqual(rv.status_code, 200)
         # Log data received
         app.logger.debug("Data retrieved from Get Comments = %s\n", rv.data)
@@ -778,7 +771,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             'POST',
             dict(),
             'john',
-            'test123')
+            'john123')
         self.assertEqual(rv.status_code, 201)
 
         # bills_prop2.endorse(bill)
@@ -787,7 +780,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             'POST',
             dict(),
             'bill',
-            'test123')
+            'bill123')
         self.assertEqual(rv.status_code, 201)
 
         # harrys_prop1.endorse(jack)
@@ -796,7 +789,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             'POST',
             dict(),
             'jack',
-            'test123')
+            'jack123')
         self.assertEqual(rv.status_code, 201)
 
         # harrys_prop1.endorse(susan)
@@ -805,7 +798,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             'POST',
             dict(),
             'susan',
-            'test123')
+            'susan123')
         self.assertEqual(rv.status_code, 201)
 
         # bills_prop1.endorse(harry)
@@ -814,7 +807,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             'POST',
             dict(),
             'harry',
-            'test123')
+            'harry123')
         self.assertEqual(rv.status_code, 201)
 
         # susans_prop1.endorse(harry)
@@ -823,7 +816,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             'POST',
             dict(),
             'harry',
-            'test123')
+            'harry123')
         self.assertEqual(rv.status_code, 201)
 
         #
@@ -834,7 +827,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             'GET',
             dict(),
             'bill',
-            'test123')
+            'bill123')
         self.assertEqual(rv.status_code, 200)
         # Log data received
         app.logger.debug("Data retrieved from Get Question Proposals after endorsements = %s\n",
@@ -848,7 +841,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             'GET',
             dict(),
             'harry',
-            'test123')
+            'harry123')
         self.assertEqual(rv.status_code, 200, rv.status_code)
         app.logger.debug("Data retrieved = %s\n", rv.data)
         # Log data received
@@ -863,7 +856,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             'GET',
             dict(),
             'harry',
-            'test123')
+            'harry123')
         self.assertEqual(rv.status_code, 200, rv.status_code)
         app.logger.debug("Data retrieved = %s\n", rv.data)
         # Log data received
@@ -878,7 +871,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             'GET',
             dict(),
             'harry',
-            'test123')
+            'harry123')
         self.assertEqual(rv.status_code, 200, rv.status_code)
         app.logger.debug("Data retrieved = %s\n", rv.data)
         # Log data received
@@ -893,7 +886,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             'GET',
             dict(),
             'harry',
-            'test123')
+            'harry123')
         self.assertEqual(rv.status_code, 200, rv.status_code)
         app.logger.debug("Endorser Effects data retrieved = %s\n", rv.data)
         # Log data received
@@ -908,7 +901,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             'GET',
             dict(),
             'harry',
-            'test123')
+            'harry123')
         self.assertEqual(rv.status_code, 200, rv.status_code)
         # Log data received
         app.logger.debug("Data retrieved from Get Proposal Relations = %s\n",
@@ -923,7 +916,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                           'PATCH',
                                           dict(move_on=True),
                                           'john',
-                                          'test123')
+                                          'john123')
             self.assertEqual(rv.status_code, 200, self.get_message(rv))
             # Log data received
             app.logger.debug("Data retrieved from Edit Question (Move On) = %s\n",
@@ -938,7 +931,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 'GET',
                 dict(),
                 'harry',
-                'test123')
+                'harry123')
             self.assertEqual(rv.status_code, 200)
             data = json.loads(rv.data)
             app.logger.debug("Data retrieved from get graph = %s\n", data)
@@ -950,7 +943,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 'GET',
                 dict(),
                 'harry',
-                'test123')
+                'harry123')
             self.assertEqual(rv.status_code, 200)
             data = json.loads(rv.data)
             app.logger.debug("Data retrieved from get graph = %s\n", data)
@@ -969,7 +962,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             'POST',
             dict(),
             'john',
-            'test123')
+            'john123')
         self.assertEqual(rv.status_code, 201)
         
         '''
@@ -981,7 +974,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             'PATCH',
             dict(endorsement_type='oppose'),
             'john',
-            'test123')
+            'john123')
         self.assertEqual(rv.status_code, 200, self.get_message(rv))
         self.assertEqual("Endorsement updated",
                          self.get_message(rv),
@@ -1002,7 +995,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                            room='test',
                                            minimum_time=60),
                                       'john',
-                                      'test123')
+                                      'john123')
         self.assertEqual(rv.status_code, 201)
         data = json.loads(rv.data)
         app.logger.debug("New question at = %s\n", data['question']['url'])
@@ -1015,7 +1008,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                       'DELETE',
                                       dict(),
                                       'john',
-                                      'test123')
+                                      'john123')
         self.assertEqual(rv.status_code, 200, self.get_message(rv))
         self.assertIn("Question deleted",
                       self.get_message(rv),

@@ -149,7 +149,7 @@ class Update(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    how = db.Column(db.Enum('daily', 'weekly', 'asap'))
+    how = db.Column(db.Enum('daily', 'weekly', 'asap', name="update_method_enum"))
     last_update = db.Column(db.DateTime)
     # M:1
     question_id = db.Column(db.Integer, db.ForeignKey('question.id'))
@@ -187,7 +187,7 @@ class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True)
-    password = db.Column(db.String(60), nullable=False)
+    password = db.Column(db.String(120), nullable=False)
     registered = db.Column(db.DateTime)
     last_seen = db.Column(db.DateTime)
     # 1:M
@@ -198,6 +198,7 @@ class User(db.Model, UserMixin):
                                 cascade="all, delete-orphan")
 
     endorsements = db.relationship('Endorsement',
+                                   primaryjoin="User.id==Endorsement.user_id",
                                    backref='endorser', lazy='dynamic',
                                    cascade="all, delete-orphan")
 
@@ -427,6 +428,40 @@ class User(db.Model, UserMixin):
                 proposal_ids.add(endorsement.proposal_id)
             return proposal_ids
 
+    def get_all_endorsememnts(self, question, generation=None):
+        '''
+        .. function:: get_all_endorsememnts(question[, generation=None])
+
+        Fetch a list of this user's endorsements for a question.
+
+        :param question: question
+        :type question: Question object
+        :param generation: question generation
+        :type generation: int or None
+        :rtype: list of proposals
+        '''
+        generation = generation or question.generation
+        all_votes = self.endorsements.filter(Endorsement.question_id == question.id,
+                                             Endorsement.generation == generation).all()
+        return all_votes
+
+    def get_all_endorsememnts_for(self, question, proposal_ids, generation=None):
+        '''
+        .. function:: get_all_endorsememnts(question[, generation=None])
+
+        Fetch a list of this user's endorsements for a question.
+
+        :param question: question
+        :type question: Question object
+        :param generation: question generation
+        :type generation: int or None
+        :rtype: list of proposals
+        '''
+        generation = generation or question.generation
+        all_votes = self.endorsements.filter(Endorsement.proposal_id.in_(x for x in proposal_ids),
+                                             Endorsement.generation == generation).all()
+        return all_votes
+    
     def get_endorsed_proposals(self, question, generation=None):
         '''
         .. function:: get_endorsed_proposals(question[, generation=None])
@@ -434,7 +469,8 @@ class User(db.Model, UserMixin):
         Fetch a LIST of the proposals endorsed by the
         user for this generation of this question.
 
-        :param question: associated question
+        :param question: question
+        :type question: Question object
         :param generation: question generation
         :type generation: int or None
         :rtype: list of proposals
@@ -710,8 +746,8 @@ class Question(db.Model):
     title = db.Column(db.String(120), nullable=False)
     blurb = db.Column(db.Text, nullable=False)
     generation = db.Column(db.Integer, default=1, nullable=False)
-    room = db.Column(db.String(20))
-    phase = db.Column(db.Enum('writing', 'voting', 'archived', 'consensus'),
+    room = db.Column(db.String(30))
+    phase = db.Column(db.Enum('writing', 'voting', 'archived', 'consensus', name="question_phase_enum"),
                       default='writing')
     # created = db.Column(db.DateTime)
     # last_move_on = db.Column(db.DateTime)
@@ -1565,7 +1601,7 @@ class Question(db.Model):
         # self.save_key_players(key_players)
         app.logger.debug("Question.calc_key_players: %s", key_players)
         return key_players
-    
+
     def calculate_key_players_v1(self, generation=None):
         '''
         .. function:: calculate_key_players([generation=None])
@@ -3000,7 +3036,7 @@ class Comment(db.Model):
     generation = db.Column(db.Integer)
     created = db.Column(db.DateTime)
     comment = db.Column(db.Text, nullable=False)
-    comment_type = db.Column(db.Enum('for', 'against', 'question', 'answer'),
+    comment_type = db.Column(db.Enum('for', 'against', 'question', 'answer', name="comment_type_enum"),
                              nullable=False)
     reply_to =  db.Column(db.Integer, default=0)
 
@@ -3387,7 +3423,7 @@ class Proposal(db.Model):
 
     def get_endorsement_type(self, user, generation=None):
         '''
-        .. function:: is_endorsed_by(user[, generation=None])
+        .. function:: get_endorsement_type(user[, generation=None])
 
         Check if the user has endorsed this proposal.
         Takes an optional generation value to check historic endorsements.
@@ -3539,20 +3575,24 @@ class Endorsement(db.Model):
                 'endorser_username': self.endorser.username,
                 'endorser_email': self.endorser.email,
                 'generation': str(self.generation),
+                'question_id': str(self.question_id),
+                'proposal_id': str(self.proposal_id),
                 'endorsement_date': str(self.endorsement_date),
                 'endorsement_type': endorsement_type}
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    question_id = db.Column(db.Integer, db.ForeignKey('question.id'))
     proposal_id = db.Column(db.Integer, db.ForeignKey('proposal.id'))
     generation = db.Column(db.Integer, nullable=False)
     endorsement_date = db.Column(db.DateTime)
-    endorsement_type = db.Column(db.Enum('endorse', 'oppose', 'confused'),
+    endorsement_type = db.Column(db.Enum('endorse', 'oppose', 'confused', name="endorsement_type_enum"),
                                  default='endorse')
 
     def __init__(self, endorser, proposal,
                  endorsement_type='endorse', comments=None):
         self.user_id = endorser.id
+        self.question_id = proposal.question_id
         self.proposal_id = proposal.id
         self.generation = proposal.question.generation
         self.endorsement_date = datetime.datetime.utcnow()
