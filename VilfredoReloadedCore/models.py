@@ -3052,9 +3052,11 @@ class Comment(db.Model):
 
     def fetch_supporter_ids(self):
         user_list = self.supporters.all()
+        # app.logger.debug("fetch_supporter_ids: user_list = %s", user_list)
         ids = list()
         for user in user_list:
-            ids.append(user.id)
+            ids.append(int(user.id))
+        # app.logger.debug("fetch_supporter_ids: ids returned = %s", ids)
         return ids
 
     @staticmethod
