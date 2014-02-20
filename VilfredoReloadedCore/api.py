@@ -2668,7 +2668,8 @@ def api_question_key_players(question_id=None):
     app.logger.debug("calculate_key_players returned: %s", key_players)
     # {3: set([<Proposal('3', Q:'1')>, <Proposal('4', Q:'1')>]), 4: set([<Proposal('3', Q:'1')>])}
 
-    
+    '''
+    # Version 1
     results = []
     for (endorser, vote_for) in key_players.iteritems():
         proposals = []
@@ -2677,15 +2678,18 @@ def api_question_key_players(question_id=None):
         kp = {'user': endorser.get_public(), 'add_vote': proposals}
         results.append(kp)
     '''
-    
+    # Version 2
     results = []
     for (endorser, vote_for) in key_players.iteritems():
-        proposals = dict()
+        # Need to initialize values to stop knockout.js complaining
+        proposals = {'notvoted': [], 'oppose': [], 'confused': []}
         for proposal in vote_for:
-            proposals[proposal.id] = proposal.get_endorsement_type(endorser)
+            endorse_type = proposal.get_endorsement_type(endorser)
+            # if endorse_type not in proposals:
+                # proposals[endorse_type] = list()
+            proposals[endorse_type].append(proposal.id)
         kp = {'user': endorser.get_public(), 'add_vote': proposals}
         results.append(kp)
-    '''
 
     return jsonify(question_id=str(question.id),
                    query_generation=str(generation),

@@ -3217,7 +3217,7 @@ class Proposal(db.Model):
 
     def get_question_count(self, generation=None):
         '''
-        .. function:: get_comments([generation=None])
+        .. function:: get_question_count([generation=None])
 
         Get all comments for a particular generation of the propsal.
 
@@ -3234,7 +3234,7 @@ class Proposal(db.Model):
 
     def get_comment_count(self, generation=None):
         '''
-        .. function:: get_comments([generation=None])
+        .. function:: get_comment_count([generation=None])
 
         Get all comments for a particular generation of the propsal.
 
