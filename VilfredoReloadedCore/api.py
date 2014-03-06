@@ -57,6 +57,7 @@ MAX_LEN_PROPOSAL_QUESTION = 300
 MAX_LEN_PROPOSAL_QUESTION_ANSWER = 300
 ENDORSEMENT_TYPES = ['endorse', 'oppose', 'confused']
 COMMENT_TYPES = ['for', 'against', 'question', 'answer']
+PWD_RESET_LIFETIME = 3600*24*2
 
 '''
 from flask_login import LoginManager
@@ -207,7 +208,7 @@ def check_auth(username, password):
     else:
         return user.check_password(password)
 
-# fixin
+
 def get_authenticated_user(request):
     '''
     .. function:: get_authenticated_user(request)
@@ -396,6 +397,7 @@ def api_get_current_user():
     userdata['email'] = user.email
     return jsonify(user=userdata), 200
 
+
 #
 # Get Users
 #
@@ -565,7 +567,7 @@ def api_update_user(user_id):
         return jsonify("Username not available"), 400
 
     elif models.User.email_available(request.json['email']) is not True:
-            response = {'message': 'New Email not available'}
+            response = {'message': 'Someone has already registered with that email.'}
             return jsonify(objects=response), 400
 
     user.username = request.json.get('new_username', user.username)
@@ -651,7 +653,7 @@ def api_create_user():
         # return make_response(jsonify({'error': 'Username not available'}), 400)
 
     elif models.User.email_available(request.json['email']) is not True:
-        message = "Email not available"
+        message = "Someone has already registered with that email."
         return jsonify(message=message), 400
 
     user = models.User(request.json['username'],
@@ -1543,7 +1545,9 @@ def api_add_proposal_comment(question_id, proposal_id):
 
     user = get_authenticated_user(request)
     if not user:
-        abort(401)
+        # abort(401)
+        message = {"message": "You need to be logged in to post a comment"}
+        return jsonify(message), 401
 
     app.logger.debug("Authenticated User = %s\n", user.id)
 
