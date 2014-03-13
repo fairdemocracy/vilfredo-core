@@ -707,6 +707,37 @@ class Invite(db.Model):
             self.receiver_id = receiver.id
 
 
+class PWDReset(db.Model):
+    '''
+    Stores data for password reset requests.
+    '''
+
+    __tablename__ = 'pwd_reset'
+
+    user_id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True)
+    token = db.Column(db.String(32), unique=True)
+    timeout = db.Column(db.Integer)
+
+    def __init__(self, user, token, timeout):
+        '''
+        .. function:: __init__(user, token, timeout)
+
+        Creates a PWDReset object.
+
+        :param user: user
+        :type user: User
+        :param token: unique reset token
+        :type token: string
+        :param timeout: timestamp to expire token
+        :type timeout: integer
+        '''
+        self.user_id = user.id
+        self.email = user.email
+        self.token = token
+        self.timeout = timeout
+
+
 class Question(db.Model):
     '''
     Stores data and handles functionality and relations for

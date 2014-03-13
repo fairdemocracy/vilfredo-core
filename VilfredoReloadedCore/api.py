@@ -584,6 +584,117 @@ def api_update_user(user_id):
 
 
 #
+# Password reset request
+#
+@app.route('/api/v1/request_password_reset', methods=['POST'])
+def api_request_password_reset():
+    app.logger.debug("api_request_password_reset called...\n")
+
+    if not request.json:
+        app.logger.debug("Non json request received...\n")
+        message = "Non json request received"
+        return jsonify(message=message), 400
+
+    elif not 'email' in request.json or request.json['email'] == '' \
+            or len(request.json['email']) > MAX_LEN_EMAIL:
+        message = "A valid email is required"
+        return jsonify(message=message), 400
+
+    email = request.json['email']
+    user = models.User.query.filter_by(email=email).one()
+    if not user:
+        message = "Email address not found"
+        return jsonify(message=message), 400
+
+    import uuid
+    pwd_reset_token = uuid.uuid4().get_hex()
+    timeout = models.get_timestamp() + PWD_RESET_LIFETIME
+    pwd_reset = models.PWDReset(user, pwd_reset_token, timeout)
+    db_session.add(pwd_reset)
+    db_session.commit()
+    # email reset token to user
+    message = 'Password reset email sent'
+    return jsonify(message=message), 201
+
+#
+# Password reset request
+#
+@app.route('/api/v1/submit_password_reset_token', methods=['GET'])
+def api_submit_password_reset_token():
+    app.logger.debug("api_request_password_reset called...\n")
+
+    user_id = 0
+    try:
+        user_id = int(request.args.get('u'))
+    except ValueError:
+        app.logger.debug("No or invalid userid received...\n")
+        message = "No or invalid userid received"
+        return jsonify(message=message), 400
+
+    pwd_reset_token = request.args.get('t', None)
+    if not pwd_reset_token:
+        app.logger.debug("No reset token received...\n")
+        message = "No token received"
+        return jsonify(message=message), 400
+
+    pwd_reset = models.PWDReset.query.filter_by(token=pwd_reset_token, user_id=user_id).one()
+
+    if not pwd_reset:
+        app.logger.debug("Token and user_id not listed...\n")
+        message = "Token and user_id not listed"
+        return jsonify(message=message), 400
+
+    elif models.get_timestamp() > pwd_reset.timeout:
+        app.logger.debug("Token expired...\n")
+        message = "Token expired"
+        return jsonify(message=message), 400
+
+    user = models.User.query.filter_by(id=user_id).one()
+    auth_token = user.get_auth_token()
+    app.logger.debug("token = %s\n", auth_token)
+    return jsonify(token=token), 200
+
+#
+# Set new password and genberate new authentication token
+#
+@app.route('/api/v1/reset_password', methods=['POST'])
+@requires_auth
+def api_reset_password(token):
+    app.logger.debug("api_reset_password called...\n")
+
+    user = get_authenticated_user(request)
+    if not user:
+        response = {"message": "User not logged in"}
+        return jsonify(response), 400
+
+    app.logger.debug("Authenticated User = %s\n", user.id)
+
+    if not 'password' in request.json or not 'password2' in request.json or \
+            request.json['password'] != request.json['password2'] or \
+            request.json['password'] == '' or \
+            len(request.json['password']) < MIN_LEN_PASSWORD or \
+            len(request.json['password']) > MAX_LEN_PASSWORD:
+        message = "Passwords must match and must be between %s and %s characters" %\
+            (MIN_LEN_PASSWORD, MAX_LEN_PASSWORD)
+        return jsonify(message=message), 400
+
+    # Delete reset token entry
+    db_session.delete(pwd_reset)
+
+    # Set new password
+    user.set_password(request.json['password'])
+    db_session.add(user)
+    db_session.commit()
+
+    # Generate new auth token
+    token = user.get_auth_token()
+    app.logger.debug("New token = %s\n", token)
+
+    message = 'Password reset'
+    return jsonify(message=message, token=token), 201
+
+
+#
 # Create User
 #
 @app.route('/api/v1/users', methods=['POST'])
