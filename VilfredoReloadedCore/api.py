@@ -1897,44 +1897,14 @@ def api_add_proposal_endorsement(question_id, proposal_id):
             app.logger.debug("Endrsing type json parameter == %s", request.json['endorsement_type'])
             endorsement_type = request.json['endorsement_type']
 
-    new_comment_text = None
-    if 'new_comment_text' in request.json:
-        if request.json['new_comment_text'] == '' \
-                or len(request.json['new_comment_text']) > MAX_LEN_PROPOSAL_COMMENT:
-            message = {"message": "Comment text must be no longer than " + MAX_LEN_PROPOSAL_COMMENT + " characters"}
-            return jsonify(message), 400
-        else:
-            new_comment_text = request.json['new_comment_text']
-
-    supported_comment_ids = []
-    if 'supported_comment_ids' in request.json and all(isinstance(x, int) for x in request.json['supported_comment_ids']):
-        supported_comment_ids = request.json['supported_comment_ids']
+    # add voting map coordinates if any
+    coords = request.json.get('coords', {'mapx': None, 'mapy': None})
 
     app.logger.debug("endorsement_type = %s\n", endorsement_type)
-    app.logger.debug("new_comment_text = %s\n", new_comment_text)
-
-    # List of supported comments
-    endorsement_comments = []
-
-    # Fetch supported comments, if any
-    if (supported_comment_ids):
-        endorsement_comments = db_session.query(models.Comment).filter(models.Comment.id.in_(supported_comment_ids)).all()
-
-    # Fetch the comment which matches comemnt text or create new one
-    if (new_comment_text):
-        existing_comment = models.Comment.fetch_if_exists(proposal, new_comment_text, endorsement_type)
-        if (existing_comment):
-            endorsement_comments.append(existing_comment)
-        else:
-            new_comment = models.Comment(user, proposal, new_comment_text, endorsement_type)
-            if (new_comment):
-                db_session.add(new_comment)
-                db_session.commit()
-                endorsement_comments.append(new_comment)
+    app.logger.debug("vote coords = %s\n", coords)
 
     # Add user endorsement
-    proposal.endorse(user, endorsement_type)
-    user.support_comments(endorsement_comments)
+    proposal.endorse(user, endorsement_type, coords=coords)
     db_session.commit()
 
     '''
@@ -1947,15 +1917,7 @@ def api_add_proposal_endorsement(question_id, proposal_id):
         map_type='all')
     '''
 
-    # Lets see if we can get the users comments for this proposal
-    # users_comments = user.get_supported_comments(proposal)
-    all_comments = proposal.get_comments()
-    app.logger.debug("All comments for prop %d = %s\n", proposal.id, all_comments)
-
-    if (len(endorsement_comments) > 0):
-        return jsonify(message="Endorsement and comments added"), 201
-    else:
-        return jsonify(message="Endorsement added"), 201
+    return jsonify(message="Endorsement added"), 201
 
 
 # Update Endorsement

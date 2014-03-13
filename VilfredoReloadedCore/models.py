@@ -3351,7 +3351,7 @@ class Proposal(db.Model):
         else:
             return False
 
-    def endorse(self, endorser, endorsement_type="endorse", comments=[]):
+    def endorse(self, endorser, endorsement_type="endorse", coords={}):
         '''
         .. function:: endorse(endorser, endorsement_type="endorse"[, comments=[]])
 
@@ -3365,15 +3365,15 @@ class Proposal(db.Model):
         :type comments: list
         '''
         if self.is_endorsed_by(endorser):
-            self.update_endorsement(endorser, endorsement_type)
+            self.update_endorsement(endorser, endorsement_type, coords)
         else:
             self.endorsements.append(Endorsement(endorser,
                                                  self,
                                                  endorsement_type,
-                                                 comments))
+                                                 coords))
         return self
 
-    def update_endorsement(self, endorser, endorsement_type):
+    def update_endorsement(self, endorser, endorsement_type, coords={'mapx': None, 'mapy': None}):
         '''
         .. function:: update_endorsement(endorser, endorsement_type)
 
@@ -3390,6 +3390,8 @@ class Proposal(db.Model):
             Endorsement.proposal_id == self.id)).first()
         if endorsement:
             endorsement.endorsement_type = endorsement_type
+            endorsement.mapx =  coords['mapx']
+            endorsement.mapy = coords['mapy']
             db_session.commit()
             return True
         else:
@@ -3589,6 +3591,31 @@ class Proposal(db.Model):
                self.question_id)
 
 
+class Threshold(db.Model):
+    '''
+    Stores voting map thresholds
+    '''
+
+    __tablename__ = 'threshold'
+    
+    def get_public(self):
+        '''
+        .. function:: get_public()
+
+        Return public propoerties as string values for REST responses.
+
+        :rtype: dict
+        '''
+        return {'id': str(self.id),
+                'question_id': str(self.question_id),
+                'generation': str(self.generation),
+                'threshold': str(self.threshold)}
+
+    id = db.Column(db.Integer, primary_key=True)
+    question_id = db.Column(db.Integer, db.ForeignKey('question.id'))
+    generation = db.Column(db.Integer)
+    threshold = db.Column(db.Float)
+
 class Endorsement(db.Model):
     '''
     Stores endorsement data
@@ -3611,7 +3638,9 @@ class Endorsement(db.Model):
                 'question_id': str(self.question_id),
                 'proposal_id': str(self.proposal_id),
                 'endorsement_date': str(self.endorsement_date),
-                'endorsement_type': endorsement_type}
+                'endorsement_type': endorsement_type,
+                'mapx': mapx,
+                'mapy': mapy}
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
@@ -3621,19 +3650,19 @@ class Endorsement(db.Model):
     endorsement_date = db.Column(db.DateTime)
     endorsement_type = db.Column(db.Enum('endorse', 'oppose', 'confused', name="endorsement_type_enum"),
                                  default='endorse')
+    mapx = db.Column(db.Float)
+    mapy = db.Column(db.Float)
 
     def __init__(self, endorser, proposal,
-                 endorsement_type='endorse', comments=None):
+                 endorsement_type='endorse', coords={'mapx': None, 'mapy': None}):
         self.user_id = endorser.id
         self.question_id = proposal.question_id
         self.proposal_id = proposal.id
         self.generation = proposal.question.generation
         self.endorsement_date = datetime.datetime.utcnow()
         self.endorsement_type = endorsement_type
-        # Add optional comments
-        if (comments):
-            for comment in comments:
-                self.comments.append(comment)
+        self.mapx = coords['mapx']
+        self.mapy = coords['mapy']
 
 
 @event.listens_for(Proposal, "after_insert")
