@@ -43,6 +43,7 @@ DELETE_DB_ON_EXIT = False
 DELETE_DB_ON_START = True
 MAKE_GRAPH = True
 MOVE_TO_GENERATION_2 = False
+USE_VOTEMAP = True
 
 
 class RESTAPITestCase(unittest.TestCase):
@@ -599,48 +600,294 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                          rv.data)
         self.assertEqual(rv.status_code, 200)
 
+
         #
         # Create Endorsements
         #
-        # susans_prop1.endorse(susan)
-        rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals/3/endorsements',
-            'POST',
-            dict(coords={'mapx': 100, 'mapy': 150}),
-            'susan',
-            'susan123')
-        self.assertEqual(rv.status_code, 201)
-        # Log data received
-        app.logger.debug("Data retrieved from Create Endorsement = %s\n",
-                         rv.data)
+        # Endorse using votemap coordinates only
+        #
+        if USE_VOTEMAP:
+                # susans_prop1.endorse(susan)
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/3/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="endorse",
+                    use_votemap=True,
+                    coords={'mapx': 0.55, 'mapy': 0.43}),
+                'susan',
+                'susan123')
+            self.assertEqual(rv.status_code, 201)
+            # Log data received
+            app.logger.debug("Data retrieved from Create Endorsement = %s\n",
+                             rv.data)
 
-        # susans_prop1.endorse(john)
-        rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals/3/endorsements',
-            'POST',
-            dict(),
-            'john',
-            'john123')
-        self.assertEqual(rv.status_code, 201)
+            # susans_prop1.endorse(john)
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/3/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="endorse",
+                    use_votemap=True,
+                    coords={'mapx': 0.7, 'mapy': 0.1}),
+                'john',
+                'john123')
+            self.assertEqual(rv.status_code, 201)
+
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/4/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="oppose",
+                    use_votemap=True,
+                    coords={'mapx': 0.3, 'mapy': 0.2}),
+                'john',
+                'john123')
+            app.logger.debug("Data retrieved from Oppose Proposal = %s\n",
+                             rv.data)
+            self.assertEqual(rv.status_code, 201, rv.status_code)
+
+            # John doesn't understand proposal 2
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/2/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="confused",
+                    use_votemap=True,
+                    coords={'mapx': 0.5, 'mapy': 0.7}),
+                'john',
+                'john123')
+            app.logger.debug("Data retrieved from Oppose Proposal = %s\n",
+                             rv.data)
+            self.assertEqual(rv.status_code, 201, rv.status_code)
+
+            # Add OPPOSED endorsement
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/4/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="oppose",
+                    use_votemap=True,
+                    coords={'mapx': 0.1, 'mapy': 0.2}),
+                'harry',
+                'harry123')
+            app.logger.debug("Data retrieved from Oppose Proposal = %s\n",
+                             rv.data)
+            self.assertEqual(rv.status_code, 201, rv.status_code)
+
+            # Add Confused endorsement
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/4/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="confused",
+                    use_votemap=True,
+                    coords={'mapx': 0.5, 'mapy': 0.9}),
+                'bill',
+                'bill123')
+            app.logger.debug("Data retrieved from Confused by Proposal = %s\n",
+                             rv.data)
+            self.assertEqual(rv.status_code, 201, rv.status_code)
+        
+            # bills_prop1.endorse(john)
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/1/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="endorse",
+                    use_votemap=True,
+                    coords={'mapx': 0.65, 'mapy': 0.16}),
+                'john',
+                'john123')
+            self.assertEqual(rv.status_code, 201)
+
+            # bills_prop2.endorse(bill)
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/2/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="endorse",
+                    use_votemap=True,
+                    coords={'mapx': 0.5, 'mapy': 0.1}),
+                'bill',
+                'bill123')
+            self.assertEqual(rv.status_code, 201)
+
+            # harrys_prop1.endorse(jack)
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/4/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="endorse",
+                    use_votemap=True,
+                    coords={'mapx': 0.6, 'mapy': 0.3}),
+                'jack',
+                'jack123')
+            self.assertEqual(rv.status_code, 201)
+
+            # harrys_prop1.endorse(susan)
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/4/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="endorse",
+                    use_votemap=True,
+                    coords={'mapx': 0.55, 'mapy': 0.22}),
+                'susan',
+                'susan123')
+            self.assertEqual(rv.status_code, 201)
+
+            # bills_prop1.endorse(harry)
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/1/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="endorse",
+                    use_votemap=True,
+                    coords={'mapx': 0.76, 'mapy': 0.33}),
+                'harry',
+                'harry123')
+            self.assertEqual(rv.status_code, 201)
+
+            # susans_prop1.endorse(harry)
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/3/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="endorse",
+                    use_votemap=True,
+                    coords={'mapx': 0.7, 'mapy': 0.22}),
+                'harry',
+                'harry123')
+            self.assertEqual(rv.status_code, 201)
+
+        # Endorse using endorsement type instead of votemap coordinates
+        #
+        else:
+            # susans_prop1.endorse(susan)
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/3/endorsements',
+                'POST',
+                dict(endorsement_type="endorse"),
+                'susan',
+                'susan123')
+            self.assertEqual(rv.status_code, 201)
+            # Log data received
+            app.logger.debug("Data retrieved from Create Endorsement = %s\n",
+                             rv.data)
+
+            # susans_prop1.endorse(john)
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/3/endorsements',
+                'POST',
+                dict(endorsement_type="endorse"),
+                'john',
+                'john123')
+            self.assertEqual(rv.status_code, 201)
+
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/4/endorsements',
+                'POST',
+                dict(endorsement_type="oppose"),
+                'john',
+                'john123')
+            app.logger.debug("Data retrieved from Oppose Proposal = %s\n",
+                             rv.data)
+            self.assertEqual(rv.status_code, 201, rv.status_code)
+
+            # John doesn't understand proposal 2
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/2/endorsements',
+                'POST',
+                dict(endorsement_type="confused"),
+                'john',
+                'john123')
+            app.logger.debug("Data retrieved from Oppose Proposal = %s\n",
+                             rv.data)
+            self.assertEqual(rv.status_code, 201, rv.status_code)
+
+            # Add OPPOSED endorsement
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/4/endorsements',
+                'POST',
+                dict(endorsement_type="oppose"),
+                'harry',
+                'harry123')
+            app.logger.debug("Data retrieved from Oppose Proposal = %s\n",
+                             rv.data)
+            self.assertEqual(rv.status_code, 201, rv.status_code)
+
+            # Add Confused endorsement
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/4/endorsements',
+                'POST',
+                dict(endorsement_type="confused"),
+                'bill',
+                'bill123')
+            app.logger.debug("Data retrieved from Confused by Proposal = %s\n",
+                             rv.data)
+            self.assertEqual(rv.status_code, 201, rv.status_code)
+        
+            # bills_prop1.endorse(john)
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/1/endorsements',
+                'POST',
+                dict(endorsement_type="endorse"),
+                'john',
+                'john123')
+            self.assertEqual(rv.status_code, 201)
+
+            # bills_prop2.endorse(bill)
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/2/endorsements',
+                'POST',
+                dict(endorsement_type="endorse"),
+                'bill',
+                'bill123')
+            self.assertEqual(rv.status_code, 201)
+
+            # harrys_prop1.endorse(jack)
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/4/endorsements',
+                'POST',
+                dict(endorsement_type="endorse"),
+                'jack',
+                'jack123')
+            self.assertEqual(rv.status_code, 201)
+
+            # harrys_prop1.endorse(susan)
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/4/endorsements',
+                'POST',
+                dict(endorsement_type="endorse"),
+                'susan',
+                'susan123')
+            self.assertEqual(rv.status_code, 201)
+
+            # bills_prop1.endorse(harry)
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/1/endorsements',
+                'POST',
+                dict(endorsement_type="endorse"),
+                'harry',
+                'harry123')
+            self.assertEqual(rv.status_code, 201)
+
+            # susans_prop1.endorse(harry)
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/3/endorsements',
+                'POST',
+                dict(endorsement_type="endorse"),
+                'harry',
+                'harry123')
+            self.assertEqual(rv.status_code, 201)
+        #
+        ########################################## Endorsements
 
 
         #
         # Comments, oppose, confused
         #
-        '''
-        rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals/4/endorsements',
-            'POST',
-            dict(
-                endorsement_type="oppose",
-                supported_comment_ids=[],
-                new_comment_text="This is terrible!"),
-            'john',
-            'john123')
-        app.logger.debug("Data retrieved from Oppose Proposal = %s\n",
-                         rv.data)
-        self.assertEqual(rv.status_code, 201, rv.status_code)
-        '''
         # Add a comment only
         rv = self.open_with_json_auth(
             '/api/v1/questions/1/proposals/4/comments',
@@ -654,20 +901,6 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                          rv.data)
         self.assertEqual(rv.status_code, 201, rv.status_code)
 
-        '''
-        # Add OPPOSED endorsement and comment
-        rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals/4/endorsements',
-            'POST',
-            dict(
-                endorsement_type="oppose",
-                new_comment_text="This is terrible!"),
-            'harry',
-            'harry123')
-        app.logger.debug("Data retrieved from Oppose Proposal = %s\n",
-                         rv.data)
-        self.assertEqual(rv.status_code, 201, rv.status_code)
-        '''
         # Add a comment only
         rv = self.open_with_json_auth(
             '/api/v1/questions/1/proposals/4/comments',
@@ -692,22 +925,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                          rv.data)
         self.assertEqual(rv.status_code, 201, rv.status_code)
 
-        '''
-        # Add CONFUSED endorsement and comment
-        rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals/4/endorsements',
-            'POST',
-            dict(
-                endorsement_type="confused",
-                supported_comment_ids=[1],
-                new_comment_text="I feel very confused!"),
-            'bill',
-            'bill123')
-        app.logger.debug("Data retrieved from Confused by Proposal = %s\n",
-                         rv.data)
-        self.assertEqual(rv.status_code, 201, rv.status_code)
-        '''
-        # Add a comment only
+        # Add a comment
         rv = self.open_with_json_auth(
             '/api/v1/questions/1/proposals/4/comments',
             'POST',
@@ -720,7 +938,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                          rv.data)
         self.assertEqual(rv.status_code, 201, rv.status_code)
 
-        # Add a comment only
+        # Add a comment
         rv = self.open_with_json_auth(
             '/api/v1/questions/1/proposals/4/comments',
             'POST',
@@ -734,7 +952,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                          rv.data)
         self.assertEqual(rv.status_code, 201, rv.status_code)
 
-        # Add a comment only
+        # Add a comment
         rv = self.open_with_json_auth(
             '/api/v1/questions/1/proposals/4/comments',
             'POST',
@@ -771,61 +989,6 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         self.assertEqual(rv.status_code, 200)
         # Log data received
         app.logger.debug("Data retrieved from Get Comments = %s\n", rv.data)
-
-
-        # bills_prop1.endorse(john)
-        rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals/1/endorsements',
-            'POST',
-            dict(),
-            'john',
-            'john123')
-        self.assertEqual(rv.status_code, 201)
-
-        # bills_prop2.endorse(bill)
-        rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals/2/endorsements',
-            'POST',
-            dict(),
-            'bill',
-            'bill123')
-        self.assertEqual(rv.status_code, 201)
-
-        # harrys_prop1.endorse(jack)
-        rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals/4/endorsements',
-            'POST',
-            dict(),
-            'jack',
-            'jack123')
-        self.assertEqual(rv.status_code, 201)
-
-        # harrys_prop1.endorse(susan)
-        rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals/4/endorsements',
-            'POST',
-            dict(),
-            'susan',
-            'susan123')
-        self.assertEqual(rv.status_code, 201)
-
-        # bills_prop1.endorse(harry)
-        rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals/1/endorsements',
-            'POST',
-            dict(),
-            'harry',
-            'harry123')
-        self.assertEqual(rv.status_code, 201)
-
-        # susans_prop1.endorse(harry)
-        rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals/3/endorsements',
-            'POST',
-            dict(),
-            'harry',
-            'harry123')
-        self.assertEqual(rv.status_code, 201)
 
         #
         # Get Proposals
@@ -968,7 +1131,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         rv = self.open_with_json_auth(
             '/api/v1/questions/1/proposals/2/endorsements',
             'POST',
-            dict(),
+            dict(ndorsement_type="endorse"),
             'john',
             'john123')
         self.assertEqual(rv.status_code, 201)

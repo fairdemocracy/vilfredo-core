@@ -754,6 +754,10 @@ class Question(db.Model):
 
         :rtype: dict
         '''
+        # Fetch current threshold coordinates for this generation
+        threshold = self.thresholds\
+            .filter(Threshold.generation == self.generation).one()
+
         return {'id': str(self.id),
                 'url': url_for('api_get_questions', question_id=self.id),
                 'title': self.title,
@@ -771,7 +775,9 @@ class Question(db.Model):
                 'new_proposal_count': str(self.get_new_proposal_count()),
                 'new_proposer_count': str(self.get_new_proposer_count()),
                 'inherited_proposal_count' : str(self.get_inherited_proposal_count()),
-                'author_url': url_for('api_get_users', user_id=self.user_id)}
+                'author_url': url_for('api_get_users', user_id=self.user_id),
+                'mapx': str(threshold.mapx),
+                'mapy': str(threshold.mapy)}
 
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(120), nullable=False)
@@ -794,6 +800,8 @@ class Question(db.Model):
                               cascade="all, delete-orphan")
     key_players = db.relationship('KeyPlayer', lazy='dynamic',
                                   cascade="all, delete-orphan")
+    thresholds = db.relationship('Threshold', lazy='dynamic',
+                              cascade="all, delete-orphan")
 
     def __init__(self, author, title, blurb,
                  minimum_time=86400, maximum_time=604800, room=None):
@@ -3185,9 +3193,14 @@ class Proposal(db.Model):
                 'question_url': url_for('api_get_questions',
                                         question_id=self.question_id)}
         if user:
-            public['endorse_type'] = self.get_endorsement_type(user)
+            endorsement_data = self.get_endorsement_data(user)
+            public['endorse_type'] = endorsement_data['endorsement_type']
+            public['mapx'] = str(endorsement_data['mapx'])
+            public['mapy'] = str(endorsement_data['mapy'])
         else:
             public['endorse_type'] = 'notvoted'
+            public['mapx'] = 'None'
+            public['mapy'] = 'None'
 
         return public
 
@@ -3351,7 +3364,7 @@ class Proposal(db.Model):
         else:
             return False
 
-    def endorse(self, endorser, endorsement_type="endorse", coords={}):
+    def endorse(self, endorser, endorsement_type="endorse", coords={'mapx': None, 'mapy': None}):
         '''
         .. function:: endorse(endorser, endorsement_type="endorse"[, comments=[]])
 
@@ -3456,6 +3469,41 @@ class Proposal(db.Model):
             Endorsement.generation == generation)
         ).count() == 1
 
+    def get_endorsement_data(self, user, generation=None):
+        '''
+        .. function:: get_endorsement_data(user[, generation=None])
+
+        Check if the user has endorsed this proposal.
+        Takes an optional generation value to check historic endorsements.
+
+        :param user: user
+        :param generation: question generation
+        :type generation: int or None
+        :rtype: dict
+        '''
+        generation = generation or self.question.generation
+
+        app.logger.debug('get_endorsement_data called with user %s', user.username)
+
+        endorsement = self.endorsements.filter(and_(
+            Endorsement.user_id == user.id,
+            Endorsement.proposal_id == self.id,
+            Endorsement.generation == generation)
+        ).first()
+
+        if not endorsement:
+            return {
+                'endorsement_type': 'notvoted',
+                'mapx': None,
+                'mapy': None
+            }
+        else:
+            return {
+                'endorsement_type': endorsement.endorsement_type,
+                'mapx': endorsement.mapx,
+                'mapy': endorsement.mapy
+            }
+    
     def get_endorsement_type(self, user, generation=None):
         '''
         .. function:: get_endorsement_type(user[, generation=None])
@@ -3466,7 +3514,7 @@ class Proposal(db.Model):
         :param user: user
         :param generation: question generation
         :type generation: int or None
-        :rtype: Endorsement or Boolean
+        :rtype: string
         '''
         generation = generation or self.question.generation
 
@@ -3609,12 +3657,21 @@ class Threshold(db.Model):
         return {'id': str(self.id),
                 'question_id': str(self.question_id),
                 'generation': str(self.generation),
-                'threshold': str(self.threshold)}
+                'mapx': str(self.threshold),
+                'mapy': str(self.threshold)}
 
     id = db.Column(db.Integer, primary_key=True)
     question_id = db.Column(db.Integer, db.ForeignKey('question.id'))
     generation = db.Column(db.Integer)
-    threshold = db.Column(db.Float)
+    mapx = db.Column(db.Float)
+    mapy = db.Column(db.Float)
+
+    def __init__(self, question, coords={'mapx': 0.5, 'mapy': 0.5}):
+        self.question_id = question.id
+        self.generation = question.generation
+        self.mapx = coords['mapx']
+        self.mapy = coords['mapy']
+
 
 class Endorsement(db.Model):
     '''

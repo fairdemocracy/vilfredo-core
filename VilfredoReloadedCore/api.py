@@ -968,6 +968,10 @@ def api_create_question():
     db_session.add(question)
     db_session.commit()
 
+    # Set default threshold for voting map
+    question.thresholds.append(models.Threshold(question))
+    db_session.commit()
+
     # url = {'url': url_for('api_get_questions', question_id=question.id)}
     # return jsonify(url), 201
 
@@ -1816,8 +1820,7 @@ def api_delete_proposal_comment(question_id, proposal_id, comment_id):
     return jsonify(message="Comment deleted"), 201
 
 
-
-# Create Endorsement with optional comments
+# Create Endorsement
 #
 @app.route(
     '/api/v1/questions/<int:question_id>/proposals/' +
@@ -1825,6 +1828,143 @@ def api_delete_proposal_comment(question_id, proposal_id, comment_id):
     methods=['POST'])
 @requires_auth
 def api_add_proposal_endorsement(question_id, proposal_id):
+    '''
+    .. http:post:: /questions/(int:question_id)/proposals/(int:proposal_id)/endorsements
+
+        Endorse a proposal.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            POST /questions/45/proposals/47/endorsements HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+            {
+                 "message": "Endorsement added"
+            }
+
+        :param question_id: question ID
+        :type question_id: int
+        :param proposal_id: proposal ID
+        :type proposal_id: int
+        :json endorsement_type: one of endorse, oppose or confused
+        :json comments: ids of supported comments
+        :json new_comment: text for new comment
+        :statuscode 200: no error
+        :statuscode 400: bad request
+    '''
+    app.logger.debug("api_add_proposal_endorsement called...\n")
+
+    user = get_authenticated_user(request)
+    if not user:
+        abort(401)
+
+    app.logger.debug("Authenticated User = %s\n", user.id)
+
+    if question_id is None or proposal_id is None:
+        abort(404)
+
+    question = models.Question.query.get(int(question_id))
+    if question is None:
+        abort(400)
+
+    elif question.phase != 'voting':
+        message = {"message": "The question is not in the voting phase"}
+        return jsonify(message), 403
+
+    proposal = models.Proposal.query.get(int(proposal_id))
+    if proposal is None:
+        abort(400)
+
+    app.logger.debug("request.json = %s\n", request.json)
+
+    '''
+    We either use an endorsement type returned from the client to set the endorsement or
+    the NORMALISED coordinates from the triangular votemap when compared to the
+    threshold for the current generation of this question.
+    '''
+
+    # Check if using votemap to calculate endorsement type
+    if 'use_votemap' in request.json and request.json['use_votemap']:
+        app.logger.debug('Endorsing using votemap coordinates')
+        # Check for coords
+
+        if not 'coords' in request.json:
+            message = {"message": "Using votemap: No votemap coordinates received"}
+            return jsonify(message), 403
+
+        coords = request.json['coords']
+
+        if not coords['mapx'] or not coords['mapy']:
+            message = {"message": "Using votemap: No votemap coordinates received"}
+            return jsonify(message), 403
+
+        # Calculate endorsement type from coords
+        mapx = float(coords['mapx'])
+        mapy = float(coords['mapy'])
+
+        # Fetch current threshold coordinates for this generation
+        threshold = question.thresholds\
+            .filter(models.Threshold.generation == question.generation).one()
+
+        if not threshold:
+            app.logger.debug('No threshold found for question! Database out of date?')
+            message = {"message": "No threshold was found for this question"}
+            return jsonify(message), 500
+
+        if mapy > threshold.mapy:
+            endorsement_type = 'confused';
+        elif mapx < threshold.mapx:
+            endorsement_type = 'oppose';
+        else:
+            endorsement_type = 'endorse';
+
+        # Add user endorsement
+        proposal.endorse(user, endorsement_type, coords=coords)
+        db_session.commit()
+    else:
+        app.logger.debug('Endorsing using supplied endorsement type')
+        if not 'endorsement_type' in request.json:
+            message = {"message": "You must set endorsement_type if not using votemap coordinates"}
+            return jsonify(message), 400
+        elif not request.json['endorsement_type'] in ENDORSEMENT_TYPES:
+            message = {"message": "endorsement_type must be one of endorse, oppose or confused"}
+            return jsonify(message), 400
+        else:
+            app.logger.debug("Endrsing type json parameter == %s", request.json['endorsement_type'])
+            endorsement_type = request.json['endorsement_type']
+            # Add user endorsement
+            proposal.endorse(user, endorsement_type)
+            db_session.commit()
+
+    '''
+    # Update graphs
+    question.get_voting_graph(
+        generation=generation,
+        map_type='all')
+    question.get_voting_graph(
+        generation=generation,
+        map_type='all')
+    '''
+
+    return jsonify(message="Endorsement added",
+                   endorsement_type=endorsement_type), 201
+
+
+
+# Create Endorsement
+#
+@requires_auth
+def api_add_proposal_endorsement_v1(question_id, proposal_id):
     '''
     .. http:post:: /questions/(int:question_id)/proposals/(int:proposal_id)/endorsements
 
