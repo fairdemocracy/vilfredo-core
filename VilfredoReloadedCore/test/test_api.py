@@ -607,7 +607,128 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         # Endorse using votemap coordinates only
         #
         if USE_VOTEMAP:
-                # susans_prop1.endorse(susan)
+            # Propoosal 1
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/1/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="oppose",
+                    use_votemap=True,
+                    coords={'mapx': 0.75, 'mapy': 0.46}),
+                'bill',
+                'bill123')
+            self.assertEqual(rv.status_code, 201)
+            
+            # bills_prop1.endorse(john)
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/1/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="endorse",
+                    use_votemap=True,
+                    coords={'mapx': 0.65, 'mapy': 0.16}),
+                'john',
+                'john123')
+            self.assertEqual(rv.status_code, 201)
+
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/1/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="confused",
+                    use_votemap=True,
+                    coords={'mapx': 0.68, 'mapy': 0.67}),
+                'jack',
+                'jack123')
+            self.assertEqual(rv.status_code, 201)
+            
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/1/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="confused",
+                    use_votemap=True,
+                    coords={'mapx': 0.497361, 'mapy': 0.598698}),
+                'susan',
+                'susan123')
+            self.assertEqual(rv.status_code, 201)
+            
+            # bills_prop1.endorse(harry)
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/1/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="endorse",
+                    use_votemap=True,
+                    coords={'mapx': 0.76, 'mapy': 0.33}),
+                'harry',
+                'harry123')
+            self.assertEqual(rv.status_code, 201)
+            
+            
+            
+            
+            # bills_prop2.endorse(bill)
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/2/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="endorse",
+                    use_votemap=True,
+                    coords={'mapx': 0.5, 'mapy': 0.1}),
+                'bill',
+                'bill123')
+            self.assertEqual(rv.status_code, 201)
+            
+            # John doesn't understand proposal 2
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/2/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="confused",
+                    use_votemap=True,
+                    coords={'mapx': 0.5, 'mapy': 0.7}),
+                'john',
+                'john123')
+            app.logger.debug("Data retrieved from Oppose Proposal = %s\n",
+                             rv.data)
+            self.assertEqual(rv.status_code, 201, rv.status_code)
+            
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/2/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="confused",
+                    use_votemap=True,
+                    coords={'mapx': 0.42, 'mapy': 0.77}),
+                'jack',
+                'jack123')
+            self.assertEqual(rv.status_code, 201)
+            
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/2/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="oppose",
+                    use_votemap=True,
+                    coords={'mapx': 0.2, 'mapy': 0.03}),
+                'susan',
+                'susan123')
+            self.assertEqual(rv.status_code, 201)
+            
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/2/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="oppose",
+                    use_votemap=True,
+                    coords={'mapx': 0.14, 'mapy': 0.39}),
+                'harry',
+                'harry123')
+            self.assertEqual(rv.status_code, 201)
+            
+            
+            # susans_prop1.endorse(susan)
             rv = self.open_with_json_auth(
                 '/api/v1/questions/1/proposals/3/endorsements',
                 'POST',
@@ -635,26 +756,49 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             self.assertEqual(rv.status_code, 201)
 
             rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/3/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="oppose",
+                    use_votemap=True,
+                    coords={'mapx': 0.26, 'mapy': 0.3}),
+                'bill',
+                'bill123')
+            self.assertEqual(rv.status_code, 201)
+            
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/3/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="oppose",
+                    use_votemap=True,
+                    coords={'mapx': 0.1, 'mapy': 0.13}),
+                'jack',
+                'jack123')
+            self.assertEqual(rv.status_code, 201)
+            
+            # susans_prop1.endorse(harry)
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/3/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="endorse",
+                    use_votemap=True,
+                    coords={'mapx': 0.7, 'mapy': 0.22}),
+                'harry',
+                'harry123')
+            self.assertEqual(rv.status_code, 201)
+            
+            
+            
+            
+            rv = self.open_with_json_auth(
                 '/api/v1/questions/1/proposals/4/endorsements',
                 'POST',
                 dict(
                     # endorsement_type="oppose",
                     use_votemap=True,
                     coords={'mapx': 0.3, 'mapy': 0.2}),
-                'john',
-                'john123')
-            app.logger.debug("Data retrieved from Oppose Proposal = %s\n",
-                             rv.data)
-            self.assertEqual(rv.status_code, 201, rv.status_code)
-
-            # John doesn't understand proposal 2
-            rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/2/endorsements',
-                'POST',
-                dict(
-                    # endorsement_type="confused",
-                    use_votemap=True,
-                    coords={'mapx': 0.5, 'mapy': 0.7}),
                 'john',
                 'john123')
             app.logger.debug("Data retrieved from Oppose Proposal = %s\n",
@@ -688,30 +832,6 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             app.logger.debug("Data retrieved from Confused by Proposal = %s\n",
                              rv.data)
             self.assertEqual(rv.status_code, 201, rv.status_code)
-        
-            # bills_prop1.endorse(john)
-            rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/1/endorsements',
-                'POST',
-                dict(
-                    # endorsement_type="endorse",
-                    use_votemap=True,
-                    coords={'mapx': 0.65, 'mapy': 0.16}),
-                'john',
-                'john123')
-            self.assertEqual(rv.status_code, 201)
-
-            # bills_prop2.endorse(bill)
-            rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/2/endorsements',
-                'POST',
-                dict(
-                    # endorsement_type="endorse",
-                    use_votemap=True,
-                    coords={'mapx': 0.5, 'mapy': 0.1}),
-                'bill',
-                'bill123')
-            self.assertEqual(rv.status_code, 201)
 
             # harrys_prop1.endorse(jack)
             rv = self.open_with_json_auth(
@@ -737,31 +857,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 'susan123')
             self.assertEqual(rv.status_code, 201)
 
-            # bills_prop1.endorse(harry)
-            rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/1/endorsements',
-                'POST',
-                dict(
-                    # endorsement_type="endorse",
-                    use_votemap=True,
-                    coords={'mapx': 0.76, 'mapy': 0.33}),
-                'harry',
-                'harry123')
-            self.assertEqual(rv.status_code, 201)
-
-            # susans_prop1.endorse(harry)
-            rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/3/endorsements',
-                'POST',
-                dict(
-                    # endorsement_type="endorse",
-                    use_votemap=True,
-                    coords={'mapx': 0.7, 'mapy': 0.22}),
-                'harry',
-                'harry123')
-            self.assertEqual(rv.status_code, 201)
-
-        # Endorse using endorsement type instead of votemap coordinates
+        # else Endorse using endorsement type instead of votemap coordinates
         #
         else:
             # susans_prop1.endorse(susan)

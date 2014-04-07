@@ -42,6 +42,68 @@ from HTMLParser import HTMLParser
 
 from flask import url_for
 
+##################################################
+# Functions to calculate Geometric Median
+##################################################
+def candMedian(dataPoints):
+    #Calculate the first candidate median as the geometric mean
+    tempX = 0.0
+    tempY = 0.0
+
+    for i in range(0,len(dataPoints)):
+        tempX += dataPoints[i][0]
+        tempY += dataPoints[i][1]
+
+    return [tempX/len(dataPoints),tempY/len(dataPoints)]
+
+def numersum(testMedian,dataPoint):
+    # Provides the numerator of the weiszfeld algorithm depending on whether you are adjusting the candidate x or y
+    return 1/math.sqrt((testMedian[0]-dataPoint[0])**2 + (testMedian[1]-dataPoint[1])**2)
+
+def denomsum(testMedian, dataPoints):
+    # Provides the denominator of the weiszfeld algorithm
+    print 'testMedian=' + str(testMedian)
+    temp = 0.0
+    for i in range(0,len(dataPoints)):
+        if testMedian == dataPoints:
+            continue
+        temp += 1/math.sqrt((testMedian[0] - dataPoints[i][0])**2 + (testMedian[1] - dataPoints[i][1])**2)
+    return temp
+
+def objfunc(testMedian, dataPoints):
+    # This function calculates the sum of linear distances from the current candidate median to all points
+    # in the data set, as such it is the objective function we are minimising.
+    temp = 0.0
+    for i in range(0,len(dataPoints)):
+        temp += math.sqrt((testMedian[0]-dataPoints[i][0])**2 + (testMedian[1]-dataPoints[i][1])**2)
+    return temp
+
+def findGeometricMedian(dataPoints):
+    # Return if too few points
+    if len(dataPoints) == 1:
+        return dataPoints[0]
+
+    # numIter depends on how long it take to get a suitable convergence of objFunc
+    numIter = 50
+    testMedian = candMedian(dataPoints)
+
+    #minimise the objective function.
+    for x in range(0,numIter):
+        # print objfunc(testMedian,dataPoints)
+        denom = denomsum(testMedian,dataPoints)
+        nextx = 0.0
+        nexty = 0.0
+
+        for y in range(0,len(dataPoints)):
+            nextx += (dataPoints[y][0] * numersum(testMedian,dataPoints[y]))/denom
+            nexty += (dataPoints[y][1] * numersum(testMedian,dataPoints[y]))/denom
+
+        testMedian = [nextx,nexty]
+
+    app.logger.debug(testMedian)
+    return testMedian
+##################################################
+
 
 def enum(**enums):
     return type('Enum', (), enums)
@@ -3213,6 +3275,8 @@ class Proposal(db.Model):
     source = db.Column(db.Integer, default=0)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     question_id = db.Column(db.Integer, db.ForeignKey('question.id'))
+    geomedx = db.Column(db.Float)
+    geomedy = db.Column(db.Float)
     # 1:M
     endorsements = db.relationship('Endorsement', backref="proposal",
                                    lazy='dynamic',
@@ -3258,7 +3322,7 @@ class Proposal(db.Model):
         :param source: the id of its parent proposal if one exists, or 0
         :type source: int
         '''
-
+    
     def get_question_count(self, generation=None):
         '''
         .. function:: get_question_count([generation=None])
@@ -3385,6 +3449,20 @@ class Proposal(db.Model):
                                                  endorsement_type,
                                                  coords))
         return self
+
+    def calculate_geometric_median(self, generation=None): # WTF
+        generation = generation or self.question.generation
+        endorsements = self.endorsements.filter(
+            Endorsement.generation == generation).all()
+        data_points = []
+        for endorsement in endorsements:
+            coords = [endorsement.mapx, endorsement.mapy]
+            data_points.append(coords)
+        geometric_median = findGeometricMedian(data_points)
+        self.geomedx = geometric_median[0]
+        self.geomedy = geometric_median[1]
+        db_session.commit()
+
 
     def update_endorsement(self, endorser, endorsement_type, coords={'mapx': None, 'mapy': None}):
         '''
