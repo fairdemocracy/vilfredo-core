@@ -49,6 +49,8 @@ EXTERNAL_MAP_PATH = 'static/maps/'
 # DATABASE_URI = development_db
 SQLALCHEMY_DATABASE_URI = development_db
 
+ALGORITHM_VERSION = 1
+
 # WARNNG: must be changed to False in production!
 DEBUG = True
 
