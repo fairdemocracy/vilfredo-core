@@ -41,9 +41,9 @@ REST_API_VERSION = 'v1'
 REST_URL_PREFIX = '/api/' + REST_API_VERSION
 RESULTS_PER_PAGE = 50
 
-MAX_LEN_EMAIL = 60
-MAX_LEN_USERNAME = 50
-MAX_LEN_PASSWORD = 60
+MAX_LEN_EMAIL = 120
+MAX_LEN_USERNAME = 20
+MAX_LEN_PASSWORD = 120
 MIN_LEN_PASSWORD = 6
 MAX_LEN_ROOM = 20
 MIN_LEN_ROOM = 2
@@ -778,7 +778,7 @@ def api_create_user():
 
 
 #
-# Fetch Questions
+# Get Questions
 #
 @app.route('/api/v1/questions', methods=['GET'])
 @app.route('/api/v1/questions/<int:question_id>', methods=['GET'])
@@ -830,17 +830,21 @@ def api_get_questions(question_id=None):
               "pages": "1"
             }
 
-        :param user_id: user id
-        :type user_id: int
+        :param question_id: question id
+        :type question_id: int
+        :param room: room title
+        :type room: string
         :query page: page number. default is 1
         :statuscode 200: no error
         :statuscode 404: there's no user
     '''
     app.logger.debug("api_get_questions called...\n")
+
     if question_id is not None:
+
         question = models.Question.query.get(int(question_id))
         if question is None:
-            abort(404)
+            return jsonify("Question not found"), 404
 
         results = question.get_public()
 
@@ -857,8 +861,11 @@ def api_get_questions(question_id=None):
         room = request.args.get('room', '')
         app.logger.debug('api_get_questions: fetch questions for room %s', room)
 
+        # Filter questions
         query = models.Question.query
-        query = query.filter_by(room=room)
+        # query = query.filter_by(room=room)
+        query = query.filter(id >= 141)
+        query = query.order_by(models.Question.last_move_on.desc())
         questions = query.paginate(page,
                                    RESULTS_PER_PAGE,
                                    False)
@@ -1206,7 +1213,7 @@ def api_get_question_proposals(question_id=None, proposal_id=None):
             query = query.filter(models.Proposal.user_id == user.id)
 
         elif inherited_only:
-            query = query.filter(models.Proposal.generation_created < question.genration)
+            query = query.filter(models.Proposal.generation_created < question.generation)
 
         proposals = query.paginate(page, RESULTS_PER_PAGE, False)
 
@@ -1491,6 +1498,8 @@ def api_get_proposal_comments(question_id, proposal_id, comment_id=None):
         if generation in request.args:
             generation = int(request.args['generation'])
 
+        app.logger.debug("Get Comments: generation = %s", generation)
+        
         comments = proposal.get_comments(generation)
 
         items = len(comments)
@@ -3155,6 +3164,9 @@ def replaceWithPublic(collection):
     return public
 
 
+# 
+# Get graph
+#
 # http://[hostname]/api/v1.0/questions/47/graph?generation=2&map_type=pareto
 @app.route('/api/v1/questions/<int:question_id>/graph', methods=['GET'])
 def api_question_graph(question_id):
@@ -3201,6 +3213,8 @@ def api_question_graph(question_id):
         :statuscode 400: bad request
     '''
     app.logger.debug("api_question_graph called...\n")
+
+    app.logger.debug("************** USING ALGORITHM %s ************", app.config['ALGORITHM_VERSION'])
 
     if question_id is None:
         app.logger.debug("ERROR: question_id is None!\n")
