@@ -44,6 +44,7 @@ DELETE_DB_ON_START = True
 MAKE_GRAPH = True
 MOVE_TO_GENERATION_2 = False
 USE_VOTEMAP = True
+CREATE_CONSENSUS = True
 
 
 class RESTAPITestCase(unittest.TestCase):
@@ -344,6 +345,16 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                            minimum_time=60),
                                       'harry',
                                       'harry123')
+        self.assertEqual(rv.status_code, 201)
+
+        rv = self.open_with_json_auth('/api/v1/questions',
+                                      'POST',
+                                      dict(title='Test Question',
+                                           blurb='Should we run tests to make sure the system works?',
+                                           room='test',
+                                           minimum_time=60),
+                                      'john',
+                                      'john123')
         self.assertEqual(rv.status_code, 201)
 
         #
@@ -664,10 +675,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 'harry',
                 'harry123')
             self.assertEqual(rv.status_code, 201)
-            
-            
-            
-            
+
             # bills_prop2.endorse(bill)
             rv = self.open_with_json_auth(
                 '/api/v1/questions/1/proposals/2/endorsements',
@@ -726,8 +734,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 'harry',
                 'harry123')
             self.assertEqual(rv.status_code, 201)
-            
-            
+
             # susans_prop1.endorse(susan)
             rv = self.open_with_json_auth(
                 '/api/v1/questions/1/proposals/3/endorsements',
@@ -788,10 +795,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 'harry',
                 'harry123')
             self.assertEqual(rv.status_code, 201)
-            
-            
-            
-            
+
             rv = self.open_with_json_auth(
                 '/api/v1/questions/1/proposals/4/endorsements',
                 'POST',
@@ -856,6 +860,30 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 'susan',
                 'susan123')
             self.assertEqual(rv.status_code, 201)
+
+            #
+            # Create a consensus?
+            #
+            if CREATE_CONSENSUS:
+                rv = self.open_with_json_auth(
+                    '/api/v1/questions/1/proposals/3/endorsements',
+                    'POST',
+                    dict(
+                        use_votemap=True,
+                        coords={'mapx': 0.56, 'mapy': 0.21}),
+                    'bill',
+                    'bill123')
+                self.assertEqual(rv.status_code, 201)
+
+                rv = self.open_with_json_auth(
+                    '/api/v1/questions/1/proposals/3/endorsements',
+                    'POST',
+                    dict(
+                        use_votemap=True,
+                        coords={'mapx': 0.57, 'mapy': 0.20}),
+                    'jack',
+                    'jack123')
+                self.assertEqual(rv.status_code, 201)
 
         # else Endorse using endorsement type instead of votemap coordinates
         #
