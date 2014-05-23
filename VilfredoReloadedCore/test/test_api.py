@@ -45,6 +45,7 @@ MAKE_GRAPH = True
 MOVE_TO_GENERATION_2 = False
 USE_VOTEMAP = True
 CREATE_CONSENSUS = True
+ALGORITHM_VERSION = "1"
 
 
 class RESTAPITestCase(unittest.TestCase):

@@ -46,6 +46,10 @@ def index():
 def display_question(question_id):
     return render_template("question.html")
 
+@app.route('/graphs/<int:question_id>')
+def display_graphs(question_id):
+    return render_template("graphs.html")
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def regiister():

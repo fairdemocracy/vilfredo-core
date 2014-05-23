@@ -121,7 +121,9 @@ def make_map_filename_hashed(question,
                              generation=None,
                              map_type="all",
                              proposal_level_type=GraphLevelType.layers,
-                             user_level_type=GraphLevelType.layers):
+                             user_level_type=GraphLevelType.layers,
+                             algorithm=None):
+    algorithm = algorithm or app.config['ALGORITHM_VERSION']
     generation = generation or question.generation
     import hashlib, json, pickle
     from flask import jsonify
@@ -129,11 +131,11 @@ def make_map_filename_hashed(question,
     m.update(str(question.id) + str(generation) + map_type)
     m.update(str(proposal_level_type) + str(user_level_type))
     m.update(str(app.config['ANONYMIZE_GRAPH']))
-    m.update(str(app.config['ALGORITHM_VERSION']))
-    proposal_endorsers = question.get_proposal_endorsers(generation)
+    m.update(str(algorithm))
+    all_endorsers = question.get_proposal_endorsers(generation)
     # app.logger.debug('*******************make_map_filename_hashed::proposal_endorsers ==> %s', proposal_endorsers)
     # app.logger.debug('make_map_filename_hashed::json ==> %s', json.dumps(proposal_endorsers))
-    m.update(json.dumps(proposal_endorsers))
+    m.update(json.dumps(all_endorsers))
     return m.hexdigest()
 
 def make_map_filename(question_id,
@@ -839,7 +841,8 @@ class Question(db.Model):
     __tablename__ = 'question'
 
     def __repr__(self):
-        return "<Question(%s by %s - Gen %s - %s)>" % (self.id,
+        return "<Question(%s '%s' by %s - Gen %s - %s)>" % (self.id,
+                                                       self.title,
                                                        self.author.username,
                                                        self.generation,
                                                        self.phase)
@@ -940,7 +943,7 @@ class Question(db.Model):
         self.minimum_time = minimum_time
         self.maximum_time = maximum_time
 
-    def consensus_found(self):
+    def consensus_found(self, algorithm=None):
         '''
         .. function:: consensus_found([generation=None])
 
@@ -961,7 +964,7 @@ class Question(db.Model):
         prev_generation = self.generation - 1
         recent_endorser_count = self.get_voter_count(prev_generation)
         # Get recent pareto
-        recent_pareto = self.calculate_pareto_front(generation=prev_generation)
+        recent_pareto = self.calculate_pareto_front(generation=prev_generation, algorithm=algorithm)
         for proposal in recent_pareto:
             if recent_endorser_count != proposal.get_endorser_count(generation=prev_generation):
                 return False
@@ -1060,7 +1063,8 @@ class Question(db.Model):
             db_session.commit()
 
         elif self.phase in {'voting', 'archive'}:
-            pareto = self.calculate_pareto_front()
+            algorithm = app.config['ALGORITHM_VERSION']
+            pareto = self.calculate_pareto_front(algorithm=algorithm)
             self.phase = 'writing'
             self.generation = self.generation + 1
             db_session.commit()
@@ -1095,7 +1099,8 @@ class Question(db.Model):
             db_session.commit()
 
         elif self.phase in {'voting', 'archive'}:
-            pareto = self.calculate_pareto_front()
+            algorithm = app.config['ALGORITHM_VERSION']
+            pareto = self.calculate_pareto_front(algorithm=algorithm)
             self.phase = 'writing'
             self.generation = self.generation + 1
             db_session.commit()
@@ -1534,7 +1539,63 @@ class Question(db.Model):
 
         return endorser_relations
 
-    def calculate_proposal_relations(self, generation=None, proposals=None): # UMM
+    def calculate_proposal_relations_qualified(self,
+                                               generation=None,
+                                               proposals=None,
+                                               algorithm=None):
+        '''
+        .. function:: calculate_proposal_relations_qualified([generation=None])
+
+        Calculates the complete map of dominations. For each proposal
+        it calculates which dominate and which are dominated.
+
+        :param generation: question generation.
+        :type generation: int
+        :rtype: dict
+        '''
+        app.logger.debug("calculate_proposal_relations_qualified called...")
+
+        generation = generation or self.generation
+        proposal_relations = dict()
+        props = dict()
+
+        all_proposals = proposals or self.get_proposals(generation)
+
+        for p in all_proposals:
+            props[p.id] = p.set_of_endorser_ids(generation)
+
+        for proposal1 in all_proposals:
+            dominating = set()
+            dominated = set()
+            proposal_relations[proposal1] = dict()
+
+            for proposal2 in all_proposals:
+                if (proposal1 == proposal2):
+                    continue
+
+                qualified_voters = Proposal.\
+                    intersection_of_qualfied_endorser_ids(proposal1,
+                                                          proposal2,
+                                                          generation)
+                app.logger.debug("Complex Domination: qualified_voters ==> %s", qualified_voters)
+
+                who_dominates = Proposal.\
+                    who_dominates_who_qualified(props[proposal1.id],
+                                                props[proposal2.id],
+                                                qualified_voters)
+
+                if (who_dominates == props[proposal1.id]):
+                    dominating.add(proposal2)
+                elif (who_dominates == props[proposal2.id]):
+                    dominated.add(proposal2)
+
+            proposal_relations[proposal1]['dominating'] = dominating
+            proposal_relations[proposal1]['dominated'] = dominated
+            app.logger.debug("Complex Domination: Relation Map ==> %s", proposal_relations)
+
+        return proposal_relations
+
+    def calculate_proposal_relations(self, generation=None, proposals=None, algorithm=None):
         '''
         .. function:: calculate_proposal_relations([generation=None])
 
@@ -1545,12 +1606,35 @@ class Question(db.Model):
         :type generation: int
         :rtype: dict
         '''
-        generation = generation or self.generation
+        algorithm = algorithm or app.config['ALGORITHM_VERSION']
 
+        if algorithm == 2:
+            app.logger.debug("************** USING ALGORITHM 2 ************")
+            return self.calculate_proposal_relations_qualified(generation=generation,
+                                                               proposals=proposals,
+                                                               algorithm=algorithm)
+        else:
+            app.logger.debug("************** USING ALGORITHM 1 ************")
+            return self.calculate_proposal_relations_original(generation=generation,
+                                                             proposals=proposals)
+
+    def calculate_proposal_relations_original(self, generation=None, proposals=None):
+        '''
+        .. function:: calculate_proposal_relations_original([generation=None])
+
+        Calculates the complete map of dominations. For each proposal
+        it calculates which dominate and which are dominated.
+
+        :param generation: question generation.
+        :type generation: int
+        :rtype: dict
+        '''
+        app.logger.debug("calculate_proposal_relations_original called...")
+
+        generation = generation or self.generation
         proposal_relations = dict()
         props = dict()
 
-        # all_proposals = self.get_proposals(generation)
         all_proposals = proposals or self.get_proposals(generation)
 
         for p in all_proposals:
@@ -1568,11 +1652,13 @@ class Question(db.Model):
                     who_dominates_who(props[proposal1.id],
                                       props[proposal2.id])
 
+                '''
                 app.logger.debug("Comparing props %s %s and %s %s\n",
                                  proposal1.id, props[proposal1.id],
                                  proposal2.id, props[proposal2.id])
                 app.logger.debug("   ===> WDW Result = %s\n",
                                  who_dominates)
+                '''
 
                 if (who_dominates == props[proposal1.id]):
                     dominating.add(proposal2)
@@ -1582,9 +1668,110 @@ class Question(db.Model):
             proposal_relations[proposal1]['dominating'] = dominating
             proposal_relations[proposal1]['dominated'] = dominated
 
+        app.logger.debug("Simple Domination: Relation Map ==> %s", proposal_relations)
         return proposal_relations
 
     def calculate_pareto_front_qualified(self,
+                               proposals=None,
+                               exclude_user=None,
+                               generation=None,
+                               save=False):
+        '''
+        .. function:: calculate_pareto_front_qualified([proposals=None,
+                                             exclude_user=None,
+                                             generation=None,
+                                             save=False])
+
+        Calculates the pareto front of the question, and optionally
+        saves the dominations in the database.
+
+        :param proposals: list of proposals
+        :type proposals: list or boolean
+        :param exclude_user: user to exclude from the calculation
+        :type exclude_user: User
+        :param generation: question generation.
+        :type generation: int
+        :param save: save the domination info in the DB
+        :type save: boolean
+        :rtype: set of proposal objects
+        '''
+
+        app.logger.debug("calculate_pareto_front_qualified called...")
+
+        generation = generation or self.generation
+        proposals = proposals or self.get_proposals(generation)
+        history = self.get_history()
+
+        if (len(proposals) == 0):
+            return set()
+        else:
+            dominated = set()
+            props = dict()
+
+            if (exclude_user is not None):
+                app.logger.\
+                    debug("calculate_pareto_front_qualified called excluding user %s\n",
+                          exclude_user.id)
+
+            for p in proposals:
+                props[p.id] = p.set_of_endorser_ids(generation)
+                if (exclude_user is not None):
+                    app.logger.debug("props[p.id] = %s\n", props[p.id])
+                    props[p.id].discard(exclude_user.id)
+                    app.logger.debug("props[p.id] with user %s "
+                                     "discarded = %s\n",
+                                     exclude_user.id,
+                                     props[p.id])
+
+            if (exclude_user is not None):
+                app.logger.debug("props with %s excluded is now %s\n",
+                                 exclude_user.id, props)
+
+            
+            
+            
+            done = list()
+            for proposal1 in proposals:
+                done.append(proposal1)
+                for proposal2 in proposals:
+                    if (proposal2 in done):
+                        continue
+
+                    qualified_voters = Proposal.\
+                        intersection_of_qualfied_endorser_ids(proposal1,
+                                                              proposal2,
+                                                              generation)
+                    who_dominates = Proposal.\
+                        who_dominates_who_qualified(props[proposal1.id],
+                                                          props[proposal2.id],
+                                                          qualified_voters)
+
+                    if (who_dominates == props[proposal1.id]):
+                        dominated.add(proposal2)
+                        if (save):
+                            app.logger.\
+                                debug('SAVE PF: PID %s dominated_by to %s\n',
+                                      proposal2.id, proposal1.id)
+                            history[proposal2.id].dominated_by = proposal1.id
+                    elif (who_dominates == props[proposal2.id]):
+                        dominated.add(proposal1)
+                        if (save):
+                            app.logger.\
+                                debug('SAVE PF: PID %s dominated_by to %s\n',
+                                      proposal2.id, proposal1.id)
+                            history[proposal1.id].dominated_by = proposal2.id
+                        # Proposal 1 dominated, move to next
+                        break
+
+            pareto = set()
+            if (len(dominated) > 0):
+                pareto = set(proposals).difference(dominated)
+            else:
+                pareto = set(proposals)
+
+            return pareto
+
+    def calculate_pareto_front_qualified_v1(self,
                                proposals=None,
                                exclude_user=None,
                                generation=None,
@@ -1653,9 +1840,8 @@ class Question(db.Model):
                                                               generation)
                     who_dominates = Proposal.\
                         who_dominates_who_qualified(props[proposal1.id],
-                                          props[proposal2.id],
-                                          qualified_voters,
-                                          generation)
+                                                    props[proposal2.id],
+                                                    qualified_voters)
 
                     if (who_dominates == props[proposal1.id]):
                         dominated.add(proposal2)
@@ -1686,12 +1872,54 @@ class Question(db.Model):
                                proposals=None,
                                exclude_user=None,
                                generation=None,
+                               save=False,
+                               algorithm=None):
+        '''
+        .. function:: calculate_pareto_front([proposals=None,
+                                             exclude_user=None,
+                                             generation=None,
+                                             save=False,
+                                             algorithm=None])
+
+        Calculates the pareto front of the question, and optionally
+        saves the dominations in the database.
+
+        :param proposals: list of proposals
+        :type proposals: list or boolean
+        :param exclude_user: user to exclude from the calculation
+        :type exclude_user: User
+        :param generation: question generation.
+        :type generation: int
+        :param save: save the domination info in the DB
+        :type save: boolean
+        :rtype: set of proposal objects
+        '''
+        algorithm = algorithm or app.config['ALGORITHM_VERSION']
+
+        if algorithm == 2:
+            app.logger.debug("************** USING ALGORITHM 2 ************")
+            return self.calculate_pareto_front_qualified(proposals,
+                                                         exclude_user,
+                                                         generation,
+                                                         save)
+        else:
+            app.logger.debug("************** USING ALGORITHM 1 ************")
+            return self.calculate_pareto_front_original(proposals,
+                                                         exclude_user,
+                                                         generation,
+                                                         save)
+
+    def calculate_pareto_front_original(self,
+                               proposals=None,
+                               exclude_user=None,
+                               generation=None,
                                save=False):
         '''
         .. function:: calculate_pareto_front([proposals=None,
                                              exclude_user=None,
                                              generation=None,
-                                             save=False])
+                                             save=False,
+                                             algorithm=None])
 
         Calculates the pareto front of the question, and optionally
         saves the dominations in the database.
@@ -1709,19 +1937,6 @@ class Question(db.Model):
         generation = generation or self.generation
         proposals = proposals or self.get_proposals(generation)
         history = self.get_history()
-
-        # Select algorithm
-        exclude_user = exclude_user or None
-        save = save or False
-
-        if app.config['ALGORITHM_VERSION'] == 2:
-            app.logger.debug("************** USING ALGORITHM 2 ************")
-            return self.calculate_pareto_front_qualified(proposals,
-                                                         exclude_user,
-                                                         generation,
-                                                         save)
-        else:
-            app.logger.debug("************** USING ALGORITHM 1 ************")
 
         if (len(proposals) == 0):
             return set()
@@ -1803,9 +2018,9 @@ class Question(db.Model):
             current_endorsers.update(set(proposal.endorsers(generation)))
         return current_endorsers
 
-    def calculate_endorser_effects(self, generation=None):
+    def calculate_endorser_effects(self, generation=None, algorithm=None):
         '''
-        .. function:: calculate_endorser_effects([generation=None])
+        .. function:: calculate_endorser_effects([generation=None, algorithm=None])
 
         Calculates the effects each endorser has on the pareto.
         What would be the effects if he didn't vote?
@@ -1836,9 +2051,9 @@ class Question(db.Model):
                 endorser_effects[endorser] = None
         return endorser_effects
 
-    def calculate_key_players(self, generation=None):
+    def calculate_key_players(self, generation=None, algorithm=None):
         '''
-        .. function:: calculate_key_players([generation=None])
+        .. function:: calculate_key_players([generation=None, algorithm=None])
 
         Calculates the effects each endorser has on the pareto.
         What would be the effects if he didn't vote?
@@ -1897,10 +2112,100 @@ class Question(db.Model):
         return key_players
 
     @staticmethod
-    def who_dominates_this_excluding(proposal, pareto, user, generation=None):
+    def who_dominates_this_excluding(proposal, pareto, user, generation=None, algorithm=None):
         '''
         .. function:: who_dominates_this_excluding(proposal, pareto,
-                                                   user[, generation])
+                                                   user[, generation, algorithm])
+
+        Calculates the set of proposals within the pareto which could dominate
+        the proposal if the endorsements of the user were excluded from the
+        calculation.
+
+        :param proposal: calculate and save the
+        :type proposal: Proposal object
+        :param pareto: the pareto front
+        :type pareto: set
+        :param user: the user to exclude from the calculation
+        :type user: User
+        :param generation: the generation
+        :type generation: int or None
+        :rtype: set
+        '''
+        algorithm = algorithm or app.config['ALGORITHM_VERSION']
+
+        if algorithm == 2:
+            app.logger.debug("************** USING ALGORITHM 2 ************")
+            return Question.who_dominates_this_excluding_qualified(users_proposal,
+                                                                   pareto,
+                                                                   user,
+                                                                   generation)
+        else:
+            app.logger.debug("************** USING ALGORITHM 1 ************")
+            return Question.who_dominates_this_excluding_original(users_proposal,
+                                                                  pareto,
+                                                                  user,
+                                                                  generation)
+
+    @staticmethod
+    def who_dominates_this_excluding_qualified(proposal, pareto, user, generation=None, algorithm=None):
+        '''
+        .. function:: who_dominates_this_excluding(proposal, pareto,
+                                                   user[, generation, algorithm])
+
+        Calculates the set of proposals within the pareto which could dominate
+        the proposal if the endorsements of the user were excluded from the
+        calculation.
+
+        :param proposal: calculate and save the
+        :type proposal: Proposal object
+        :param pareto: the pareto front
+        :type pareto: set
+        :param user: the user to exclude from the calculation
+        :type user: User
+        :param generation: the generation
+        :type generation: int or None
+        :rtype: set
+        '''
+
+        app.logger.debug("who_dominates_this_excluding_qualified\n")
+        app.logger.debug(">>>> Pareto %s >>>> User %s\n", pareto, user.id)
+        could_dominate = set()
+        proposal_endorsers = proposal.set_of_endorser_ids(generation)
+        proposal_endorsers.discard(user.id)
+        app.logger.debug("Users proposal %s endorsers %s\n",
+                         proposal.id,
+                         proposal_endorsers)
+        for prop in pareto:
+            if (prop == proposal):
+                continue
+            app.logger.debug("Testing Pareto Prop %s for domination\n",
+                             prop.id)
+            endorsers = prop.set_of_endorser_ids(generation)
+            endorsers.discard(user.id)
+            app.logger.debug("Current endorsers with user excluded %s\n",
+                             endorsers)
+
+            qualified_voters = Proposal.\
+                intersection_of_qualfied_endorser_ids(proposal1,
+                                                      proposal2,
+                                                      generation)
+            dominated = Proposal.\
+                who_dominates_who_qualified(proposal_endorsers,
+                                            endorsers,
+                                            qualified_voters)
+
+            # dominated = Proposal.who_dominates_who(proposal_endorsers, endorsers)
+
+            app.logger.debug("dominated %s\n", dominated)
+            if (dominated == endorsers):
+                could_dominate.add(prop)
+        return could_dominate
+
+    @staticmethod
+    def who_dominates_this_excluding_original(proposal, pareto, user, generation=None, algorithm=None):
+        '''
+        .. function:: who_dominates_this_excluding(proposal, pareto,
+                                                   user[, generation, algorithm])
 
         Calculates the set of proposals within the pareto which could dominate
         the proposal if the endorsements of the user were excluded from the
@@ -1974,7 +2279,8 @@ class Question(db.Model):
                          generation=None,
                          map_type='all',
                          proposal_level_type=GraphLevelType.layers,
-                         user_level_type=GraphLevelType.layers):
+                         user_level_type=GraphLevelType.layers,
+                         algorithm=None):
         '''
         .. function:: get_voting_graph(generation, map_type)
 
@@ -1999,7 +2305,8 @@ class Question(db.Model):
                                             generation,
                                             map_type,
                                             proposal_level_type,
-                                            user_level_type)
+                                            user_level_type,
+                                            algorithm)
         # app.logger.debug('Filename: %s hashed: %s', filename, filename_hashed)
         # filename = filename_hashed
 
@@ -2027,7 +2334,8 @@ class Question(db.Model):
                     app.logger.debug("Generating pareto graph...")
                     #map_proposals = self.\
                     #   get_pareto_front(generation=generation, calculate_if_missing=True)
-                    map_proposals = self.calculate_pareto_front(generation=generation) # debugging
+                    map_proposals = self.calculate_pareto_front(generation=generation,
+                                                                algorithm=algorithm)
                 else:
                     map_proposals = self.\
                         get_proposals(generation=generation)
@@ -2039,7 +2347,8 @@ class Question(db.Model):
                     proposals=map_proposals,
                     generation=generation,
                     proposal_level_type=proposal_level_type,
-                    user_level_type=user_level_type)
+                    user_level_type=user_level_type,
+                    algorithm=algorithm)
                 # Save the dot specification as a dot file
                 app.logger.debug("Writing dot file %s.dot", filepath)
                 dot_file = open(filepath+".dot", "w")
@@ -2096,7 +2405,8 @@ class Question(db.Model):
                           user_level_type=GraphLevelType.layers,
                           address_image='',
                           highlight_user1=None,
-                          highlight_proposal1=None):
+                          highlight_proposal1=None,
+                          algorithm=None):
         '''
         .. function:: make_graphviz_map(
             [proposals=None,
@@ -2140,7 +2450,8 @@ class Question(db.Model):
 
         # get pareto
         pareto = self.calculate_pareto_front(proposals=proposals,
-                                             generation=generation)
+                                             generation=generation,
+                                             algorithm=algorithm)
         app.logger.debug("pareto %s\n",
                          pareto)
 
@@ -2175,7 +2486,9 @@ class Question(db.Model):
         app.logger.debug("pareto proposals => endorsers %s\n",
                          pareto_endorsers)
 
-        proposal_relations = self.calculate_proposal_relations(generation=generation, proposals=proposals) # fix?
+        proposal_relations = self.calculate_proposal_relations(generation=generation,
+                                                               proposals=proposals,
+                                                               algorithm=algorithm) # algstuff
         app.logger.debug("proposal_relations %s\n",
                          proposal_relations)
 
@@ -3443,8 +3756,10 @@ class Proposal(db.Model):
     __tablename__ = 'proposal'
 
     def __repr__(self):
-        return "<Proposal('%s', Q:'%s')>"\
+        return "<Proposal(%s '%s' by %s, Q:'%s')>"\
             % (self.id,
+               self.title,
+               self.author.username,
                self.question_id)
 
     def get_public(self, user=None):
@@ -3963,7 +4278,24 @@ class Proposal(db.Model):
         return endorser_ids
 
     @staticmethod
-    def who_dominates_who_qualified(proposal1, proposal2, qualified_voters, generation):
+    def who_dominates(proposal1_voters, proposal2_voters, generation, algorithm):
+        if algorithm == 2:
+            # Use Algorithm 2
+            qualified_voters = Proposal.\
+                        intersection_of_qualfied_endorser_ids(proposal1_voters,
+                                                              proposal2_voters,
+                                                              generation)
+            return Proposal.\
+                who_dominates_who_qualified(proposal1_voters,
+                                            proposal2_voters,
+                                            qualified_voters)
+        else:
+            # Use Algorithm 1
+            return Proposal.who_dominates_who(proposal1_voters,
+                                              proposal2_voters)
+
+    @staticmethod
+    def who_dominates_who_qualified(proposal1_voters, proposal2_voters, qualified_voters):
         '''
         .. function:: who_dominates_who_qualified(proposal1, proposal2)
 
@@ -3974,18 +4306,22 @@ class Proposal(db.Model):
             - 0 if the sets of endorsers are different
             - -1 if the sets of endorsers are the same
 
-        :param proposal1: set of voters for proposal 1
-        :type proposal1: set of int
-        :param proposal2: set of voters for proposal 2
-        :type proposal2: set of int
+        :param proposal1_voters: set of voters for proposal 1
+        :type proposal1_voters: set of int
+        :param proposal2_voters: set of voters for proposal 2
+        :type proposal2_voters: set of int
         :rtype: interger or set of int
         '''
+        app.logger.debug("who_dominates_who_qualified called with voters %s and %s and qualified %s",
+            proposal1_voters, proposal2_voters, qualified_voters)
+        
+        
         # Remove unqualified voters from each proposal.
         #   ie find intersection with qualified endorsers
         #   (those that understand both proposal A and proposal B)
-        proposal1_qualified = proposal1 & qualified_voters
-        proposal2_qualified = proposal2 & qualified_voters
-        
+        proposal1_qualified = proposal1_voters & qualified_voters
+        proposal2_qualified = proposal2_voters & qualified_voters
+
         # If proposal1 and proposal2 are not the same return -1
         if (proposal1_qualified == proposal2_qualified):
             return -1
@@ -4009,9 +4345,9 @@ class Proposal(db.Model):
         return "<Proposal('%s', Q:'%s')>"\
             % (self.id,
                self.question_id)
-    
+
     @staticmethod
-    def who_dominates_who(proposal1, proposal2):
+    def who_dominates_who(proposal1_voters, proposal2_voters):
         '''
         .. function:: who_dominates_who(proposal1, proposal2)
 
@@ -4022,28 +4358,28 @@ class Proposal(db.Model):
             - 0 if the sets of endorsers are different
             - -1 if the sets of endorsers are the same
 
-        :param proposal1: set of voters for proposal 1
-        :type proposal1: set of int
-        :param proposal2: set of voters for proposal 2
-        :type proposal2: set of int
+        :param proposal1_voters: set of voters for proposal 1
+        :type proposal1_voters: set of int
+        :param proposal2_voters: set of voters for proposal 2
+        :type proposal2_voters: set of int
         :rtype: interger or set of int
         '''
         # If proposal1 and proposal2 are the same return -1
-        if (proposal1 == proposal2):
+        if (proposal1_voters == proposal2_voters):
             return -1
         # If proposal1 is empty return proposal2
-        elif (len(proposal1) == 0):
-            return proposal2
+        elif (len(proposal1_voters) == 0):
+            return proposal2_voters
         # If proposal2 is empty return proposal1
-        elif (len(proposal2) == 0):
-            return proposal1
+        elif (len(proposal2_voters) == 0):
+            return proposal1_voters
         # Check if proposal1 is a propoer subset of proposal2
-        elif (proposal1 < proposal2):
-            return proposal2
+        elif (proposal1_voters < proposal2_voters):
+            return proposal2_voters
         # Check if proposal2 is a proper subset of proposal1
-        elif (proposal2 < proposal1):
-            return proposal1
-        # proposal1 and proposal2 are different return 0
+        elif (proposal2_voters < proposal1_voters):
+            return proposal1_voters
+        # proposal1_voters and proposal2_voters are different return 0
         else:
             return 0
 
