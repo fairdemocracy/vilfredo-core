@@ -46,53 +46,8 @@ def index():
 def display_question(question_id):
     return render_template("question.html")
 
-@app.route('/graphs/<int:question_id>')
-def display_graphs(question_id):
-    return render_template("graphs.html")
 
+@app.route('/domination/<int:question_id>/gen/<int:generation>')
+def display_domination(question_id, generation):
+    return render_template("domination.html")
 
-@app.route('/register', methods=['GET', 'POST'])
-def regiister():
-    if request.method == 'POST':
-        if request.form['username'] == '':
-            return 'Invalid username'
-        elif request.form['password'] == '':
-            return 'Invalid password'
-        elif request.form['email'] == '':
-            return 'Invalid email'
-        elif models.User.username_available(request.form['username']) \
-                is not True:
-            return 'Username not available'
-        elif models.User.email_available(request.form['email']) is not True:
-            return 'Email not available'
-        else:
-            new_user = models.User(
-                request.form['username'],
-                request.form['email'],
-                request.form['password'])
-            db_session.add(new_user)
-            db_session.commit()
-            if (new_user.id is not None):
-                return 'You have been registered'
-            else:
-                return "Registration failed"
-    return "Please enter your registration details"
-
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        if request.form['username'] != 'test_user':
-            return 'Invalid username'
-        elif request.form['password'] != 'test_password':
-            return 'Invalid password'
-        else:
-            session['logged_in'] = True
-            return 'You were logged in'
-    return "Please log in"
-
-
-@app.route('/logout')
-def logout():
-    session.pop('logged_in', None)
-    return 'You were logged out'

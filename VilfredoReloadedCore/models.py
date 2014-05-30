@@ -178,6 +178,15 @@ user_comments = db.Table(
     db.Column('comment_id', db.Integer, db.ForeignKey('comment.id')))
 
 
+#
+# Useful Functions
+#
+def get_ids_list_from_objects(objects):
+    ids = []
+    for o in objects:
+        ids.append(o.id)
+    return ids
+
 def get_ids_from_proposals(proposals): # fix?
     ids = set()
     for prop in proposals:
@@ -1315,6 +1324,7 @@ class Question(db.Model):
         proposals = db_session.query(Proposal).join(QuestionHistory).\
             filter(QuestionHistory.question_id == self.id).\
             filter(QuestionHistory.generation == generation).\
+            order_by(Proposal.id).\
             all()
         return set(proposals)
 
@@ -1589,8 +1599,8 @@ class Question(db.Model):
                 elif (who_dominates == props[proposal2.id]):
                     dominated.add(proposal2)
 
-            proposal_relations[proposal1]['dominating'] = dominating
-            proposal_relations[proposal1]['dominated'] = dominated
+            proposal_relations[proposal1.id]['dominating'] = dominating
+            proposal_relations[proposal1.id]['dominated'] = dominated
             app.logger.debug("Complex Domination: Relation Map ==> %s", proposal_relations)
 
         return proposal_relations
@@ -1618,7 +1628,7 @@ class Question(db.Model):
             return self.calculate_proposal_relations_original(generation=generation,
                                                              proposals=proposals)
 
-    def calculate_proposal_relations_original(self, generation=None, proposals=None):
+    def calculate_proposal_relations_original(self, generation=None, proposals=None): 
         '''
         .. function:: calculate_proposal_relations_original([generation=None])
 
@@ -1643,7 +1653,7 @@ class Question(db.Model):
         for proposal1 in all_proposals:
             dominating = set()
             dominated = set()
-            proposal_relations[proposal1] = dict()
+            proposal_relations[proposal1.id] = dict()
 
             for proposal2 in all_proposals:
                 if (proposal1 == proposal2):
@@ -1665,11 +1675,185 @@ class Question(db.Model):
                 elif (who_dominates == props[proposal2.id]):
                     dominated.add(proposal2)
 
-            proposal_relations[proposal1]['dominating'] = dominating
-            proposal_relations[proposal1]['dominated'] = dominated
+            proposal_relations[proposal1.id]['dominating'] = dominating
+            proposal_relations[proposal1.id]['dominated'] = dominated
 
         app.logger.debug("Simple Domination: Relation Map ==> %s", proposal_relations)
         return proposal_relations
+
+    def calculate_domination_map(self, generation=None, proposals=None, algorithm=None):
+        '''
+        .. function:: calculate_domination_map([generation=None])
+
+        Calculates the complete map of dominations. For each proposal
+        it calculates which dominate and which are dominated.
+
+        :param generation: question generation.
+        :type generation: int
+        :rtype: dict
+        '''
+        algorithm = algorithm or app.config['ALGORITHM_VERSION']
+
+        if algorithm == 2:
+            app.logger.debug("************** USING ALGORITHM 2 ************")
+            return self.calculate_domination_map_qualified(generation=generation,
+                                                               proposals=proposals)
+        else:
+            app.logger.debug("************** USING ALGORITHM 1 ************")
+            return self.calculate_domination_map_original(generation=generation,
+                                                             proposals=proposals)
+
+    def calculate_domination_map_qualified(self, generation=None, proposals=None): 
+        '''
+        .. function:: calculate_proposal_relations_original([generation=None])
+
+        Calculates the complete map of dominations. For each proposal
+        it calculates which dominate and which are dominated.
+
+        :param generation: question generation.
+        :type generation: int
+        :rtype: dict
+        '''
+        app.logger.debug("calculate_domination_map_original called...")
+
+        generation = generation or self.generation
+        domination_map = dict()
+        endorser_ids = dict()
+
+        all_proposals = proposals or self.get_proposals_list(generation)
+        
+        for p in all_proposals:
+            endorser_ids[p.id] = p.set_of_endorser_ids(generation)
+
+        for proposal1 in all_proposals:
+            domination_map[proposal1.id] = dict()
+
+            for proposal2 in all_proposals:
+                if (proposal1 == proposal2):
+                    domination_map[proposal1.id][proposal1.id] = -1
+                    continue
+
+                qualified_voters = Proposal.\
+                    intersection_of_qualfied_endorser_ids(proposal1,
+                                                          proposal2,
+                                                          generation)
+                app.logger.debug("Complex Domination: qualified_voters ==> %s", qualified_voters)
+
+                who_dominates = Proposal.\
+                    who_dominates_who_qualified(endorser_ids[proposal1.id],
+                                                endorser_ids[proposal2.id],
+                                                qualified_voters)
+
+                if (who_dominates == endorser_ids[proposal1.id]):
+                    # dominating
+                    domination_map[proposal1.id][proposal2.id] = 1
+                    # dominating.add(proposal2)
+                elif (who_dominates == endorser_ids[proposal2.id]):
+                    # dominated
+                    domination_map[proposal1.id][proposal2.id] = 2
+                    # dominated.add(proposal2)
+                else:
+                    domination_map[proposal1.id][proposal2.id] = 0
+
+        app.logger.debug("Simple Domination: Domination Map ==> %s", domination_map)
+        return domination_map
+    
+    def calculate_domination_map_original(self, generation=None, proposals=None): 
+        '''
+        .. function:: calculate_proposal_relations_original([generation=None])
+
+        Calculates the complete map of dominations. For each proposal
+        it calculates which dominate and which are dominated.
+
+        :param generation: question generation.
+        :type generation: int
+        :rtype: dict
+        '''
+        app.logger.debug("calculate_domination_map_original called...")
+
+        generation = generation or self.generation
+        domination_map = dict()
+        endorser_ids = dict()
+
+        all_proposals = proposals or self.get_proposals_list(generation)
+        
+        for p in all_proposals:
+            endorser_ids[p.id] = p.set_of_endorser_ids(generation)
+
+        for proposal1 in all_proposals:
+            domination_map[proposal1.id] = dict()
+
+            for proposal2 in all_proposals:
+                if (proposal1 == proposal2):
+                    domination_map[proposal1.id][proposal1.id] = -1
+                    continue
+                who_dominates = Proposal.\
+                    who_dominates_who(endorser_ids[proposal1.id],
+                                      endorser_ids[proposal2.id])
+
+                if (who_dominates == endorser_ids[proposal1.id]):
+                    # dominating
+                    domination_map[proposal1.id][proposal2.id] = 1
+                    # dominating.add(proposal2)
+                elif (who_dominates == endorser_ids[proposal2.id]):
+                    # dominated
+                    domination_map[proposal1.id][proposal2.id] = 2
+                    # dominated.add(proposal2)
+                else:
+                    domination_map[proposal1.id][proposal2.id] = 0
+
+        app.logger.debug("Simple Domination: Domination Map ==> %s", domination_map)
+        return domination_map
+
+    def calculate_domination_map_original_2(self, generation=None, proposals=None): 
+        '''
+        .. function:: calculate_proposal_relations_original([generation=None])
+
+        Calculates the complete map of dominations. For each proposal
+        it calculates which dominate and which are dominated.
+
+        :param generation: question generation.
+        :type generation: int
+        :rtype: dict
+        '''
+        app.logger.debug("calculate_domination_map_original called...")
+
+        generation = generation or self.generation
+        domination_map = dict()
+        endorser_ids = dict()
+
+        all_proposals = proposals or self.get_proposals(generation)
+
+        for p in all_proposals:
+            endorser_ids[p.id] = p.set_of_endorser_ids(generation)
+
+        for proposal1 in all_proposals:
+            domination_map = []
+            dominations = dict()
+
+            for proposal2 in all_proposals:
+                if (proposal1 == proposal2):
+                    dominations[proposal1.id] = -1
+                    continue
+                who_dominates = Proposal.\
+                    who_dominates_who(endorser_ids[proposal1.id],
+                                      endorser_ids[proposal2.id])
+
+                if (who_dominates == endorser_ids[proposal1.id]):
+                    # dominating
+                    dominations[proposal2.id] = 1
+                    # dominating.add(proposal2)
+                elif (who_dominates == endorser_ids[proposal2.id]):
+                    # dominated
+                    dominations[proposal2.id] = 2
+                    # dominated.add(proposal2)
+                else:
+                    dominations[proposal2.id] = 0
+
+                    domination_map.append({"id": proposal1.id, "dominations": dominations})
+
+        app.logger.debug("Simple Domination: Domination Map ==> %s", domination_map)
+        return domination_map
 
     def calculate_pareto_front_qualified(self,
                                proposals=None,
@@ -1727,9 +1911,6 @@ class Question(db.Model):
                 app.logger.debug("props with %s excluded is now %s\n",
                                  exclude_user.id, props)
 
-            
-            
-            
             done = list()
             for proposal1 in proposals:
                 done.append(proposal1)
