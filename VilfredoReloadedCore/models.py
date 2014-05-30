@@ -1605,7 +1605,7 @@ class Question(db.Model):
 
         return proposal_relations
 
-    def calculate_proposal_relations(self, generation=None, proposals=None, algorithm=None):
+    def calculate_proposal_relations_NEW(self, generation=None, proposals=None, algorithm=None):
         '''
         .. function:: calculate_proposal_relations([generation=None])
 
@@ -1628,6 +1628,56 @@ class Question(db.Model):
             return self.calculate_proposal_relations_original(generation=generation,
                                                              proposals=proposals)
 
+    def calculate_proposal_relations(self, generation=None, proposals=None, algorithm=None): # UMM
+        '''
+        .. function:: calculate_proposal_relations([generation=None])
+
+        Calculates the complete map of dominations. For each proposal
+        it calculates which dominate and which are dominated.
+
+        :param generation: question generation.
+        :type generation: int
+        :rtype: dict
+        '''
+        generation = generation or self.generation
+
+        proposal_relations = dict()
+        props = dict()
+
+        # all_proposals = self.get_proposals(generation)
+        all_proposals = proposals or self.get_proposals(generation)
+
+        for p in all_proposals:
+            props[p.id] = p.set_of_endorser_ids(generation)
+
+        for proposal1 in all_proposals:
+            dominating = set()
+            dominated = set()
+            proposal_relations[proposal1] = dict()
+
+            for proposal2 in all_proposals:
+                if (proposal1 == proposal2):
+                    continue
+                who_dominates = Proposal.\
+                    who_dominates_who(props[proposal1.id],
+                                      props[proposal2.id])
+
+                app.logger.debug("Comparing props %s %s and %s %s\n",
+                                 proposal1.id, props[proposal1.id],
+                                 proposal2.id, props[proposal2.id])
+                app.logger.debug("   ===> WDW Result = %s\n",
+                                 who_dominates)
+
+                if (who_dominates == props[proposal1.id]):
+                    dominating.add(proposal2)
+                elif (who_dominates == props[proposal2.id]):
+                    dominated.add(proposal2)
+
+            proposal_relations[proposal1]['dominating'] = dominating
+            proposal_relations[proposal1]['dominated'] = dominated
+
+        return proposal_relations
+    
     def calculate_proposal_relations_original(self, generation=None, proposals=None): 
         '''
         .. function:: calculate_proposal_relations_original([generation=None])
@@ -2316,13 +2366,13 @@ class Question(db.Model):
 
         if algorithm == 2:
             app.logger.debug("************** USING ALGORITHM 2 ************")
-            return Question.who_dominates_this_excluding_qualified(users_proposal,
+            return Question.who_dominates_this_excluding_qualified(proposal,
                                                                    pareto,
                                                                    user,
                                                                    generation)
         else:
             app.logger.debug("************** USING ALGORITHM 1 ************")
-            return Question.who_dominates_this_excluding_original(users_proposal,
+            return Question.who_dominates_this_excluding_original(proposal,
                                                                   pareto,
                                                                   user,
                                                                   generation)
