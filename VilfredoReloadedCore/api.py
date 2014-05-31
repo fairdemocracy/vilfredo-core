@@ -59,6 +59,8 @@ ENDORSEMENT_TYPES = ['endorse', 'oppose', 'confused']
 COMMENT_TYPES = ['for', 'against', 'question', 'answer']
 PWD_RESET_LIFETIME = 3600*24*2
 
+DOMINATION_MAP_SYMBOLS = {-1: '=', 0: '', 1: '<', 2: '^'}
+
 '''
 from flask_login import LoginManager
 login_manager = LoginManager()
@@ -3348,7 +3350,7 @@ def api_question_domination_map(question_id=None):
 
         domination_list = []
         for pid in keys:
-            domination_list.append(int(dominations[pid]))
+            domination_list.append( DOMINATION_MAP_SYMBOLS[ dominations[pid] ] )
         domination_map.append({"id": int(proposal_id), "dominations": domination_list})
 
         app.logger.debug("domination_map==>%s", domination_map)
@@ -3359,7 +3361,6 @@ def api_question_domination_map(question_id=None):
         current_generation=str(question.generation),
         num_items=str(len(domination_map)),
         domination_map=domination_map), 200
-
 
 # @app.route('/api/v1/questions/<int:question_id>/domination_map',
 #           methods=['GET'])
