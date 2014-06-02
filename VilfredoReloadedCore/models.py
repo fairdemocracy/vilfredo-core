@@ -1549,7 +1549,318 @@ class Question(db.Model):
 
         return endorser_relations
 
-    def calculate_proposal_relations_qualified(self,
+    def calculate_proposal_relations_NEW(self, generation=None, proposals=None, algorithm=None):
+        '''
+        .. function:: calculate_proposal_relations([generation=None])
+
+        Calculates the complete map of dominations. For each proposal
+        it calculates which dominate and which are dominated.
+
+        :param generation: question generation.
+        :type generation: int
+        :rtype: dict
+        '''
+        algorithm = algorithm or app.config['ALGORITHM_VERSION']
+
+        if algorithm == 2:
+            app.logger.debug("************** USING ALGORITHM 2 ************")
+            return self.calculate_proposal_relations_qualified(generation=generation,
+                                                               proposals=proposals,
+                                                               algorithm=algorithm)
+        else:
+            app.logger.debug("************** USING ALGORITHM 1 ************")
+            return self.calculate_proposal_relations_original(generation=generation,
+                                                             proposals=proposals)
+
+    def calculate_proposal_relations_original_v_whatever(self, generation=None, proposals=None, algorithm=None):
+        '''
+        .. function:: calculate_proposal_relations([generation=None])
+
+        Calculates the complete map of dominations. For each proposal
+        it calculates which dominate and which are dominated.
+
+        :param generation: question generation.
+        :type generation: int
+        :rtype: dict
+        '''
+        generation = generation or self.generation
+
+        proposal_relations = dict()
+        props = dict()
+
+        # all_proposals = self.get_proposals(generation)
+        all_proposals = proposals or self.get_proposals(generation)
+
+        for p in all_proposals:
+            props[p.id] = p.set_of_endorser_ids(generation)
+
+        for proposal1 in all_proposals:
+            dominating = set()
+            dominated = set()
+            proposal_relations[proposal1] = dict()
+
+            for proposal2 in all_proposals:
+                if (proposal1 == proposal2):
+                    continue
+                who_dominates = Proposal.\
+                    who_dominates_who(props[proposal1.id],
+                                      props[proposal2.id])
+
+                app.logger.debug("Comparing props %s %s and %s %s\n",
+                                 proposal1.id, props[proposal1.id],
+                                 proposal2.id, props[proposal2.id])
+                app.logger.debug("   ===> WDW Result = %s\n",
+                                 who_dominates)
+
+                if (who_dominates == props[proposal1.id]):
+                    dominating.add(proposal2)
+                elif (who_dominates == props[proposal2.id]):
+                    dominated.add(proposal2)
+
+            proposal_relations[proposal1]['dominating'] = dominating
+            proposal_relations[proposal1]['dominated'] = dominated
+
+        return proposal_relations
+    
+    def calculate_proposal_relations(self, generation=None, proposals=None, algorithm=None):
+        '''
+        .. function:: calculate_proposal_relations([generation=None])
+
+        Calculates the complete map of dominations. For each proposal
+        it calculates which dominate and which are dominated.
+
+        :param generation: question generation.
+        :type generation: int
+        :rtype: dict
+        '''
+        generation = generation or self.generation
+
+        proposal_relations = dict()
+        props = dict()
+
+        # all_proposals = self.get_proposals(generation)
+        all_proposals = proposals or self.get_proposals(generation)
+
+        for p in all_proposals:
+            props[p.id] = p.set_of_endorser_ids(generation)
+
+        for proposal1 in all_proposals:
+            dominating = set()
+            dominated = set()
+            proposal_relations[proposal1] = dict()
+
+            for proposal2 in all_proposals:
+                if (proposal1 == proposal2):
+                    continue
+                who_dominates = Proposal.\
+                    who_dominates_who(props[proposal1.id],
+                                      props[proposal2.id])
+
+                app.logger.debug("Comparing props %s %s and %s %s\n",
+                                 proposal1.id, props[proposal1.id],
+                                 proposal2.id, props[proposal2.id])
+                app.logger.debug("   ===> WDW Result = %s\n",
+                                 who_dominates)
+
+                if (who_dominates == props[proposal1.id]):
+                    dominating.add(proposal2)
+                elif (who_dominates == props[proposal2.id]):
+                    dominated.add(proposal2)
+
+            proposal_relations[proposal1]['dominating'] = dominating
+            proposal_relations[proposal1]['dominated'] = dominated
+
+        return proposal_relations
+
+    
+    def calculate_proposal_relation_ids(self, generation=None, proposals=None, algorithm=None):
+        '''
+        .. function:: calculate_proposal_relations([generation=None])
+
+        Calculates the complete map of dominations. For each proposal
+        it calculates which dominate and which are dominated.
+
+        :param generation: question generation.
+        :type generation: int
+        :rtype: dict
+        '''
+        algorithm = algorithm or app.config['ALGORITHM_VERSION']
+
+        if algorithm == 2:
+            app.logger.debug("************** USING ALGORITHM 2 ************")
+            return self.calculate_proposal_relation_ids_qualified(generation=generation,
+                                                                  proposals=proposals)
+        else:
+            app.logger.debug("************** USING ALGORITHM 1 ************")
+            return self.calculate_proposal_relation_ids_original(generation=generation,
+                                                                 proposals=proposals)
+
+    def calculate_proposal_relation_ids_original(self, generation=None, proposals=None):
+        '''
+        .. function:: calculate_proposal_relations([generation=None])
+
+        Calculates the complete map of dominations. For each proposal
+        it calculates which dominate and which are dominated.
+
+        :param generation: question generation.
+        :type generation: int
+        :rtype: dict
+        '''
+        generation = generation or self.generation
+
+        proposal_relations = dict()
+        endorser_ids = dict()
+
+        # all_proposals = self.get_proposals(generation)
+        all_proposals = proposals or self.get_proposals(generation)
+
+        for p in all_proposals:
+            endorser_ids[p.id] = p.set_of_endorser_ids(generation)
+
+        for proposal1 in all_proposals:
+            dominating = set()
+            dominated = set()
+            proposal_relations[proposal1.id] = dict()
+
+            for proposal2 in all_proposals:
+                if (proposal1 == proposal2):
+                    continue
+                who_dominates = Proposal.\
+                    who_dominates_who(endorser_ids[proposal1.id],
+                                      endorser_ids[proposal2.id])
+
+                '''
+                app.logger.debug("Comparing endorser_ids %s %s and %s %s\n",
+                                 proposal1.id, endorser_ids[proposal1.id],
+                                 proposal2.id, endorser_ids[proposal2.id])
+                app.logger.debug("   ===> WDW Result = %s\n",
+                                 who_dominates)
+                '''
+
+                if (who_dominates == endorser_ids[proposal1.id]):
+                    dominating.add(proposal2.id)
+                elif (who_dominates == endorser_ids[proposal2.id]):
+                    dominated.add(proposal2.id)
+
+            proposal_relations[proposal1.id]['dominating'] = dominating
+            proposal_relations[proposal1.id]['dominated'] = dominated
+
+        return proposal_relations
+
+    def calculate_proposal_relation_ids_qualified(self, generation=None, proposals=None):
+        '''
+        .. function:: calculate_proposal_relations([generation=None])
+
+        Calculates the complete map of dominations. For each proposal
+        it calculates which dominate and which are dominated.
+
+        :param generation: question generation.
+        :type generation: int
+        :rtype: dict
+        '''
+        generation = generation or self.generation
+
+        proposal_relations = dict()
+        endorser_ids = dict()
+
+        # all_proposals = self.get_proposals(generation)
+        all_proposals = proposals or self.get_proposals(generation)
+
+        for p in all_proposals:
+            endorser_ids[p.id] = p.set_of_endorser_ids(generation)
+
+        for proposal1 in all_proposals:
+            dominating = set()
+            dominated = set()
+            proposal_relations[proposal1.id] = dict()
+
+            for proposal2 in all_proposals:
+                if (proposal1 == proposal2):
+                    continue
+                
+                qualified_voters = Proposal.\
+                    intersection_of_qualfied_endorser_ids(proposal1,
+                                                          proposal2,
+                                                          generation)
+                app.logger.debug("Complex Domination: qualified_voters ==> %s", qualified_voters)
+
+                who_dominates = Proposal.\
+                    who_dominates_who_qualified(endorser_ids[proposal1.id],
+                                                endorser_ids[proposal2.id],
+                                                qualified_voters)
+
+                '''
+                app.logger.debug("Comparing endorser_ids %s %s and %s %s\n",
+                                 proposal1.id, endorser_ids[proposal1.id],
+                                 proposal2.id, endorser_ids[proposal2.id])
+                app.logger.debug("   ===> WDW Result = %s\n",
+                                 who_dominates)
+                '''
+
+                if (who_dominates == endorser_ids[proposal1.id]):
+                    dominating.add(proposal2.id)
+                elif (who_dominates == endorser_ids[proposal2.id]):
+                    dominated.add(proposal2.id)
+
+            proposal_relations[proposal1.id]['dominating'] = dominating
+            proposal_relations[proposal1.id]['dominated'] = dominated
+
+        return proposal_relations
+    
+    def calculate_proposal_relations_original_v1(self, generation=None, proposals=None): 
+        '''
+        .. function:: calculate_proposal_relations_original([generation=None])
+
+        Calculates the complete map of dominations. For each proposal
+        it calculates which dominate and which are dominated.
+
+        :param generation: question generation.
+        :type generation: int
+        :rtype: dict
+        '''
+        app.logger.debug("calculate_proposal_relations_original called...")
+
+        generation = generation or self.generation
+        proposal_relations = dict()
+        props = dict()
+
+        all_proposals = proposals or self.get_proposals(generation)
+
+        for p in all_proposals:
+            props[p.id] = p.set_of_endorser_ids(generation)
+
+        for proposal1 in all_proposals:
+            dominating = set()
+            dominated = set()
+            proposal_relations[proposal1.id] = dict()
+
+            for proposal2 in all_proposals:
+                if (proposal1 == proposal2):
+                    continue
+                who_dominates = Proposal.\
+                    who_dominates_who(props[proposal1.id],
+                                      props[proposal2.id])
+
+                '''
+                app.logger.debug("Comparing props %s %s and %s %s\n",
+                                 proposal1.id, props[proposal1.id],
+                                 proposal2.id, props[proposal2.id])
+                app.logger.debug("   ===> WDW Result = %s\n",
+                                 who_dominates)
+                '''
+
+                if (who_dominates == props[proposal1.id]):
+                    dominating.add(proposal2)
+                elif (who_dominates == props[proposal2.id]):
+                    dominated.add(proposal2)
+
+            proposal_relations[proposal1.id]['dominating'] = dominating
+            proposal_relations[proposal1.id]['dominated'] = dominated
+
+        app.logger.debug("Simple Domination: Relation Map ==> %s", proposal_relations)
+        return proposal_relations
+    
+    def calculate_proposal_relations_qualified_v1(self,
                                                generation=None,
                                                proposals=None,
                                                algorithm=None):
@@ -1605,9 +1916,10 @@ class Question(db.Model):
 
         return proposal_relations
 
-    def calculate_proposal_relations_NEW(self, generation=None, proposals=None, algorithm=None):
+    
+    def calculate_pareto_map(self, generation=None, proposals=None, algorithm=None):
         '''
-        .. function:: calculate_proposal_relations([generation=None])
+        .. function:: calculate_domination_map([generation=None])
 
         Calculates the complete map of dominations. For each proposal
         it calculates which dominate and which are dominated.
@@ -1620,17 +1932,18 @@ class Question(db.Model):
 
         if algorithm == 2:
             app.logger.debug("************** USING ALGORITHM 2 ************")
-            return self.calculate_proposal_relations_qualified(generation=generation,
-                                                               proposals=proposals,
-                                                               algorithm=algorithm)
+            return self.calculate_pareto_map_qualified(generation=generation,
+                                                       proposals=proposals,
+                                                       algorithm=algorithm)
         else:
             app.logger.debug("************** USING ALGORITHM 1 ************")
-            return self.calculate_proposal_relations_original(generation=generation,
-                                                             proposals=proposals)
+            return self.calculate_pareto_map_original(generation=generation,
+                                                      proposals=proposals,
+                                                      algorithm=algorithm)
 
-    def calculate_proposal_relations(self, generation=None, proposals=None, algorithm=None): # UMM
+    def calculate_pareto_map_original(self, generation=None, proposals=None, algorithm=None):
         '''
-        .. function:: calculate_proposal_relations([generation=None])
+        .. function:: calculate_pareto_map_original([generation=None, proposals=None])
 
         Calculates the complete map of dominations. For each proposal
         it calculates which dominate and which are dominated.
@@ -1641,46 +1954,126 @@ class Question(db.Model):
         '''
         generation = generation or self.generation
 
-        proposal_relations = dict()
-        props = dict()
+        domination_map = self.calculate_domination_map_original(generation=generation, proposals=proposals)
+        app.logger.debug("domination_map = %s", domination_map)
+        
+        pareto_map = dict()
+        relations = self.calculate_proposal_relation_ids(generation=generation, algorithm=algorithm)
+        app.logger.debug("relations = %s", relations)
+        
+        num_proposals = len(relations)
+        app.logger.debug("num_proposals = %s", num_proposals)
+        
+        # set of all proposal ids
+        all_pids = set(relations.keys())
+        top_done = set()
+        bottom_done = set()
+        top_levels = dict()
+        bottom_levels = dict()
+        
+        # set top and bottom levels
+        top_levels[0] = set()
+        bottom_levels[0] = set()
+        
+        for (proposal_id, dominations) in domination_map.iteritems():
+            # Initialize map
+            pareto_map[proposal_id] = {'dominates': -1, 'dominated': -1}
 
-        # all_proposals = self.get_proposals(generation)
-        all_proposals = proposals or self.get_proposals(generation)
+            # Test if proposal is undominated
+            if 2 not in dominations.values():
+                pareto_map[proposal_id]['dominated'] = 0
+                top_done.add(proposal_id)
+                top_levels[0].add(proposal_id)
 
-        for p in all_proposals:
-            props[p.id] = p.set_of_endorser_ids(generation)
+            # Test if proposal dominates nothing
+            if 1 not in dominations.values():
+                pareto_map[proposal_id]['dominates'] = 0
+                bottom_done.add(proposal_id)
+                bottom_levels[0].add(proposal_id)
 
-        for proposal1 in all_proposals:
-            dominating = set()
-            dominated = set()
-            proposal_relations[proposal1] = dict()
-
-            for proposal2 in all_proposals:
-                if (proposal1 == proposal2):
-                    continue
-                who_dominates = Proposal.\
-                    who_dominates_who(props[proposal1.id],
-                                      props[proposal2.id])
-
-                app.logger.debug("Comparing props %s %s and %s %s\n",
-                                 proposal1.id, props[proposal1.id],
-                                 proposal2.id, props[proposal2.id])
-                app.logger.debug("   ===> WDW Result = %s\n",
-                                 who_dominates)
-
-                if (who_dominates == props[proposal1.id]):
-                    dominating.add(proposal2)
-                elif (who_dominates == props[proposal2.id]):
-                    dominated.add(proposal2)
-
-            proposal_relations[proposal1]['dominating'] = dominating
-            proposal_relations[proposal1]['dominated'] = dominated
-
-        return proposal_relations
-    
-    def calculate_proposal_relations_original(self, generation=None, proposals=None): 
         '''
-        .. function:: calculate_proposal_relations_original([generation=None])
+        today
+        
+        relations
+        {1: {'dominated': set(), 'dominating': {2}},
+         2: {'dominated': {1}, 'dominating': set()},
+         3: {'dominated': set(), 'dominating': set()},
+         4: {'dominated': set(), 'dominating': set()}}
+         
+         {1: {'dominated': set([]), 'dominating': set([2])}, 
+         2: {'dominated': set([1]), 'dominating': set([])}, 
+         3: {'dominated': set([]), 'dominating': set([])}, 
+         4: {'dominated': set([]), 'dominating': set([])}}
+        
+        domination_map
+        {1: {1: -1, 2: 1, 3: 0, 4: 0},
+         2: {1: 2, 2: -1, 3: 0, 4: 0},
+         3: {1: 0, 2: 0, 3: -1, 4: 0},
+         4: {1: 0, 2: 0, 3: 0, 4: -1}}
+        
+        paretomap
+        {1: {'dominated': 0, 'dominates': -1},
+         2: {'dominated': -1, 'dominates': 0},
+         3: {'dominated': 0, 'dominates': 0},
+         4: {'dominated': 0, 'dominates': 0}}
+        '''
+                
+        # Finish levels below pareto
+        app.logger.debug("Finish levels below pareto")
+        app.logger.debug("num_proposals = %s", num_proposals)
+        app.logger.debug("top_done = %s", top_done)
+        level = 1
+        for proposal_id in all_pids:
+            if proposal_id in top_done:
+                continue
+            top_levels[level] = set()
+            app.logger.debug("top_done = %s", top_done)
+            doms = relations[proposal_id]['dominated']
+            app.logger.debug("doms = %s", doms)
+            app.logger.debug("doms - top_done = %s", doms - top_done)
+            app.logger.debug("len(doms - top_done) == %s", len(doms - top_done))
+            if len(doms - top_done) == 0:
+                app.logger.debug("proposal_id %s dominated by levels %s and up - adding to level %s", proposal_id, level-1, level)
+                pareto_map[proposal_id]['dominated'] = level
+                top_done.add(proposal_id)
+                top_levels[level].add(proposal_id)
+                
+            level = level + 1
+            '''
+            if level > 1:
+                app.logger.debug("at level %s", level)
+                break
+            '''
+        # return pareto_map
+        
+        level = 1
+        for proposal_id in all_pids:
+            if proposal_id in bottom_done:
+                continue
+            bottom_levels[level] = set()
+            app.logger.debug("bottom_done = %s", bottom_done)
+            doms = relations[proposal_id]['dominating']
+            app.logger.debug("doms = %s", doms)
+            app.logger.debug("doms - bottom_done = %s", doms - bottom_done)
+            app.logger.debug("len(doms - bottom_done) == %s", len(doms - bottom_done))
+            if len(doms - bottom_done) == 0:
+                app.logger.debug("proposal_id %s dominating levels %s and up - adding to level %s", proposal_id, level-1, level)
+                pareto_map[proposal_id]['dominates'] = level
+                bottom_done.add(proposal_id)
+                bottom_levels[level].add(proposal_id)
+                
+            level = level + 1
+            '''
+            if level > 1:
+                app.logger.debug("at level %s", level)
+                break
+            '''
+        return pareto_map
+
+
+    def calculate_pareto_map_qualified(self, generation=None, proposals=None, algorithm=None):
+        '''
+        .. function:: calculate_pareto_map_original([generation=None, proposals=None])
 
         Calculates the complete map of dominations. For each proposal
         it calculates which dominate and which are dominated.
@@ -1689,47 +2082,123 @@ class Question(db.Model):
         :type generation: int
         :rtype: dict
         '''
-        app.logger.debug("calculate_proposal_relations_original called...")
-
         generation = generation or self.generation
-        proposal_relations = dict()
-        props = dict()
 
-        all_proposals = proposals or self.get_proposals(generation)
+        domination_map = self.calculate_domination_map_qualified(generation=generation, proposals=proposals)
+        app.logger.debug("domination_map = %s", domination_map)
+        
+        pareto_map = dict()
+        relations = self.calculate_proposal_relation_ids(generation=generation, algorithm=algorithm)
+        app.logger.debug("relations = %s", relations)
+        
+        num_proposals = len(relations)
+        app.logger.debug("num_proposals = %s", num_proposals)
+        
+        # set of all proposal ids
+        all_pids = set(relations.keys())
+        top_done = set()
+        bottom_done = set()
+        top_levels = dict()
+        bottom_levels = dict()
+        
+        # set top and bottom levels
+        top_levels[0] = set()
+        bottom_levels[0] = set()
+        
+        for (proposal_id, dominations) in domination_map.iteritems():
+            # Initialize map
+            pareto_map[proposal_id] = {'dominates': -1, 'dominated': -1}
 
-        for p in all_proposals:
-            props[p.id] = p.set_of_endorser_ids(generation)
+            # Test if proposal is undominated
+            if 2 not in dominations.values():
+                pareto_map[proposal_id]['dominated'] = 0
+                top_done.add(proposal_id)
+                top_levels[0].add(proposal_id)
 
-        for proposal1 in all_proposals:
-            dominating = set()
-            dominated = set()
-            proposal_relations[proposal1.id] = dict()
+            # Test if proposal dominates nothing
+            if 1 not in dominations.values():
+                pareto_map[proposal_id]['dominates'] = 0
+                bottom_done.add(proposal_id)
+                bottom_levels[0].add(proposal_id)
 
-            for proposal2 in all_proposals:
-                if (proposal1 == proposal2):
-                    continue
-                who_dominates = Proposal.\
-                    who_dominates_who(props[proposal1.id],
-                                      props[proposal2.id])
-
-                '''
-                app.logger.debug("Comparing props %s %s and %s %s\n",
-                                 proposal1.id, props[proposal1.id],
-                                 proposal2.id, props[proposal2.id])
-                app.logger.debug("   ===> WDW Result = %s\n",
-                                 who_dominates)
-                '''
-
-                if (who_dominates == props[proposal1.id]):
-                    dominating.add(proposal2)
-                elif (who_dominates == props[proposal2.id]):
-                    dominated.add(proposal2)
-
-            proposal_relations[proposal1.id]['dominating'] = dominating
-            proposal_relations[proposal1.id]['dominated'] = dominated
-
-        app.logger.debug("Simple Domination: Relation Map ==> %s", proposal_relations)
-        return proposal_relations
+        '''
+        today
+        
+        relations
+        {1: {'dominated': set(), 'dominating': {2}},
+         2: {'dominated': {1}, 'dominating': set()},
+         3: {'dominated': set(), 'dominating': set()},
+         4: {'dominated': set(), 'dominating': set()}}
+         
+         {1: {'dominated': set([]), 'dominating': set([2])}, 
+         2: {'dominated': set([1]), 'dominating': set([])}, 
+         3: {'dominated': set([]), 'dominating': set([])}, 
+         4: {'dominated': set([]), 'dominating': set([])}}
+        
+        domination_map
+        {1: {1: -1, 2: 1, 3: 0, 4: 0},
+         2: {1: 2, 2: -1, 3: 0, 4: 0},
+         3: {1: 0, 2: 0, 3: -1, 4: 0},
+         4: {1: 0, 2: 0, 3: 0, 4: -1}}
+        
+        paretomap
+        {1: {'dominated': 0, 'dominates': -1},
+         2: {'dominated': -1, 'dominates': 0},
+         3: {'dominated': 0, 'dominates': 0},
+         4: {'dominated': 0, 'dominates': 0}}
+        '''
+                
+        # Finish levels below pareto
+        app.logger.debug("Finish levels below pareto")
+        app.logger.debug("num_proposals = %s", num_proposals)
+        app.logger.debug("top_done = %s", top_done)
+        level = 1
+        for proposal_id in all_pids:
+            if proposal_id in top_done:
+                continue
+            top_levels[level] = set()
+            app.logger.debug("top_done = %s", top_done)
+            doms = relations[proposal_id]['dominated']
+            app.logger.debug("doms = %s", doms)
+            app.logger.debug("doms - top_done = %s", doms - top_done)
+            app.logger.debug("len(doms - top_done) == %s", len(doms - top_done))
+            if len(doms - top_done) == 0:
+                app.logger.debug("proposal_id %s dominated by levels %s and up - adding to level %s", proposal_id, level-1, level)
+                pareto_map[proposal_id]['dominated'] = level
+                top_done.add(proposal_id)
+                top_levels[level].add(proposal_id)
+                
+            level = level + 1
+            '''
+            if level > 1:
+                app.logger.debug("at level %s", level)
+                break
+            '''
+        # return pareto_map
+        
+        level = 1
+        for proposal_id in all_pids:
+            if proposal_id in bottom_done:
+                continue
+            bottom_levels[level] = set()
+            app.logger.debug("bottom_done = %s", bottom_done)
+            doms = relations[proposal_id]['dominating']
+            app.logger.debug("doms = %s", doms)
+            app.logger.debug("doms - bottom_done = %s", doms - bottom_done)
+            app.logger.debug("len(doms - bottom_done) == %s", len(doms - bottom_done))
+            if len(doms - bottom_done) == 0:
+                app.logger.debug("proposal_id %s dominating levels %s and up - adding to level %s", proposal_id, level-1, level)
+                pareto_map[proposal_id]['dominates'] = level
+                bottom_done.add(proposal_id)
+                bottom_levels[level].add(proposal_id)
+                
+            level = level + 1
+            '''
+            if level > 1:
+                app.logger.debug("at level %s", level)
+                break
+            '''
+        return pareto_map
 
     def calculate_domination_map(self, generation=None, proposals=None, algorithm=None):
         '''
@@ -1771,7 +2240,7 @@ class Question(db.Model):
         endorser_ids = dict()
 
         all_proposals = proposals or self.get_proposals_list(generation)
-        
+
         for p in all_proposals:
             endorser_ids[p.id] = p.set_of_endorser_ids(generation)
 
@@ -1807,8 +2276,8 @@ class Question(db.Model):
 
         app.logger.debug("Simple Domination: Domination Map ==> %s", domination_map)
         return domination_map
-    
-    def calculate_domination_map_original(self, generation=None, proposals=None): 
+
+    def calculate_domination_map_original(self, generation=None, proposals=None):
         '''
         .. function:: calculate_proposal_relations_original([generation=None])
 
@@ -1855,55 +2324,46 @@ class Question(db.Model):
         app.logger.debug("Simple Domination: Domination Map ==> %s", domination_map)
         return domination_map
 
-    def calculate_domination_map_original_2(self, generation=None, proposals=None): 
+    def calculate_pareto_front(self,
+                               proposals=None,
+                               exclude_user=None,
+                               generation=None,
+                               save=False,
+                               algorithm=None):
         '''
-        .. function:: calculate_proposal_relations_original([generation=None])
+        .. function:: calculate_pareto_front([proposals=None,
+                                             exclude_user=None,
+                                             generation=None,
+                                             save=False,
+                                             algorithm=None])
 
-        Calculates the complete map of dominations. For each proposal
-        it calculates which dominate and which are dominated.
+        Calculates the pareto front of the question, and optionally
+        saves the dominations in the database.
 
+        :param proposals: list of proposals
+        :type proposals: list or boolean
+        :param exclude_user: user to exclude from the calculation
+        :type exclude_user: User
         :param generation: question generation.
         :type generation: int
-        :rtype: dict
+        :param save: save the domination info in the DB
+        :type save: boolean
+        :rtype: set of proposal objects
         '''
-        app.logger.debug("calculate_domination_map_original called...")
+        algorithm = algorithm or app.config['ALGORITHM_VERSION']
 
-        generation = generation or self.generation
-        domination_map = dict()
-        endorser_ids = dict()
-
-        all_proposals = proposals or self.get_proposals(generation)
-
-        for p in all_proposals:
-            endorser_ids[p.id] = p.set_of_endorser_ids(generation)
-
-        for proposal1 in all_proposals:
-            domination_map = []
-            dominations = dict()
-
-            for proposal2 in all_proposals:
-                if (proposal1 == proposal2):
-                    dominations[proposal1.id] = -1
-                    continue
-                who_dominates = Proposal.\
-                    who_dominates_who(endorser_ids[proposal1.id],
-                                      endorser_ids[proposal2.id])
-
-                if (who_dominates == endorser_ids[proposal1.id]):
-                    # dominating
-                    dominations[proposal2.id] = 1
-                    # dominating.add(proposal2)
-                elif (who_dominates == endorser_ids[proposal2.id]):
-                    # dominated
-                    dominations[proposal2.id] = 2
-                    # dominated.add(proposal2)
-                else:
-                    dominations[proposal2.id] = 0
-
-                    domination_map.append({"id": proposal1.id, "dominations": dominations})
-
-        app.logger.debug("Simple Domination: Domination Map ==> %s", domination_map)
-        return domination_map
+        if algorithm == 2:
+            app.logger.debug("************** USING ALGORITHM 2 ************")
+            return self.calculate_pareto_front_qualified(proposals,
+                                                         exclude_user,
+                                                         generation,
+                                                         save)
+        else:
+            app.logger.debug("************** USING ALGORITHM 1 ************")
+            return self.calculate_pareto_front_original(proposals,
+                                                         exclude_user,
+                                                         generation,
+                                                         save)
 
     def calculate_pareto_front_qualified(self,
                                proposals=None,
@@ -1996,149 +2456,11 @@ class Question(db.Model):
 
             pareto = set()
             if (len(dominated) > 0):
-                pareto = set(proposals).difference(dominated)
+                pareto = set(proposals) - dominated
             else:
                 pareto = set(proposals)
 
             return pareto
-
-    def calculate_pareto_front_qualified_v1(self,
-                               proposals=None,
-                               exclude_user=None,
-                               generation=None,
-                               save=False):
-        '''
-        .. function:: calculate_pareto_front_qualified([proposals=None,
-                                             exclude_user=None,
-                                             generation=None,
-                                             save=False])
-
-        Calculates the pareto front of the question, and optionally
-        saves the dominations in the database.
-
-        :param proposals: list of proposals
-        :type proposals: list or boolean
-        :param exclude_user: user to exclude from the calculation
-        :type exclude_user: User
-        :param generation: question generation.
-        :type generation: int
-        :param save: save the domination info in the DB
-        :type save: boolean
-        :rtype: set of proposal objects
-        '''
-
-        app.logger.debug("calculate_pareto_front_qualified called...")
-
-        generation = generation or self.generation
-        proposals = proposals or self.get_proposals(generation)
-        history = self.get_history()
-
-        if (len(proposals) == 0):
-            return set()
-        else:
-            dominated = set()
-            props = dict()
-
-            if (exclude_user is not None):
-                app.logger.\
-                    debug("calculate_pareto_front_qualified called excluding user %s\n",
-                          exclude_user.id)
-
-            for p in proposals:
-                props[p.id] = p.set_of_endorser_ids(generation)
-                if (exclude_user is not None):
-                    app.logger.debug("props[p.id] = %s\n", props[p.id])
-                    props[p.id].discard(exclude_user.id)
-                    app.logger.debug("props[p.id] with user %s "
-                                     "discarded = %s\n",
-                                     exclude_user.id,
-                                     props[p.id])
-
-            if (exclude_user is not None):
-                app.logger.debug("props with %s excluded is now %s\n",
-                                 exclude_user.id, props)
-
-            done = list()
-            for proposal1 in proposals:
-                done.append(proposal1)
-                for proposal2 in proposals:
-                    if (proposal2 in done):
-                        continue
-
-                    qualified_voters = Proposal.\
-                        intersection_of_qualfied_endorser_ids(proposal1,
-                                                              proposal2,
-                                                              generation)
-                    who_dominates = Proposal.\
-                        who_dominates_who_qualified(props[proposal1.id],
-                                                    props[proposal2.id],
-                                                    qualified_voters)
-
-                    if (who_dominates == props[proposal1.id]):
-                        dominated.add(proposal2)
-                        if (save):
-                            app.logger.\
-                                debug('SAVE PF: PID %s dominated_by to %s\n',
-                                      proposal2.id, proposal1.id)
-                            history[proposal2.id].dominated_by = proposal1.id
-                    elif (who_dominates == props[proposal2.id]):
-                        dominated.add(proposal1)
-                        if (save):
-                            app.logger.\
-                                debug('SAVE PF: PID %s dominated_by to %s\n',
-                                      proposal2.id, proposal1.id)
-                            history[proposal1.id].dominated_by = proposal2.id
-                        # Proposal 1 dominated, move to next
-                        break
-
-            pareto = set()
-            if (len(dominated) > 0):
-                pareto = set(proposals).difference(dominated)
-            else:
-                pareto = set(proposals)
-
-            return pareto
-
-    def calculate_pareto_front(self,
-                               proposals=None,
-                               exclude_user=None,
-                               generation=None,
-                               save=False,
-                               algorithm=None):
-        '''
-        .. function:: calculate_pareto_front([proposals=None,
-                                             exclude_user=None,
-                                             generation=None,
-                                             save=False,
-                                             algorithm=None])
-
-        Calculates the pareto front of the question, and optionally
-        saves the dominations in the database.
-
-        :param proposals: list of proposals
-        :type proposals: list or boolean
-        :param exclude_user: user to exclude from the calculation
-        :type exclude_user: User
-        :param generation: question generation.
-        :type generation: int
-        :param save: save the domination info in the DB
-        :type save: boolean
-        :rtype: set of proposal objects
-        '''
-        algorithm = algorithm or app.config['ALGORITHM_VERSION']
-
-        if algorithm == 2:
-            app.logger.debug("************** USING ALGORITHM 2 ************")
-            return self.calculate_pareto_front_qualified(proposals,
-                                                         exclude_user,
-                                                         generation,
-                                                         save)
-        else:
-            app.logger.debug("************** USING ALGORITHM 1 ************")
-            return self.calculate_pareto_front_original(proposals,
-                                                         exclude_user,
-                                                         generation,
-                                                         save)
 
     def calculate_pareto_front_original(self,
                                proposals=None,
@@ -4572,10 +4894,6 @@ class Proposal(db.Model):
         else:
             return 0
 
-    def __repr__(self):
-        return "<Proposal('%s', Q:'%s')>"\
-            % (self.id,
-               self.question_id)
 
     @staticmethod
     def who_dominates_who(proposal1_voters, proposal2_voters):

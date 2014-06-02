@@ -3272,6 +3272,71 @@ def api_question_graph(question_id):
                    proposal_level_type=proposal_level_type,
                    user_level_type=user_level_type), 200
 
+@app.route('/api/v1/questions/<int:question_id>/pareto_map',
+           methods=['GET'])
+def api_question_pareto_map(question_id=None):
+    '''
+    .. http:post:: questions/(int:question_id)/pareto_map
+
+        A map of proposal dominations.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET questions/42/domination_map HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+
+        :param question_id: question id
+        :type question_id: int
+        :param generation: generation
+        :type generation: int
+        :param algorithm: algorithm id
+        :type algorithm: int
+        :statuscode 200: no error
+        :statuscode 400: bad request
+    '''
+    app.logger.debug("api_question_pareto_map called with %s...\n",
+                     question_id)
+
+    if question_id is None:
+        app.logger.debug("ERROR: question_id is None!\n")
+        abort(404)
+
+    question = models.Question.query.get(int(question_id))
+
+    if question is None:
+        app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
+        abort(404)
+
+    generation = int(request.args.get('generation', question.generation))
+    # set Algorithm version
+    algorithm = int(request.args.get('algorithm', app.config['ALGORITHM_VERSION']))
+
+    levels =\
+        question.calculate_pareto_map(generation=generation, algorithm=algorithm)
+    app.logger.debug("levels==>%s", levels)
+    
+    pareto_map = []
+    for (proposal_id, levels) in levels.iteritems():
+        pareto_map.append({"id": proposal_id, "levels": levels})
+
+    return jsonify(
+        question_id=str(question.id),
+        query_generation=str(generation),
+        current_generation=str(question.generation),
+        num_items=str(len(pareto_map)),
+        pareto_map=pareto_map), 200
+
 @app.route('/api/v1/questions/<int:question_id>/domination_map',
            methods=['GET'])
 def api_question_domination_map(question_id=None):
@@ -3360,97 +3425,6 @@ def api_question_domination_map(question_id=None):
         query_generation=str(generation),
         current_generation=str(question.generation),
         num_items=str(len(domination_map)),
-        domination_map=domination_map), 200
-
-# @app.route('/api/v1/questions/<int:question_id>/domination_map',
-#           methods=['GET'])
-def api_question_domination_map_v1(question_id=None):
-    '''
-    .. http:post:: questions/(int:question_id)/domination_map
-
-        A map of proposal dominations.
-
-        **Example request**:
-
-        .. sourcecode:: http
-
-            GET questions/42/domination_map HTTP/1.1
-            Host: example.com
-            Accept: application/json
-
-        **Example response**:
-
-        .. sourcecode:: http
-
-            Status Code: 201 OK
-            Content-Type: application/json
-
-
-        :param question_id: question id
-        :type question_id: int
-        :param algorithm: algorithm id
-        :type algorithm: int
-        :statuscode 200: no error
-        :statuscode 400: bad request
-    '''
-    app.logger.debug("api_question_domination_map called with %s...\n",
-                     question_id)
-
-    if question_id is None:
-        app.logger.debug("ERROR: question_id is None!\n")
-        abort(404)
-
-    question = models.Question.query.get(int(question_id))
-
-    if question is None:
-        app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
-        abort(404)
-
-    generation = int(request.args.get('generation', question.generation))
-    # set Algorithm version
-    algorithm = int(request.args.get('algorithm', app.config['ALGORITHM_VERSION']))
-
-    proposal_relations =\
-        question.calculate_proposal_relations(generation=generation, algorithm=algorithm)
-
-    app.logger.debug("Proposal Relations==> %s", proposal_relations)
-
-    # Get all the proposal IDs
-    prop_ids = list(proposal_relations.viewkeys())
-    domination_map = []
-
-    for (proposal_id, relations) in proposal_relations.iteritems():
-
-        '''
-        app.logger.debug("Processing relations for proposal %s", proposal.id)
-        app.logger.debug("%s Dominated ==>%s", proposal.id, relations['dominated'])
-        app.logger.debug("%s Dominating ==>%s", proposal.id, relations['dominating'])
-        '''
-        dominated_ids = []
-        for dominated_prop in relations['dominated']:
-            dominated_ids.append(dominated_prop.id)
-
-        # app.logger.debug("dominated_ids==>%s", dominated_ids)
-
-        dominating_ids = []
-        for dominating_prop in relations['dominating']:
-            dominating_ids.append(dominating_prop.id)
-
-        # app.logger.debug("dominating_ids==>%s", dominating_ids)
-
-        prop_relations = {
-            'dominated': str(dominated_ids),
-            'dominating': str(dominating_ids)}
-
-        domination_map.append({proposal.id: prop_relations})
-
-        # app.logger.debug("domination_map==>%s", domination_map)
-
-    return jsonify(
-        question_id=str(question.id),
-        query_generation=str(generation),
-        current_generation=str(question.generation),
-        num_items=str(len(proposal_relations)),
         domination_map=domination_map), 200
 
 @app.route('/api/v1/questions/<int:question_id>/proposal_relations',
