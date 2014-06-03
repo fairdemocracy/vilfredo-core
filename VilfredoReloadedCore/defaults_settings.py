@@ -51,6 +51,8 @@ SQLALCHEMY_DATABASE_URI = development_db
 
 ALGORITHM_VERSION = 1
 
+DO_LOGGING = False
+
 # WARNNG: must be changed to False in production!
 DEBUG = True
 

@@ -100,21 +100,26 @@ if os.path.isfile(app.config['LOG_FILE_PATH']):
         print 'Failed to delete log file ' + app.config['LOG_FILE_PATH']
 
 # Logging
-import logging
-import logging.config
-basedir = os.path.abspath(os.path.dirname(__file__))
-# config_file = os.path.join(basedir, app.config['LOG_CONFIG_FILE'])
+if app.config['DO_LOGGING']:
+    import logging
+    import logging.config
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    # config_file = os.path.join(basedir, app.config['LOG_CONFIG_FILE'])
 
-# Check if environment variable VILFREDO_SETTINGS is set
-if 'VILFREDO_SETTINGS' in os.environ\
-        and os.path.isfile(os.path.join(os.environ['VILFREDO_SETTINGS'], app.config['LOG_CONFIG_FILE'])):
-    config_file = os.path.join(os.environ['VILFREDO_SETTINGS'], app.config['LOG_CONFIG_FILE'])
-else:
-    config_file = os.path.join(basedir, app.config['LOG_CONFIG_FILE'])
-logging.config.fileConfig(config_file)
-logger = logging.getLogger('vilfredo_logger')
-logger.propagate = False
+    # Check if environment variable VILFREDO_SETTINGS is set
+    if 'VILFREDO_SETTINGS' in os.environ\
+            and os.path.isfile(os.path.join(os.environ['VILFREDO_SETTINGS'], app.config['LOG_CONFIG_FILE'])):
+        config_file = os.path.join(os.environ['VILFREDO_SETTINGS'], app.config['LOG_CONFIG_FILE'])
+    else:
+        config_file = os.path.join(basedir, app.config['LOG_CONFIG_FILE'])
+    logging.config.fileConfig(config_file)
+    logger = logging.getLogger('vilfredo_logger')
+    logger.propagate = False
 
-# Apply the logger.handlers to the flask application
-for lh in logger.handlers:
-    app.logger.addHandler(lh)
+    root_logger = logging.getLogger('root')
+    root_logger.propagate = False
+
+    # Apply the logger.handlers to the flask application
+    for lh in logger.handlers:
+        app.logger.addHandler(lh)
+
