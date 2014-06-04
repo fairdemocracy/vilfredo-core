@@ -28,6 +28,8 @@ SITE_DOMAIN = '0.0.0.0:8080'
 # DATABASE_URI = 'sqlite:////var/tmp/vr.db'
 development_db = 'sqlite:////var/tmp/vr.db'
 
+ALGORITHM_VERSION = 1
+
 # Set path to log file
 LOG_FILE_PATH = '/var/tmp/vr.log'
 
@@ -48,10 +50,6 @@ EXTERNAL_MAP_PATH = 'static/maps/'
 
 # DATABASE_URI = development_db
 SQLALCHEMY_DATABASE_URI = development_db
-
-ALGORITHM_VERSION = 1
-
-DO_LOGGING = False
 
 # WARNNG: must be changed to False in production!
 DEBUG = True
