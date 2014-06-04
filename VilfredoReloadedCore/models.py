@@ -42,6 +42,8 @@ from HTMLParser import HTMLParser
 
 from flask import url_for
 
+import cPickle as pickle
+
 ##################################################
 # Functions to calculate Geometric Median
 ##################################################
@@ -104,6 +106,9 @@ def findGeometricMedian(dataPoints):
     return testMedian
 ##################################################
 
+def save_object(obj, filename):
+    with open(filename, 'wb') as output:
+        pickle.dump(obj, output, pickle.HIGHEST_PROTOCOL)
 
 def enum(**enums):
     return type('Enum', (), enums)
@@ -1684,16 +1689,29 @@ class Question(db.Model):
         :type generation: int
         :rtype: dict
         '''
-        algorithm = algorithm or app.config['ALGORITHM_VERSION']
+        algorithm = algorithm or app.config['ALGORITHM_VERSION']        
+        generation = generation or self.generation
+        
+        import os
+        
+        filepath = app.config['WORK_FILE_DIRECTORY'] + '/' + 'prop_rel_ids_qid_' + str(self.id) + '__gen_' + str(generation) + '__alg_' + str(algorithm) + '.pkl'
+        
+        if os.path.isfile(filepath):
+            app.logger.debug("Found prop_rel_ids cache file!!!")
+            with open(filepath, 'rb') as input:
+                return pickle.load(input)
 
         if algorithm == 2:
             app.logger.debug("************** USING ALGORITHM 2 ************")
-            return self.calculate_proposal_relation_ids_qualified(generation=generation,
+            proposal_relation_ids = self.calculate_proposal_relation_ids_qualified(generation=generation,
                                                                   proposals=proposals)
         else:
             app.logger.debug("************** USING ALGORITHM 1 ************")
-            return self.calculate_proposal_relation_ids_original(generation=generation,
+            proposal_relation_ids = self.calculate_proposal_relation_ids_original(generation=generation,
                                                                  proposals=proposals)
+        
+        save_object(proposal_relation_ids, r'' + filepath)
+        return proposal_relation_ids
 
     def calculate_proposal_relation_ids_original(self, generation=None, proposals=None):
         '''
@@ -1958,10 +1976,12 @@ class Question(db.Model):
 
         domination_map = self.calculate_domination_map(generation=generation, proposals=proposals, algorithm=algorithm)
         app.logger.debug("domination_map = %s", domination_map)
+        # return "CALCULATED DOMINATION MAP !!!!!"
         
         pareto_map = dict()
         relations = self.calculate_proposal_relation_ids(generation=generation, algorithm=algorithm)
         app.logger.debug("relations = %s", relations)
+        # return "CALCULATED PROPOSAL RELATIONS !!!!!"
         
         num_proposals = len(relations)
         # app.logger.debug("num_proposals = %s", num_proposals)
@@ -2044,7 +2064,6 @@ class Question(db.Model):
                 doms = relations[proposal_id]['dominated']
                 app.logger.debug("Relations = %s", doms)
                                 
-                # if len(doms - top_done) == 0:
                 app.logger.debug("Test if proposals dominations %s is a subset of higher levels %s",
                                      doms, higher_levels)
 
@@ -2090,7 +2109,6 @@ class Question(db.Model):
                 doms = relations[proposal_id]['dominating']
                 app.logger.debug("Relations = %s", doms)
                                 
-                # if len(doms - bottom_done) == 0:
                 app.logger.debug("Test if proposals dominations %s is a subset of lower levels %s",
                                      doms, lower_levels)
 
@@ -2136,6 +2154,7 @@ class Question(db.Model):
         
         pareto_map = dict()
         relations = self.calculate_proposal_relation_ids(generation=generation, algorithm=algorithm)
+        
         app.logger.debug("relations = %s", relations)
         
         num_proposals = len(relations)
@@ -2283,11 +2302,11 @@ class Question(db.Model):
             app.logger.debug("lower_levels now %s", lower_levels)
             level = level + 1
             app.logger.debug("level now %s", level)
-            '''
-            if level > 3:
+            
+
+            if level > 50:
                 app.logger.debug("at level %s - BREAKING!!!", level)
                 break
-            '''
 
         return pareto_map
 
@@ -2421,7 +2440,7 @@ class Question(db.Model):
             '''
         return pareto_map
 
-    def calculate_domination_map(self, generation=None, proposals=None, algorithm=None):
+    def calculate_domination_map(self, generation=None, proposals=None, algorithm=None): # cia
         '''
         .. function:: calculate_domination_map([generation=None])
 
@@ -2433,42 +2452,77 @@ class Question(db.Model):
         :rtype: dict
         '''
         algorithm = algorithm or app.config['ALGORITHM_VERSION']
+        
+        generation = generation or self.generation
+        
+        import os
+        
+        filepath = app.config['WORK_FILE_DIRECTORY'] + '/' + 'dom_map_qid_' + str(self.id) + '__gen_' + str(generation) + '__alg_' + str(algorithm) + '.pkl'
+        
+        if os.path.isfile(filepath):
+            app.logger.debug("Found dom map work file!!!")
+            with open(filepath, 'rb') as input:
+                return pickle.load(input)
 
         if algorithm == 2:
             app.logger.debug("************** USING ALGORITHM 2 ************")
-            return self.calculate_domination_map_qualified(generation=generation,
+            dom_map = self.calculate_domination_map_qualified(generation=generation,
                                                                proposals=proposals)
         else:
             app.logger.debug("************** USING ALGORITHM 1 ************")
-            return self.calculate_domination_map_original(generation=generation,
+            dom_map = self.calculate_domination_map_original(generation=generation,
                                                              proposals=proposals)
+        
+        save_object(dom_map, r'' + filepath)
+        return dom_map
 
-    def calculate_domination_map_qualified(self, generation=None, proposals=None): 
+    def calculate_domination_map_qualified(self, generation=None, proposals=None):
         '''
         .. function:: calculate_proposal_relations_original([generation=None])
 
         Calculates the complete map of dominations. For each proposal
         it calculates which dominate and which are dominated.
 
-        :param generation: question generation.
+        :param generation: question generation. today 2
         :type generation: int
         :rtype: dict
         '''
-        app.logger.debug("calculate_domination_map_original called...")
+        app.logger.debug("CALCULATE_DOMINATION_MAP_ORIGINAL CALLED...")
 
         generation = generation or self.generation
         domination_map = dict()
         endorser_ids = dict()
 
         all_proposals = proposals or self.get_proposals_list(generation)
+        
+        app.logger.debug("Processing %s proposals", len(all_proposals))
 
         for p in all_proposals:
             endorser_ids[p.id] = p.set_of_endorser_ids(generation)
 
+        outer_counter = 0
+        
         for proposal1 in all_proposals:
             domination_map[proposal1.id] = dict()
+            
+            outer_counter = outer_counter + 1
+            app.logger.debug("********************* OUTER PROPOSAL COUNTER = %s ********************* ", outer_counter)
+            
+            '''
+            if outer_counter == len(all_proposals):
+                c = 0
+                while c < 50:
+                    c = c + 1
+                    app.logger.debug("********************* S H O U L D   B E   F I N I S H E D !!! = %s ********************* ", outer_counter)
+            '''
+            
+            inner_counter = 0
 
             for proposal2 in all_proposals:
+                
+                inner_counter = inner_counter + 1
+                app.logger.debug("INNER PROPOSAL COUNTER = %s", inner_counter)
+                
                 if (proposal1 == proposal2):
                     domination_map[proposal1.id][proposal1.id] = -1
                     continue
@@ -5098,7 +5152,7 @@ class Proposal(db.Model):
         
         # Remove unqualified voters from each proposal.
         #   ie find intersection with qualified endorsers
-        #   (those that understand both proposal A and proposal B)
+        #   (those that understand both proposal A and proposal B) today 2
         proposal1_qualified = proposal1_voters & qualified_voters
         proposal2_qualified = proposal2_voters & qualified_voters
 
