@@ -2494,11 +2494,11 @@ class Question(db.Model):
         endorser_ids = dict()
 
         all_proposals = proposals or self.get_proposals_list(generation)
-        
+
         app.logger.debug("Processing %s proposals", len(all_proposals))
 
         for p in all_proposals:
-            endorser_ids[p.id] = p.set_of_endorser_ids(generation)
+            endorser_ids[p.id] = p.set_of_endorser_ids(generation) # look
 
         outer_counter = 0
         
@@ -2531,7 +2531,10 @@ class Question(db.Model):
                     intersection_of_qualfied_endorser_ids(proposal1,
                                                           proposal2,
                                                           generation)
-                app.logger.debug("Complex Domination: qualified_voters ==> %s", qualified_voters)
+                app.logger.debug("Complex Domination: qualified_voters for %s and %s ==> %s",
+                    proposal1.id,
+                    proposal2.id,
+                    qualified_voters)
 
                 who_dominates = Proposal.\
                     who_dominates_who_qualified(endorser_ids[proposal1.id],
@@ -2546,13 +2549,13 @@ class Question(db.Model):
                     # dominated
                     domination_map[proposal1.id][proposal2.id] = 2
                     # dominated.add(proposal2)
-                elif who_dominates == -1:
+                elif who_dominates == -2:
                     # both proposals have the same voters
-                    domination_map[proposal1.id][proposal2.id] = -1
+                    domination_map[proposal1.id][proposal2.id] = -2
                 else:
                     domination_map[proposal1.id][proposal2.id] = 0
 
-        app.logger.debug("Simple Domination: Domination Map ==> %s", domination_map)
+        app.logger.debug("Complex Domination: Domination Map ==> %s", domination_map)
         return domination_map
 
     def calculate_domination_map_original(self, generation=None, proposals=None):
@@ -2690,6 +2693,7 @@ class Question(db.Model):
 
             for p in proposals:
                 props[p.id] = p.set_of_endorser_ids(generation)
+                
                 if (exclude_user is not None):
                     app.logger.debug("props[p.id] = %s\n", props[p.id])
                     props[p.id].discard(exclude_user.id)
@@ -5020,7 +5024,64 @@ class Proposal(db.Model):
             endorsers.append(e.endorser)
         endorsers.sort(key=lambda x: x.id, reverse=False)
         return endorsers
+    
+    def endorsers(self, generation=None):
+        '''
+        .. function:: endorsers([generation=None])
 
+        Returns a set of the current endorsers
+            - Defaults to current generation
+
+        :param generation: question generation
+        :type generation: int or None
+        :rtype: set
+        '''
+        generation = generation or self.question.generation
+        current_endorsements = list()
+        current_endorsements = self.endorsements.filter(and_(
+            Endorsement.proposal_id == self.id,
+            Endorsement.generation == generation,
+            Endorsement.endorsement_type == 'endorse')
+        ).all()
+        endorsers = set()
+        for e in current_endorsements:
+            endorsers.add(e.endorser)
+        return endorsers
+
+    def voters_by_type(self, generation=None):
+        '''
+        .. function:: endorsers([generation=None])
+
+        Returns a set of the current endorsers
+            - Defaults to current generation
+
+        :param generation: question generation
+        :type generation: int or None
+        :rtype: set
+        '''
+        generation = generation or self.question.generation
+        current_endorsements = list()
+        current_endorsements = self.endorsements.filter(and_(
+            Endorsement.proposal_id == self.id,
+            Endorsement.generation == generation)
+        ).all()
+        
+        endorse = set()
+        oppose =set()
+        confused = set()
+        for e in current_endorsements:
+            if e.endorsement_type == 'endorse':
+                endorse.add(e.endorser.id)
+            elif e.endorsement_type == 'oppose':
+                oppose.add(e.endorser.id)
+            elif e.endorsement_type == 'confused':
+                confused.add(e.endorser.id)
+        endorsments = dict()
+        endorsments['endorse'] = endorse
+        endorsments['oppose'] = oppose
+        endorsments['confused'] = confused
+        return endorsments
+    
     def qualified_endorsers(self, generation=None):
         '''
         .. function:: endorsers([generation=None])
@@ -5040,29 +5101,6 @@ class Proposal(db.Model):
             or_(
                 Endorsement.endorsement_type == 'endorse',
                 Endorsement.endorsement_type == 'oppose'))
-        ).all()
-        endorsers = set()
-        for e in current_endorsements:
-            endorsers.add(e.endorser)
-        return endorsers
-    
-    def endorsers(self, generation=None):
-        '''
-        .. function:: endorsers([generation=None])
-
-        Returns a set of the current endorsers
-            - Defaults to current generation
-
-        :param generation: question generation
-        :type generation: int or None
-        :rtype: set
-        '''
-        generation = generation or self.question.generation
-        current_endorsements = list()
-        current_endorsements = self.endorsements.filter(and_(
-            Endorsement.proposal_id == self.id,
-            Endorsement.generation == generation,
-            Endorsement.endorsement_type == 'endorse')
         ).all()
         endorsers = set()
         for e in current_endorsements:
@@ -5130,6 +5168,53 @@ class Proposal(db.Model):
 
     @staticmethod
     def who_dominates_who_qualified(proposal1_voters, proposal2_voters, qualified_voters):
+        '''
+        .. function:: who_dominates_who_qualified(proposal1, proposal2)
+
+        Takes 2 SETS of Qualified ENDORSER IDs representing who endorsed each proposal
+        and calulates which proposal if any domiantes the other.
+        Returns either the dominating set, or an db.Integer value of:
+
+            - 0 if the sets of endorsers are different
+            - -1 if the sets of endorsers are the same
+
+        :param proposal1_voters: set of voters for proposal 1
+        :type proposal1_voters: set of int
+        :param proposal2_voters: set of voters for proposal 2
+        :type proposal2_voters: set of int
+        :rtype: interger or set of int
+        '''
+        app.logger.debug("who_dominates_who_qualified called with voters %s and %s and qualified %s",
+            proposal1_voters, proposal2_voters, qualified_voters)
+        
+        
+        # Remove unqualified voters from each proposal.
+        #   ie find intersection with qualified endorsers
+        #   (those that understand both proposal A and proposal B) ---- look
+        proposal1_qualified = proposal1_voters & qualified_voters
+        proposal2_qualified = proposal2_voters & qualified_voters
+
+        # If proposal1 and proposal2 are the same return -1
+        if (proposal1_qualified == proposal2_qualified):
+            return -2
+        # If proposal1 is empty return proposal2
+        elif (len(proposal1_qualified) == 0):
+            return proposal2_qualified
+        # If proposal2 is empty return proposal1
+        elif (len(proposal2_qualified) == 0):
+            return proposal1_qualified
+        # Check if proposal1 is a propoer subset of proposal2
+        elif (proposal1_qualified < proposal2_qualified):
+            return proposal2_qualified
+        # Check if proposal2 is a proper subset of proposal1
+        elif (proposal2_qualified < proposal1_qualified):
+            return proposal1_qualified
+        # proposal1 and proposal2 are different return 0
+        else:
+            return 0
+    
+    @staticmethod
+    def who_dominates_who_qualified_prev(proposal1_voters, proposal2_voters, qualified_voters):
         '''
         .. function:: who_dominates_who_qualified(proposal1, proposal2)
 
