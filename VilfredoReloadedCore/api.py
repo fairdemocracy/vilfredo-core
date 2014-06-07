@@ -3272,11 +3272,11 @@ def api_question_graph(question_id):
                    proposal_level_type=proposal_level_type,
                    user_level_type=user_level_type), 200
 
-@app.route('/api/v1/questions/<int:question_id>/pareto_map',
+@app.route('/api/v1/questions/<int:question_id>/levels_map',
            methods=['GET'])
-def api_question_pareto_map(question_id=None):
+def api_question_levels_map(question_id=None):
     '''
-    .. http:post:: questions/(int:question_id)/pareto_map
+    .. http:post:: questions/(int:question_id)/levels_map
 
         A map of proposal dominations.
 
@@ -3305,7 +3305,7 @@ def api_question_pareto_map(question_id=None):
         :statuscode 200: no error
         :statuscode 400: bad request
     '''
-    app.logger.debug("api_question_pareto_map called with %s...\n",
+    app.logger.debug("api_question_levels_map called with %s...\n",
                      question_id)
 
     if question_id is None:
@@ -3323,19 +3323,19 @@ def api_question_pareto_map(question_id=None):
     algorithm = int(request.args.get('algorithm', app.config['ALGORITHM_VERSION']))
 
     levels =\
-        question.calculate_pareto_map(generation=generation, algorithm=algorithm)
-    app.logger.debug("levels==>%s", levels)
+        question.calculate_levels_map(generation=generation, algorithm=algorithm)
+    # app.logger.debug("levels=====>%s", levels)
     
-    pareto_map = []
+    levels_map = []
     for (proposal_id, levels) in levels.iteritems():
-        pareto_map.append({"id": proposal_id, "levels": levels})
+        levels_map.append({"id": proposal_id, "levels": levels})
 
     return jsonify(
         question_id=str(question.id),
         query_generation=str(generation),
         current_generation=str(question.generation),
-        num_items=str(len(pareto_map)),
-        pareto_map=pareto_map), 200
+        num_items=str(len(levels_map)),
+        levels_map=levels_map), 200
 
 @app.route('/api/v1/questions/<int:question_id>/domination_map',
            methods=['GET'])
@@ -3418,7 +3418,7 @@ def api_question_domination_map(question_id=None):
             domination_list.append( DOMINATION_MAP_SYMBOLS[ dominations[pid] ] )
         domination_map.append({"id": int(proposal_id), "dominations": domination_list})
 
-        app.logger.debug("domination_map==>%s", domination_map)
+        # app.logger.debug("domination_map==>%s", domination_map)
 
     return jsonify(
         question_id=str(question.id),
