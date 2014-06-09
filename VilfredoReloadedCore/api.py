@@ -3324,7 +3324,7 @@ def api_question_levels_map(question_id=None):
 
     levels =\
         question.calculate_levels_map(generation=generation, algorithm=algorithm)
-    # app.logger.debug("levels=====>%s", levels)
+    app.logger.debug("levels=====>%s", levels)
     
     levels_map = []
     for (proposal_id, levels) in levels.iteritems():

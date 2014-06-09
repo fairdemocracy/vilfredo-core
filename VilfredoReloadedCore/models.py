@@ -1998,14 +1998,17 @@ class Question(db.Model):
         # set top and bottom levels
         top_levels[0] = set()
         bottom_levels[0] = set()
+        pareto = set()
         
         for (proposal_id, dominations) in domination_map.iteritems():
             # Initialize map
-            levels_map[proposal_id] = {'dominates': -1, 'dominated': -1}
+            levels_map[proposal_id] = {'dominates': -1, 'dominated': -1, 'pf_dominated': '&hellip;'}
 
             # Test if proposal is undominated
             if 2 not in dominations.values():
+                pareto.add(proposal_id)
                 levels_map[proposal_id]['dominated'] = 0
+                levels_map[proposal_id]['pf_dominated'] = 0
                 top_done.add(proposal_id)
                 top_levels[0].add(proposal_id)
 
@@ -2015,6 +2018,11 @@ class Question(db.Model):
                 bottom_done.add(proposal_id)
                 bottom_levels[0].add(proposal_id)
 
+        
+        for (proposal_id, rel) in relations.iteritems():
+            if len(rel['dominated'] & top_levels[0]) > 0:
+                levels_map[proposal_id]['pf_dominated'] = 1
+        
         '''
         today
         
