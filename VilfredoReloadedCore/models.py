@@ -1029,6 +1029,8 @@ class Question(db.Model):
         for proposal in proposals:
             proposers.add(proposal.user_id)
         return len(proposers)
+    
+    
 
     def get_proposer_count(self, generation=None):
         generation = generation or self.generation
@@ -1293,6 +1295,44 @@ class Question(db.Model):
             history_data[entry.proposal_id] = entry
         return history_data
 
+    def voting_map(self, generation=None):
+        gen = 1
+        voting_map = dict()
+        while gen <= self.generation:
+            gen_proposals = self.get_proposals_list(gen)
+            generation_votes = dict()
+            confused_count = 0
+            oppose_count = 0
+            for proposal in gen_proposals:
+                voters_by_type = proposal.voters_by_type(gen)
+                # generation_votes.append({'proposal': proposal.id, 'votes': voters_by_type})
+                generation_votes[proposal.id]= {'proposal': proposal.id, 'votes': voters_by_type}
+                confused_count = confused_count + len(voters_by_type['confused'])
+                oppose_count = oppose_count + len(voters_by_type['oppose'])
+            # voting_map.append({'generation': gen, 'votes': generation_votes})
+            voting_map[gen] = {'generation': gen, 
+                               'proposals': generation_votes, 
+                               'confused_count': confused_count, 
+                               'oppose_count': oppose_count}
+            gen = gen + 1
+        return voting_map
+    
+    def generation_voting_map(self, generation=None):
+        generation = generation or self.generation
+        proposals = self.get_proposals_list(generation)
+        all_endorsment_types = dict()
+        for proposal in proposals:
+            all_endorsment_types[proposal.id] = proposal.voters_by_type(generation)
+        return all_endorsment_types
+    
+    def all_votes_by_type(self, generation=None):
+        generation = generation or self.generation
+        proposals = self.get_proposals_list(generation)
+        all_endorsment_types = dict()
+        for proposal in proposals:
+            all_endorsment_types[proposal.id] = proposal.voters_by_type(generation)
+        return all_endorsment_types
+    
     def get_proposals_list(self, generation=None):
         '''
         .. function:: get_proposals()
@@ -1696,21 +1736,25 @@ class Question(db.Model):
         
         filepath = app.config['WORK_FILE_DIRECTORY'] + '/' + 'prop_rel_ids_qid_' + str(self.id) + '__gen_' + str(generation) + '__alg_' + str(algorithm) + '.pkl'
         
-        if os.path.isfile(filepath):
-            app.logger.debug("Found prop_rel_ids cache file!!!")
-            with open(filepath, 'rb') as input:
-                return pickle.load(input)
+        if app.config['CACHE_COMPLEX_DOM']:
+            if os.path.isfile(filepath):
+                app.logger.debug('calculate_proposal_relation_ids: RETURNING CACHED DATA')
+                with open(filepath, 'rb') as input:
+                    return pickle.load(input)
 
         if algorithm == 2:
             app.logger.debug("************** USING ALGORITHM 2 ************")
+            app.logger.debug('calculate_proposal_relation_ids: NON CACHED DATA')
             proposal_relation_ids = self.calculate_proposal_relation_ids_qualified(generation=generation,
                                                                   proposals=proposals)
         else:
             app.logger.debug("************** USING ALGORITHM 1 ************")
+            app.logger.debug('calculate_proposal_relation_ids: NON CACHED DATA')
             proposal_relation_ids = self.calculate_proposal_relation_ids_original(generation=generation,
                                                                  proposals=proposals)
+        if app.config['CACHE_COMPLEX_DOM']:
+            save_object(proposal_relation_ids, r'' + filepath)
         
-        save_object(proposal_relation_ids, r'' + filepath)
         return proposal_relation_ids
 
     def calculate_proposal_relation_ids_original(self, generation=None, proposals=None):
@@ -2467,21 +2511,25 @@ class Question(db.Model):
         
         filepath = app.config['WORK_FILE_DIRECTORY'] + '/' + 'dom_map_qid_' + str(self.id) + '__gen_' + str(generation) + '__alg_' + str(algorithm) + '.pkl'
         
-        if os.path.isfile(filepath):
-            app.logger.debug("Found dom map work file!!!")
-            with open(filepath, 'rb') as input:
-                return pickle.load(input)
+        if app.config['CACHE_COMPLEX_DOM']:
+            if os.path.isfile(filepath):
+                app.logger.debug('calculate_proposal_relation_ids: RETURNING CACHED DATA')
+                with open(filepath, 'rb') as input:
+                    return pickle.load(input)
 
         if algorithm == 2:
             app.logger.debug("************** USING ALGORITHM 2 ************")
+            app.logger.debug('calculate_proposal_relation_ids: NON CACHED DATA')
             dom_map = self.calculate_domination_map_qualified(generation=generation,
                                                                proposals=proposals)
         else:
             app.logger.debug("************** USING ALGORITHM 1 ************")
+            app.logger.debug('calculate_proposal_relation_ids: NON CACHED DATA')
             dom_map = self.calculate_domination_map_original(generation=generation,
                                                              proposals=proposals)
+        if app.config['CACHE_COMPLEX_DOM']:
+            save_object(dom_map, r'' + filepath)
         
-        save_object(dom_map, r'' + filepath)
         return dom_map
 
     def calculate_domination_map_qualified(self, generation=None, proposals=None):
@@ -5075,21 +5123,21 @@ class Proposal(db.Model):
             Endorsement.generation == generation)
         ).all()
         
-        endorse = set()
-        oppose =set()
-        confused = set()
+        endorse = []
+        oppose = []
+        confused = []
         for e in current_endorsements:
             if e.endorsement_type == 'endorse':
-                endorse.add(e.endorser.id)
+                endorse.append(e.endorser.id)
             elif e.endorsement_type == 'oppose':
-                oppose.add(e.endorser.id)
+                oppose.append(e.endorser.id)
             elif e.endorsement_type == 'confused':
-                confused.add(e.endorser.id)
-        endorsments = dict()
-        endorsments['endorse'] = endorse
-        endorsments['oppose'] = oppose
-        endorsments['confused'] = confused
-        return endorsments
+                confused.append(e.endorser.id)
+        endorsment_types = dict()
+        endorsment_types['endorse'] = endorse
+        endorsment_types['oppose'] = oppose
+        endorsment_types['confused'] = confused
+        return endorsment_types
     
     def qualified_endorsers(self, generation=None):
         '''

@@ -30,6 +30,8 @@ development_db = 'sqlite:////var/tmp/vr.db'
 
 ALGORITHM_VERSION = 1
 
+CACHE_COMPLEX_DOM = True
+
 # Set path to log file
 LOG_FILE_PATH = '/var/tmp/vr.log'
 

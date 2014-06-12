@@ -3272,6 +3272,64 @@ def api_question_graph(question_id):
                    proposal_level_type=proposal_level_type,
                    user_level_type=user_level_type), 200
 
+@app.route('/api/v1/questions/<int:question_id>/voting_map',
+           methods=['GET'])
+def api_question_voting_map(question_id):
+    '''
+    .. http:post:: questions/(int:question_id)/voting_map
+
+        A map of proposal dominations.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET questions/42/domination_map HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+
+        :param question_id: question id
+        :type question_id: int
+        :param generation: generation
+        :type generation: int
+        :param algorithm: algorithm id
+        :type algorithm: int
+        :statuscode 200: no error
+        :statuscode 400: bad request
+    '''
+    app.logger.debug("api_question_voting_map called with %s...\n",
+                     question_id)
+
+    if question_id is None:
+        app.logger.debug("ERROR: question_id is None!\n")
+        abort(404)
+
+    question = models.Question.query.get(int(question_id))
+
+    if question is None:
+        app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
+        abort(404)
+
+    generation = int(request.args.get('generation', question.generation))
+
+    voting_map = question.voting_map()
+    
+    # app.logger.debug("voting_map=====>%s", voting_map)
+
+    return jsonify(
+        question_id=str(question.id),
+        current_generation=str(question.generation),
+        num_items=str(len(voting_map)),
+        voting_map=voting_map), 200
+
 @app.route('/api/v1/questions/<int:question_id>/levels_map',
            methods=['GET'])
 def api_question_levels_map(question_id=None):
@@ -3411,7 +3469,7 @@ def api_question_domination_map(question_id=None):
         for (pid, relation) in dominations.iteritems():
             doms.append({"pid": pid, "relation": relation})
         '''
-        app.logger.debug("dominations===>>>>> %s", dominations)
+        # app.logger.debug("dominations===>>>>> %s", dominations)
 
         domination_list = []
         for pid in keys:
