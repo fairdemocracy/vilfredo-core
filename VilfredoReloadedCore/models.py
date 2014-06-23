@@ -322,7 +322,38 @@ class User(db.Model, UserMixin):
         :rtype: None
         '''
         self.comments.append(comment)
-    
+
+    def get_endorsement_count(self, question, generation=None):
+        '''
+        .. function:: get_endorsement_count(question[, generation=None])
+
+        Get endorsement count for the generation of a question.
+
+        :param question: question
+        :type question: int
+        :rtype: boolean
+        '''
+        generation = generation or question.generation
+        return db_session.query(Endorsement)\
+                        .filter(Endorsement.user_id == self.id)\
+                        .filter(Endorsement.question_id == question.id)\
+                        .filter(Endorsement.generation == generation)\
+                        .count()
+
+    def generations_participated_count(self, question):
+        '''
+        .. function:: get_endorsement_count(question[, generation=None])
+
+        Get endorsement count for the generation of a question.
+
+        :param question: question
+        :type question: int
+        :rtype: boolean
+        '''
+        return db_session.query(distinct(Endorsement.generation))\
+                        .filter(Endorsement.question_id == question.id)\
+                        .count()
+
     def unsupport_comment(self, comment):
         '''
         .. function:: unsupport_comments(comments)
@@ -638,6 +669,28 @@ class User(db.Model, UserMixin):
         for proposal in proposals:
             proposal_ids.append(proposal.id)
         return proposal_ids
+
+    def get_all_proposals(self, question):
+        '''
+        .. function:: get_proposals(question[, generation=None])
+
+        Fetch a LIST of the proposals authored by the user for this question.
+
+        :param question: associated question
+        :param generation: question generation
+        :type generation: int or None
+        :rtype: list of proposals
+        '''
+        '''
+        return self.proposals.filter(and_(
+            Proposal.question == question,
+            Proposal.generation == generation)
+        ).all()
+        '''
+        return db_session.query(Proposal).join(QuestionHistory).\
+            filter(QuestionHistory.question_id == question.id).\
+            filter(QuestionHistory.generation == generation).\
+            all()
 
     def get_proposals(self, question, generation=None):
         '''
@@ -1001,6 +1054,11 @@ class Question(db.Model):
                         .filter(Endorsement.generation == generation)\
                         .count()
 
+    def get_all_proposals(self):
+        return db_session.query(Proposal).join(QuestionHistory)\
+                        .filter(QuestionHistory.question_id == self.id)\
+                        .all()
+    
     def get_inherited_proposal_count(self, generation=None):
         generation = generation or self.generation
         if generation < 2:
@@ -1029,8 +1087,6 @@ class Question(db.Model):
         for proposal in proposals:
             proposers.add(proposal.user_id)
         return len(proposers)
-    
-    
 
     def get_proposer_count(self, generation=None):
         generation = generation or self.generation
@@ -1176,6 +1232,25 @@ class Question(db.Model):
         :rtype: Generation
         '''
         return Generation(self, generation)
+
+    def get_participants(self, generation=None):
+        '''
+        .. function:: get_participants(generation)
+
+        Returns a set of participents.
+
+        :rtype: Generation
+        '''
+        participants = set()
+        
+        # Add author
+        participants.add(self.author)
+        
+        # Get writers
+        
+        # Get Voters
+        
+        return participants
 
     def minimum_time_passed(self):
         '''
@@ -5080,6 +5155,34 @@ class Proposal(db.Model):
         for e in current_endorsements:
             endorsers.append(e.endorser)
         endorsers.sort(key=lambda x: x.id, reverse=False)
+        return endorsers
+    
+    def all_voters(self, generation=None):
+        '''
+        .. function:: endorsers([generation=None])
+
+        Returns a set of the current endorsers
+            - Defaults to current generation
+
+        :param generation: question generation
+        :type generation: int or None
+        :rtype: set
+        '''
+        all_endorsements = list()
+        
+        if not generation:
+            current_endorsements = self.endorsements.filter(
+                Endorsement.proposal_id == self.id
+            ).all()
+        else:
+            current_endorsements = self.endorsements.filter(and_(
+                Endorsement.proposal_id == self.id,
+                Endorsement.generation == generation)
+            ).all()
+
+        endorsers = set()
+        for e in current_endorsements:
+            endorsers.add(e.endorser)
         return endorsers
     
     def endorsers(self, generation=None):

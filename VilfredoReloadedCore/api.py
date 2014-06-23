@@ -2828,6 +2828,99 @@ def api_question_pareto(question_id=None):
                    num_items=str(len(pareto)), proposals=results), 200
 
 
+@app.route('/api/v1/questions/<int:question_id>/participation_table', methods=['GET'])
+def api_question_participation_table(question_id=None):
+    '''
+    .. http:post:: /questions/(int:question_id)/participation_table
+
+        A list of the Key Players for this round.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            POST /questions/44/key_players HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+            {
+              "query_generation": "1",
+              "current_generation": "1",
+              "key_players": [
+                {
+                  "3": [
+                    "/api/v1/questions/1/proposals/4",
+                    "/api/v1/questions/1/proposals/3"
+                  ]
+                },
+                {
+                  "4": [
+                    "/api/v1/questions/1/proposals/3"
+                  ]
+                }
+              ],
+              "num_items": "2",
+              "question_id": "1"
+            }
+
+        :param question_id: question id
+        :statuscode 200: no error
+        :statuscode 400: bad request
+    '''
+    app.logger.debug("api_question_participation_table called with %s...\n",
+                     question_id)
+
+    if question_id is None:
+        app.logger.debug("ERROR: question_id is None!\n")
+        abort(404)
+
+    question = models.Question.query.get(int(question_id))
+
+    if question is None:
+        app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
+        jsonify(message="Question not found"), 404
+
+    participants = set()
+
+    key_players = question.calculate_key_players()
+    all_proposals = question.get_all_proposals()
+
+    all_voters = set()
+    all_authors = set()
+    for proposal in all_proposals:
+        all_authors.add(proposal.author)
+        all_voters.update(proposal.all_voters())
+
+    participants.update(all_authors)
+    participants.update(all_voters)
+
+    app.logger.debug("participants==> %s", participants)
+
+    participation_table = []
+    for user in participants:
+        participant = dict()
+        participant['username'] = user.username
+        participant['key_player'] = user in key_players
+        participant['past_generations'] = user.generations_participated_count(question)
+        participant['evaluations'] = user.get_endorsement_count(question)
+        app.logger.debug("participant==>%s", participant)
+        participation_table.append(participant)
+        app.logger.debug("participation_table==>%s", participation_table)
+
+    return jsonify(question_id=str(question.id),
+                   current_generation=str(question.generation),
+                   num_proposals=str(len(all_proposals)),
+                   num_items=str(len(participation_table)),
+                   participation_table=participation_table), 200
+
+
 @app.route('/api/v1/questions/<int:question_id>/key_players', methods=['GET'])
 def api_question_key_players(question_id=None):
     '''
