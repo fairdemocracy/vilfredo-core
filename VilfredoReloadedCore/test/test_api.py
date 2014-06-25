@@ -649,7 +649,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 dict(
                     # endorsement_type="confused",
                     use_votemap=True,
-                    coords={'mapx': 0.68, 'mapy': 0.67}),
+                    coords={'mapx': 0.631388, 'mapy': 0.634726}),
                 'jack',
                 'jack123')
             self.assertEqual(rv.status_code, 201)
@@ -731,7 +731,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 dict(
                     # endorsement_type="oppose",
                     use_votemap=True,
-                    coords={'mapx': 0.14, 'mapy': 0.39}),
+                    coords={'mapx': 0.311503, 'mapy': 0.264203}),
                 'harry',
                 'harry123')
             self.assertEqual(rv.status_code, 201)
@@ -817,7 +817,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 dict(
                     # endorsement_type="oppose",
                     use_votemap=True,
-                    coords={'mapx': 0.1, 'mapy': 0.2}),
+                    coords={'mapx': 0.0910423, 'mapy': 0.153047}),
                 'harry',
                 'harry123')
             app.logger.debug("Data retrieved from Oppose Proposal = %s\n",
