@@ -1370,7 +1370,7 @@ class Question(db.Model):
             history_data[entry.proposal_id] = entry
         return history_data
 
-    def voting_map(self, generation=None):
+    def voting_map(self, generation=None): #newgrap fix
         gen = 1
         voting_map = dict()
         while gen <= self.generation:
@@ -1379,7 +1379,7 @@ class Question(db.Model):
             confused_count = 0
             oppose_count = 0
             for proposal in gen_proposals:
-                voters_by_type = proposal.voters_by_type(gen)
+                voters_by_type = proposal.voters_by_type(generation=gen)
                 # generation_votes.append({'proposal': proposal.id, 'votes': voters_by_type})
                 generation_votes[proposal.id]= {'proposal': proposal.id, 'votes': voters_by_type}
                 confused_count = confused_count + len(voters_by_type['confused'])
@@ -1391,15 +1391,7 @@ class Question(db.Model):
                                'oppose_count': oppose_count}
             gen = gen + 1
         return voting_map
-    
-    def generation_voting_map(self, generation=None):
-        generation = generation or self.generation
-        proposals = self.get_proposals_list(generation)
-        all_endorsment_types = dict()
-        for proposal in proposals:
-            all_endorsment_types[proposal.id] = proposal.voters_by_type(generation)
-        return all_endorsment_types
-    
+
     def all_votes_by_type(self, generation=None):
         generation = generation or self.generation
         proposals = self.get_proposals_list(generation)
@@ -1407,7 +1399,7 @@ class Question(db.Model):
         for proposal in proposals:
             all_endorsment_types[proposal.id] = proposal.voters_by_type(generation)
         return all_endorsment_types
-    
+
     def get_proposals_list(self, generation=None):
         '''
         .. function:: get_proposals()
@@ -1683,12 +1675,12 @@ class Question(db.Model):
         algorithm = algorithm or app.config['ALGORITHM_VERSION']
 
         if algorithm == 2:
-            app.logger.debug("************** USING ALGORITHM 2 ************")
+            # app.logger.debug("************** USING ALGORITHM 2 ************")
             return self.calculate_proposal_relations_qualified(generation=generation,
                                                                proposals=proposals,
                                                                algorithm=algorithm)
         else:
-            app.logger.debug("************** USING ALGORITHM 1 ************")
+            # app.logger.debug("************** USING ALGORITHM 1 ************")
             return self.calculate_proposal_relations_original(generation=generation,
                                                              proposals=proposals)
 
@@ -1792,7 +1784,7 @@ class Question(db.Model):
 
         return proposal_relations
 
-    
+
     def calculate_proposal_relation_ids(self, generation=None, proposals=None, algorithm=None):
         '''
         .. function:: calculate_proposal_relations([generation=None])
@@ -1804,11 +1796,11 @@ class Question(db.Model):
         :type generation: int
         :rtype: dict
         '''
-        algorithm = algorithm or app.config['ALGORITHM_VERSION']        
+        algorithm = algorithm or app.config['ALGORITHM_VERSION']
         generation = generation or self.generation
-        
+
         import os
-        
+
         filepath = app.config['WORK_FILE_DIRECTORY'] + '/' + 'prop_rel_ids_qid_' + str(self.id) + '__gen_' + str(generation) + '__alg_' + str(algorithm) + '.pkl'
         
         if app.config['CACHE_COMPLEX_DOM']:
@@ -1818,12 +1810,12 @@ class Question(db.Model):
                     return pickle.load(input)
 
         if algorithm == 2:
-            app.logger.debug("************** USING ALGORITHM 2 ************")
+            # app.logger.debug("************** USING ALGORITHM 2 ************")
             app.logger.debug('calculate_proposal_relation_ids: NON CACHED DATA')
             proposal_relation_ids = self.calculate_proposal_relation_ids_qualified(generation=generation,
                                                                   proposals=proposals)
         else:
-            app.logger.debug("************** USING ALGORITHM 1 ************")
+            # app.logger.debug("************** USING ALGORITHM 1 ************")
             app.logger.debug('calculate_proposal_relation_ids: NON CACHED DATA')
             proposal_relation_ids = self.calculate_proposal_relation_ids_original(generation=generation,
                                                                  proposals=proposals)
@@ -1914,15 +1906,15 @@ class Question(db.Model):
             for proposal2 in all_proposals:
                 if (proposal1 == proposal2):
                     continue
-                
+
                 qualified_voters = Proposal.\
                     intersection_of_qualfied_endorser_ids(proposal1,
                                                           proposal2,
                                                           generation)
-                app.logger.debug("Complex Domination: qualified_voters ==> %s", qualified_voters)
+                # app.logger.debug("Complex Domination: qualified_voters ==> %s", qualified_voters)
 
                 who_dominates = Proposal.\
-                    who_dominates_who_qualified(endorser_ids[proposal1.id],
+                    who_dominates_who_qualified(endorser_ids[proposal1.id], # newgraph
                                                 endorser_ids[proposal2.id],
                                                 qualified_voters)
 
@@ -1941,6 +1933,8 @@ class Question(db.Model):
 
             proposal_relations[proposal1.id]['dominating'] = dominating
             proposal_relations[proposal1.id]['dominated'] = dominated
+            # Add whether or not the proposal is fully understood
+            proposal_relations[proposal1.id]['understood'] = proposal1.is_completely_understood()
 
         return proposal_relations
     
@@ -2035,7 +2029,7 @@ class Question(db.Model):
                     intersection_of_qualfied_endorser_ids(proposal1,
                                                           proposal2,
                                                           generation)
-                app.logger.debug("Complex Domination: qualified_voters ==> %s", qualified_voters)
+                # app.logger.debug("Complex Domination: qualified_voters ==> %s", qualified_voters)
 
                 who_dominates = Proposal.\
                     who_dominates_who_qualified(props[proposal1.id],
@@ -2049,14 +2043,14 @@ class Question(db.Model):
 
             proposal_relations[proposal1.id]['dominating'] = dominating
             proposal_relations[proposal1.id]['dominated'] = dominated
-            app.logger.debug("Complex Domination: Relation Map ==> %s", proposal_relations)
+            # app.logger.debug("Complex Domination: Relation Map ==> %s", proposal_relations)
 
         return proposal_relations
 
     
     def calculate_levels_map_off(self, generation=None, proposals=None, algorithm=None):
         '''
-        .. function:: calculate_domination_map([generation=None])
+        .. function:: calculate_levels_map([generation=None])
 
         Calculates the complete map of dominations. For each proposal
         it calculates which dominate and which are dominated.
@@ -2068,12 +2062,12 @@ class Question(db.Model):
         algorithm = algorithm or app.config['ALGORITHM_VERSION']
 
         if algorithm == 2:
-            app.logger.debug("************** USING ALGORITHM 2 ************")
+            # app.logger.debug("************** USING ALGORITHM 2 ************")
             return self.calculate_levels_map_qualified(generation=generation,
                                                        proposals=proposals,
                                                        algorithm=algorithm)
         else:
-            app.logger.debug("************** USING ALGORITHM 1 ************")
+            # app.logger.debug("************** USING ALGORITHM 1 ************")
             return self.calculate_levels_map_original(generation=generation,
                                                       proposals=proposals,
                                                       algorithm=algorithm)
@@ -2567,7 +2561,7 @@ class Question(db.Model):
             '''
         return levels_map
 
-    def calculate_domination_map(self, generation=None, proposals=None, algorithm=None): # cia
+    def calculate_domination_map(self, generation=None, proposals=None, algorithm=None): # 
         '''
         .. function:: calculate_domination_map([generation=None])
 
@@ -2579,13 +2573,13 @@ class Question(db.Model):
         :rtype: dict
         '''
         algorithm = algorithm or app.config['ALGORITHM_VERSION']
-        
+
         generation = generation or self.generation
-        
+
         import os
-        
+
         filepath = app.config['WORK_FILE_DIRECTORY'] + '/' + 'dom_map_qid_' + str(self.id) + '__gen_' + str(generation) + '__alg_' + str(algorithm) + '.pkl'
-        
+
         if app.config['CACHE_COMPLEX_DOM']:
             if os.path.isfile(filepath):
                 app.logger.debug('calculate_proposal_relation_ids: RETURNING CACHED DATA')
@@ -2593,20 +2587,24 @@ class Question(db.Model):
                     return pickle.load(input)
 
         if algorithm == 2:
-            app.logger.debug("************** USING ALGORITHM 2 ************")
+            # app.logger.debug("************** USING ALGORITHM 2 ************")
             app.logger.debug('calculate_proposal_relation_ids: NON CACHED DATA')
             dom_map = self.calculate_domination_map_qualified(generation=generation,
                                                                proposals=proposals)
         else:
-            app.logger.debug("************** USING ALGORITHM 1 ************")
+            # app.logger.debug("************** USING ALGORITHM 1 ************")
             app.logger.debug('calculate_proposal_relation_ids: NON CACHED DATA')
             dom_map = self.calculate_domination_map_original(generation=generation,
                                                              proposals=proposals)
         if app.config['CACHE_COMPLEX_DOM']:
             save_object(dom_map, r'' + filepath)
-        
+
         return dom_map
 
+    @staticmethod
+    def test_for_full_domination(votes, pid1, pid2):
+        pass
+    
     def calculate_domination_map_qualified(self, generation=None, proposals=None):
         '''
         .. function:: calculate_proposal_relations_original([generation=None])
@@ -2618,41 +2616,37 @@ class Question(db.Model):
         :type generation: int
         :rtype: dict
         '''
-        app.logger.debug("CALCULATE_DOMINATION_MAP_ORIGINAL CALLED...")
+        app.logger.debug("CALCULATE_DOMINATION_MAP_QUALIFIED CALLED...")
 
         generation = generation or self.generation
         domination_map = dict()
         endorser_ids = dict()
 
         all_proposals = proposals or self.get_proposals_list(generation)
+        
+        # Get all votes sorted into sets by type for this genration
+        votes = self.all_votes_by_type(generation)
+        app.logger.debug("votes ==> %s")
 
-        app.logger.debug("Processing %s proposals", len(all_proposals))
+        # app.logger.debug("Processing %s proposals", len(all_proposals))
 
         for p in all_proposals:
-            endorser_ids[p.id] = p.set_of_endorser_ids(generation) # look
+            endorser_ids[p.id] = p.set_of_endorser_ids(generation) # thu
 
         outer_counter = 0
-        
+
         for proposal1 in all_proposals:
             domination_map[proposal1.id] = dict()
-            
+
             outer_counter = outer_counter + 1
-            app.logger.debug("********************* OUTER PROPOSAL COUNTER = %s ********************* ", outer_counter)
-            
-            '''
-            if outer_counter == len(all_proposals):
-                c = 0
-                while c < 50:
-                    c = c + 1
-                    app.logger.debug("********************* S H O U L D   B E   F I N I S H E D !!! = %s ********************* ", outer_counter)
-            '''
-            
+            # app.logger.debug("********************* OUTER PROPOSAL COUNTER = %s ********************* ", outer_counter)
+
             inner_counter = 0
 
             for proposal2 in all_proposals:
                 
                 inner_counter = inner_counter + 1
-                app.logger.debug("INNER PROPOSAL COUNTER = %s", inner_counter)
+                # app.logger.debug("INNER PROPOSAL COUNTER = %s", inner_counter)
                 
                 if (proposal1 == proposal2):
                     domination_map[proposal1.id][proposal1.id] = -1
@@ -2662,23 +2656,60 @@ class Question(db.Model):
                     intersection_of_qualfied_endorser_ids(proposal1,
                                                           proposal2,
                                                           generation)
+                '''
                 app.logger.debug("Complex Domination: qualified_voters for %s and %s ==> %s",
                     proposal1.id,
                     proposal2.id,
                     qualified_voters)
+                '''
 
                 who_dominates = Proposal.\
                     who_dominates_who_qualified(endorser_ids[proposal1.id],
                                                 endorser_ids[proposal2.id],
                                                 qualified_voters)
 
-                if (who_dominates == endorser_ids[proposal1.id]):
+                '''
+                ^ = intersection
+                < = subset
+                \ = set minus. (A\B= elements that are in A but not in B)
+                0 = empty set.
+                => = implies
+
+                if A? < B- AND B? < A+
+                then A > B
+                '''
+
+                partial_understanding = len(votes[proposal1.id]['confused']) > 0 or len(votes[proposal2.id]['confused']) > 0
+                app.logger.debug("Partial Understanding for relation %s --> %s = %s",
+                    proposal1.id,
+                    proposal2.id,
+                    partial_understanding)
+
+                if (who_dominates == endorser_ids[proposal1.id]): # newgraph
                     # dominating
-                    domination_map[proposal1.id][proposal2.id] = 1
+                    '''
+                    if partial_understanding\
+                            and votes[proposal1.id]['confused'] < votes[proposal2.id]['oppose']\
+                            and votes[proposal2.id]['confused'] < votes[proposal1.id]['endorse']:
+                        domination_map[proposal1.id][proposal2.id] = 3
+                    '''
+                    if partial_understanding:
+                        domination_map[proposal1.id][proposal2.id] = 3
+                    else:
+                        domination_map[proposal1.id][proposal2.id] = 1
                     # dominating.add(proposal2)
                 elif (who_dominates == endorser_ids[proposal2.id]):
                     # dominated
-                    domination_map[proposal1.id][proposal2.id] = 2
+                    '''
+                    if partial_understanding\
+                            and votes[proposal2.id]['confused'] < votes[proposal1.id]['oppose']\
+                            and votes[proposal1.id]['confused'] < votes[proposal2.id]['endorse']:
+                        domination_map[proposal1.id][proposal2.id] = 4
+                    '''
+                    if partial_understanding:
+                        domination_map[proposal1.id][proposal2.id] = 4
+                    else:
+                        domination_map[proposal1.id][proposal2.id] = 2
                     # dominated.add(proposal2)
                 elif who_dominates == -2:
                     # both proposals have the same voters
@@ -2769,13 +2800,13 @@ class Question(db.Model):
         algorithm = algorithm or app.config['ALGORITHM_VERSION']
 
         if algorithm == 2:
-            app.logger.debug("************** USING ALGORITHM 2 ************")
+            # app.logger.debug("************** USING ALGORITHM 2 ************")
             return self.calculate_pareto_front_qualified(proposals,
                                                          exclude_user,
                                                          generation,
                                                          save)
         else:
-            app.logger.debug("************** USING ALGORITHM 1 ************")
+            # app.logger.debug("************** USING ALGORITHM 1 ************")
             return self.calculate_pareto_front_original(proposals,
                                                          exclude_user,
                                                          generation,
@@ -3104,13 +3135,13 @@ class Question(db.Model):
         algorithm = algorithm or app.config['ALGORITHM_VERSION']
 
         if algorithm == 2:
-            app.logger.debug("************** USING ALGORITHM 2 ************")
+            # app.logger.debug("************** USING ALGORITHM 2 ************")
             return Question.who_dominates_this_excluding_qualified(proposal,
                                                                    pareto,
                                                                    user,
                                                                    generation)
         else:
-            app.logger.debug("************** USING ALGORITHM 1 ************")
+            # app.logger.debug("************** USING ALGORITHM 1 ************")
             return Question.who_dominates_this_excluding_original(proposal,
                                                                   pareto,
                                                                   user,
@@ -3250,7 +3281,7 @@ class Question(db.Model):
                          map_type='all',
                          proposal_level_type=GraphLevelType.layers,
                          user_level_type=GraphLevelType.layers,
-                         algorithm=None):
+                         algorithm=None): # oldgraph
         '''
         .. function:: get_voting_graph(generation, map_type)
 
@@ -3366,7 +3397,10 @@ class Question(db.Model):
         # app.logger.debug('get_proposal_endorsers: proposal_endorsers: %s', proposal_endorsers)
         return proposal_endorsers
 
-    # fix graph
+    
+
+
+    # oldgraph
     def make_graphviz_map(self,
                           proposals=None,
                           generation=None,
@@ -3462,7 +3496,7 @@ class Question(db.Model):
         app.logger.debug("proposal_relations %s\n",
                          proposal_relations)
 
-        proposals_below = dict()
+        proposals_below = dict() #oldgraph
         proposals_above = dict()
         for (proposal, relation) in proposal_relations.iteritems():
             proposals_below[proposal] = relation['dominating']
@@ -3508,7 +3542,7 @@ class Question(db.Model):
             proposal_levels = list()
             proposal_levels[0] = proposals
 
-        app.logger.debug("proposal_levels %s\n",
+        app.logger.debug("***proposal_levels %s\n",
                          proposal_levels)
 
         if (user_level_type == GraphLevelType.num_votes):
@@ -4826,6 +4860,27 @@ class Proposal(db.Model):
         self.question = question
         self.source = source
 
+    def all_votes(self, generation=None):
+        generation = generation or self.question.generation
+        all_votes = dict()
+
+        proposals = self.get_proposals_list(generation)
+        generation_votes = dict()
+        confused_count = 0
+        oppose_count = 0
+        for proposal in proposals:
+            voters_by_type = proposal.voters_by_type(gen)
+            # generation_votes.append({'proposal': proposal.id, 'votes': voters_by_type})
+            generation_votes[proposal.id]= {'proposal': proposal.id, 'votes': voters_by_type}
+            confused_count = confused_count + len(voters_by_type['confused'])
+            oppose_count = oppose_count + len(voters_by_type['oppose'])
+        # voting_map.append({'generation': gen, 'votes': generation_votes})
+        voting_map[gen] = {'generation': gen, 
+                           'proposals': generation_votes, 
+                           'confused_count': confused_count, 
+                           'oppose_count': oppose_count}
+        return voting_map
+    
     def get_endorser_count(self, generation=None):
         '''
         .. function:: get_endorser_count([generation=None])
@@ -5208,7 +5263,7 @@ class Proposal(db.Model):
             endorsers.add(e.endorser)
         return endorsers
 
-    def voters_by_type(self, generation=None):
+    def voters_by_type(self, return_sets=None, generation=None):
         '''
         .. function:: endorsers([generation=None])
 
@@ -5220,12 +5275,14 @@ class Proposal(db.Model):
         :rtype: set
         '''
         generation = generation or self.question.generation
+        return_sets = return_sets or False
+        
         current_endorsements = list()
         current_endorsements = self.endorsements.filter(and_(
             Endorsement.proposal_id == self.id,
             Endorsement.generation == generation)
         ).all()
-        
+
         endorse = []
         oppose = []
         confused = []
@@ -5236,11 +5293,62 @@ class Proposal(db.Model):
                 oppose.append(e.endorser.id)
             elif e.endorsement_type == 'confused':
                 confused.append(e.endorser.id)
+
         endorsment_types = dict()
-        endorsment_types['endorse'] = endorse
-        endorsment_types['oppose'] = oppose
-        endorsment_types['confused'] = confused
+
+        if return_sets:
+            endorsment_types['endorse'] = set(endorse)
+            endorsment_types['oppose'] = set(oppose)
+            endorsment_types['confused'] = set(confused)
+        else:
+            endorsment_types['endorse'] = endorse
+            endorsment_types['oppose'] = oppose
+            endorsment_types['confused'] = confused
+
         return endorsment_types
+
+    def is_completely_understood(self, generation=None): # thu
+        '''
+        .. function:: endorsers([generation=None])
+
+        Returns a set of the current endorsers
+            - Defaults to current generation
+
+        :param generation: question generation
+        :type generation: int or None
+        :rtype: set
+        '''
+        generation = generation or self.question.generation
+        current_endorsements = self.endorsements.filter(and_(
+            Endorsement.proposal_id == self.id,
+            Endorsement.generation == generation,
+            Endorsement.endorsement_type == 'confused')
+        ).count()
+        return current_endorsements == 0
+    
+    def get_endorser_id_by_type(self, endorsement_type=None, generation=None): #newgraph
+        '''
+        .. function:: endorsers([generation=None])
+
+        Returns a set of the current endorsers
+            - Defaults to current generation
+
+        :param generation: question generation
+        :type generation: int or None
+        :rtype: set
+        '''
+        endorsement_type = endorsement_type or 'endorse'
+        generation = generation or self.question.generation
+        current_endorsements = list()
+        current_endorsements = self.endorsements.filter(and_(
+            Endorsement.proposal_id == self.id,
+            Endorsement.generation == generation,
+            Endorsement.endorsement_type == endorsement_type)
+        ).all()
+        endorsers = set()
+        for e in current_endorsements:
+            endorsers.add(e.endorser.id)
+        return endorsers
     
     def qualified_endorsers(self, generation=None):
         '''
@@ -5327,7 +5435,7 @@ class Proposal(db.Model):
                                               proposal2_voters)
 
     @staticmethod
-    def who_dominates_who_qualified(proposal1_voters, proposal2_voters, qualified_voters):
+    def who_dominates_who_qualified(proposal1_voters, proposal2_voters, qualified_voters): # newgraph
         '''
         .. function:: who_dominates_who_qualified(proposal1, proposal2)
 
@@ -5344,10 +5452,20 @@ class Proposal(db.Model):
         :type proposal2_voters: set of int
         :rtype: interger or set of int
         '''
-        app.logger.debug("who_dominates_who_qualified called with voters %s and %s and qualified %s",
-            proposal1_voters, proposal2_voters, qualified_voters)
+        # app.logger.debug("who_dominates_who_qualified called with voters %s and %s and qualified %s",
+        #    proposal1_voters, proposal2_voters, qualified_voters)
         
-        
+        '''
+        ^ = intersection
+        < = subset
+        \ = set minus. (A\B= elements that are in A but not in B)
+        0 = empty set.
+        => = implies
+
+        if A? < B- AND B? < A+
+        then A > B
+        '''
+
         # Remove unqualified voters from each proposal.
         #   ie find intersection with qualified endorsers
         #   (those that understand both proposal A and proposal B) ---- look
@@ -5391,8 +5509,8 @@ class Proposal(db.Model):
         :type proposal2_voters: set of int
         :rtype: interger or set of int
         '''
-        app.logger.debug("who_dominates_who_qualified called with voters %s and %s and qualified %s",
-            proposal1_voters, proposal2_voters, qualified_voters)
+        # app.logger.debug("who_dominates_who_qualified called with voters %s and %s and qualified %s",
+        #    proposal1_voters, proposal2_voters, qualified_voters)
         
         
         # Remove unqualified voters from each proposal.

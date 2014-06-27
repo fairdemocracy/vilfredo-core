@@ -59,7 +59,7 @@ ENDORSEMENT_TYPES = ['endorse', 'oppose', 'confused']
 COMMENT_TYPES = ['for', 'against', 'question', 'answer']
 PWD_RESET_LIFETIME = 3600*24*2
 
-DOMINATION_MAP_SYMBOLS = {-2: '&approx;', -1: '&equiv;', 0: '&hellip;', 1: '^', 2: '<'}
+DOMINATION_MAP_SYMBOLS = {-2: '&approx;', -1: '&equiv;', 0: '&hellip;', 1: '^', 2: '<', 3: '&Precedes;', 4: '&curlywedge;'}
 
 '''
 from flask_login import LoginManager
@@ -3377,7 +3377,7 @@ def api_question_voting_map(question_id):
 
         .. sourcecode:: http
 
-            GET questions/42/domination_map HTTP/1.1
+            GET questions/42/voting_map HTTP/1.1
             Host: example.com
             Accept: application/json
 
@@ -3435,7 +3435,7 @@ def api_question_levels_map(question_id=None):
 
         .. sourcecode:: http
 
-            GET questions/42/domination_map HTTP/1.1
+            GET questions/42/levels_map HTTP/1.1
             Host: example.com
             Accept: application/json
 
