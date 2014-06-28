@@ -2626,7 +2626,7 @@ class Question(db.Model):
         
         # Get all votes sorted into sets by type for this genration
         votes = self.all_votes_by_type(generation)
-        app.logger.debug("votes ==> %s")
+        app.logger.debug("votes ==> %s", votes)
 
         # app.logger.debug("Processing %s proposals", len(all_proposals))
 
@@ -2657,6 +2657,9 @@ class Question(db.Model):
                                                           proposal2,
                                                           generation)
                 '''
+                app.logger.debug("Proposal %s votes == %s", proposal1.id, endorser_ids[proposal1.id])
+                app.logger.debug("Proposal %s votes == %s", proposal2.id, endorser_ids[proposal2.id])
+                
                 app.logger.debug("Complex Domination: qualified_voters for %s and %s ==> %s",
                     proposal1.id,
                     proposal2.id,
@@ -2667,6 +2670,7 @@ class Question(db.Model):
                     who_dominates_who_qualified(endorser_ids[proposal1.id],
                                                 endorser_ids[proposal2.id],
                                                 qualified_voters)
+                app.logger.debug("who dominates returned ==> %s", who_dominates)
 
                 '''
                 ^ = intersection
@@ -2680,10 +2684,12 @@ class Question(db.Model):
                 '''
 
                 partial_understanding = len(votes[proposal1.id]['confused']) > 0 or len(votes[proposal2.id]['confused']) > 0
+                '''
                 app.logger.debug("Partial Understanding for relation %s --> %s = %s",
                     proposal1.id,
                     proposal2.id,
                     partial_understanding)
+                '''
 
                 if (who_dominates == endorser_ids[proposal1.id]): # newgraph
                     # dominating
@@ -5477,16 +5483,16 @@ class Proposal(db.Model):
             return -2
         # If proposal1 is empty return proposal2
         elif (len(proposal1_qualified) == 0):
-            return proposal2_qualified
+            return proposal2_voters
         # If proposal2 is empty return proposal1
         elif (len(proposal2_qualified) == 0):
-            return proposal1_qualified
+            return proposal1_voters
         # Check if proposal1 is a propoer subset of proposal2
         elif (proposal1_qualified < proposal2_qualified):
-            return proposal2_qualified
+            return proposal2_voters
         # Check if proposal2 is a proper subset of proposal1
         elif (proposal2_qualified < proposal1_qualified):
-            return proposal1_qualified
+            return proposal1_voters
         # proposal1 and proposal2 are different return 0
         else:
             return 0
