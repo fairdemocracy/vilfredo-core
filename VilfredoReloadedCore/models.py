@@ -2693,27 +2693,27 @@ class Question(db.Model):
 
                 if (who_dominates == endorser_ids[proposal1.id]): # newgraph
                     # dominating
-                    '''
-                    if partial_understanding\
-                            and votes[proposal1.id]['confused'] < votes[proposal2.id]['oppose']\
-                            and votes[proposal2.id]['confused'] < votes[proposal1.id]['endorse']:
-                        domination_map[proposal1.id][proposal2.id] = 3
-                    '''
                     if partial_understanding:
-                        domination_map[proposal1.id][proposal2.id] = 3
+                        if votes[proposal1.id]['confused'] < votes[proposal2.id]['oppose']\
+                                and votes[proposal2.id]['confused'] < votes[proposal1.id]['endorse']:
+                            domination_map[proposal1.id][proposal2.id] = 5
+                        else:
+                            domination_map[proposal1.id][proposal2.id] = 3
+                    # if partial_understanding:
+                    #    domination_map[proposal1.id][proposal2.id] = 3
                     else:
                         domination_map[proposal1.id][proposal2.id] = 1
                     # dominating.add(proposal2)
                 elif (who_dominates == endorser_ids[proposal2.id]):
                     # dominated
-                    '''
-                    if partial_understanding\
-                            and votes[proposal2.id]['confused'] < votes[proposal1.id]['oppose']\
-                            and votes[proposal1.id]['confused'] < votes[proposal2.id]['endorse']:
-                        domination_map[proposal1.id][proposal2.id] = 4
-                    '''
                     if partial_understanding:
-                        domination_map[proposal1.id][proposal2.id] = 4
+                        if votes[proposal2.id]['confused'] < votes[proposal1.id]['oppose']\
+                                and votes[proposal1.id]['confused'] < votes[proposal2.id]['endorse']:
+                            domination_map[proposal1.id][proposal2.id] = 6
+                        else:
+                            domination_map[proposal1.id][proposal2.id] = 4
+                    # if partial_understanding:
+                    #    domination_map[proposal1.id][proposal2.id] = 4
                     else:
                         domination_map[proposal1.id][proposal2.id] = 2
                     # dominated.add(proposal2)

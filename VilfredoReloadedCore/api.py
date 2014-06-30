@@ -59,7 +59,7 @@ ENDORSEMENT_TYPES = ['endorse', 'oppose', 'confused']
 COMMENT_TYPES = ['for', 'against', 'question', 'answer']
 PWD_RESET_LIFETIME = 3600*24*2
 
-DOMINATION_MAP_SYMBOLS = {-2: '&approx;', -1: '&equiv;', 0: '&hellip;', 1: '^', 2: '<', 3: '&curlywedge;', 4: '&Precedes;'}
+DOMINATION_MAP_SYMBOLS = {-2: '&approx;', -1: '&equiv;', 0: '&hellip;', 1: '^', 2: '<', 3: '&curlywedge;', 4: '&Precedes;', 5: '<span class="partial2full">&curlywedge;</span>', 6: '<span class="partial2full">&Precedes;</span>'}
 
 '''
 from flask_login import LoginManager
