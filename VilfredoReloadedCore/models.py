@@ -1797,17 +1797,22 @@ class Question(db.Model):
         :rtype: dict
         '''
         algorithm = algorithm or app.config['ALGORITHM_VERSION']
+                
         generation = generation or self.generation
 
         import os
 
         filepath = app.config['WORK_FILE_DIRECTORY'] + '/' + 'prop_rel_ids_qid_' + str(self.id) + '__gen_' + str(generation) + '__alg_' + str(algorithm) + '.pkl'
         
+        app.logger.debug("calculate_proposal_relation_ids: check for cache file %s", filepath)
+        
         if app.config['CACHE_COMPLEX_DOM']:
             if os.path.isfile(filepath):
                 app.logger.debug('calculate_proposal_relation_ids: RETURNING CACHED DATA')
                 with open(filepath, 'rb') as input:
                     return pickle.load(input)
+            else:
+                app.logger.debug("calculate_proposal_relation_ids: Cache file %s not found", filepath)
 
         if algorithm == 2:
             # app.logger.debug("************** USING ALGORITHM 2 ************")
@@ -1820,6 +1825,7 @@ class Question(db.Model):
             proposal_relation_ids = self.calculate_proposal_relation_ids_original(generation=generation,
                                                                  proposals=proposals)
         if app.config['CACHE_COMPLEX_DOM']:
+            app.logger.debug("calculate_proposal_relation_ids: saving cache to file %s", filepath)
             save_object(proposal_relation_ids, r'' + filepath)
         
         return proposal_relation_ids
@@ -2048,7 +2054,7 @@ class Question(db.Model):
         return proposal_relations
 
     
-    def calculate_levels_map_off(self, generation=None, proposals=None, algorithm=None):
+    def calculate_levels_map_off(self, generation=None, proposals=None, algorithm=None): # test_complex
         '''
         .. function:: calculate_levels_map([generation=None])
 
@@ -2579,21 +2585,25 @@ class Question(db.Model):
         import os
 
         filepath = app.config['WORK_FILE_DIRECTORY'] + '/' + 'dom_map_qid_' + str(self.id) + '__gen_' + str(generation) + '__alg_' + str(algorithm) + '.pkl'
+        
+        app.logger.debug("calculate_domination_map: check for cache file %s", filepath)
 
         if app.config['CACHE_COMPLEX_DOM']:
             if os.path.isfile(filepath):
-                app.logger.debug('calculate_proposal_relation_ids: RETURNING CACHED DATA')
+                app.logger.debug('calculate_domination_map: RETURNING CACHED DATA')
                 with open(filepath, 'rb') as input:
                     return pickle.load(input)
+            else:
+                app.logger.debug("Cache file %s not found", filepath)
 
         if algorithm == 2:
             # app.logger.debug("************** USING ALGORITHM 2 ************")
-            app.logger.debug('calculate_proposal_relation_ids: NON CACHED DATA')
+            app.logger.debug('def calculate_domination_map_qualified: NON CACHED DATA')
             dom_map = self.calculate_domination_map_qualified(generation=generation,
                                                                proposals=proposals)
         else:
             # app.logger.debug("************** USING ALGORITHM 1 ************")
-            app.logger.debug('calculate_proposal_relation_ids: NON CACHED DATA')
+            app.logger.debug('def calculate_domination_map_original: NON CACHED DATA')
             dom_map = self.calculate_domination_map_original(generation=generation,
                                                              proposals=proposals)
         if app.config['CACHE_COMPLEX_DOM']:
@@ -2607,7 +2617,7 @@ class Question(db.Model):
     
     def calculate_domination_map_qualified(self, generation=None, proposals=None):
         '''
-        .. function:: calculate_proposal_relations_original([generation=None])
+        .. function:: calculate_domination_map_qualified([generation=None])
 
         Calculates the complete map of dominations. For each proposal
         it calculates which dominate and which are dominated.
