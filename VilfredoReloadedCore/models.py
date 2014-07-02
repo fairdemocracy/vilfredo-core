@@ -1393,11 +1393,13 @@ class Question(db.Model):
         return voting_map
 
     def all_votes_by_type(self, generation=None):
+        app.logger.debug("all_votes_by_type called for gen %s", generation)
         generation = generation or self.generation
         proposals = self.get_proposals_list(generation)
         all_endorsment_types = dict()
         for proposal in proposals:
-            all_endorsment_types[proposal.id] = proposal.voters_by_type(generation)
+            all_endorsment_types[proposal.id] = proposal.voters_by_type(generation=generation)
+            app.logger.debug("proposal %s votes = %s", proposal.id, all_endorsment_types[proposal.id])
         return all_endorsment_types
 
     def get_proposals_list(self, generation=None):
@@ -2629,13 +2631,14 @@ class Question(db.Model):
         app.logger.debug("CALCULATE_DOMINATION_MAP_QUALIFIED CALLED...")
 
         generation = generation or self.generation
+        app.logger.debug("calculate_domination_map_qualified: called with generation %s", generation)
         domination_map = dict()
         endorser_ids = dict()
 
         all_proposals = proposals or self.get_proposals_list(generation)
         
         # Get all votes sorted into sets by type for this genration
-        votes = self.all_votes_by_type(generation)
+        votes = self.all_votes_by_type(generation=generation)
         app.logger.debug("votes ==> %s", votes)
 
         # app.logger.debug("Processing %s proposals", len(all_proposals))
@@ -2666,7 +2669,7 @@ class Question(db.Model):
                     intersection_of_qualfied_endorser_ids(proposal1,
                                                           proposal2,
                                                           generation)
-                '''
+                
                 app.logger.debug("Proposal %s votes == %s", proposal1.id, endorser_ids[proposal1.id])
                 app.logger.debug("Proposal %s votes == %s", proposal2.id, endorser_ids[proposal2.id])
                 
@@ -2674,7 +2677,7 @@ class Question(db.Model):
                     proposal1.id,
                     proposal2.id,
                     qualified_voters)
-                '''
+                
 
                 who_dominates = Proposal.\
                     who_dominates_who_qualified(endorser_ids[proposal1.id],
@@ -2694,12 +2697,12 @@ class Question(db.Model):
                 '''
 
                 partial_understanding = len(votes[proposal1.id]['confused']) > 0 or len(votes[proposal2.id]['confused']) > 0
-                '''
+                
                 app.logger.debug("Partial Understanding for relation %s --> %s = %s",
                     proposal1.id,
                     proposal2.id,
                     partial_understanding)
-                '''
+                
 
                 if (who_dominates == endorser_ids[proposal1.id]): # newgraph
                     # dominating
