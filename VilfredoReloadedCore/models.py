@@ -5486,17 +5486,6 @@ class Proposal(db.Model):
         # app.logger.debug("who_dominates_who_qualified called with voters %s and %s and qualified %s",
         #    proposal1_voters, proposal2_voters, qualified_voters)
         
-        '''
-        ^ = intersection
-        < = subset
-        \ = set minus. (A\B= elements that are in A but not in B)
-        0 = empty set.
-        => = implies
-
-        if A? < B- AND B? < A+
-        then A > B
-        '''
-
         # Remove unqualified voters from each proposal.
         #   ie find intersection with qualified endorsers
         #   (those that understand both proposal A and proposal B) ---- look
