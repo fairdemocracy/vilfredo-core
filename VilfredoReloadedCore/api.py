@@ -59,7 +59,10 @@ ENDORSEMENT_TYPES = ['endorse', 'oppose', 'confused']
 COMMENT_TYPES = ['for', 'against', 'question', 'answer']
 PWD_RESET_LIFETIME = 3600*24*2
 
-DOMINATION_MAP_SYMBOLS = {-2: '&approx;', -1: '&equiv;', 0: '&hellip;', 1: '^', 2: '<', 3: '&curlywedge;', 4: '&Precedes;', 5: '<span class="partial2full">&curlywedge;</span>', 6: '<span class="partial2full">&Precedes;</span>'}
+# &hellip; ....
+# &NotGreaterLess;
+
+DOMINATION_MAP_SYMBOLS = {-2: '&approx;', -1: '&equiv;', 0: '&hellip;', 1: '^', 2: '<', 3: '&uHar;', 4: '&lHar;', 5: '<span class="partial2full">&uHar;</span>', 6: '<span class="partial2full">&lHar;</span>'}
 
 '''
 from flask_login import LoginManager
@@ -3564,6 +3567,7 @@ def api_question_domination_map(question_id=None):
         '''
         # app.logger.debug("dominations===>>>>> %s", dominations)
 
+        app.logger.debug("Dom Table Symbols: %s", DOMINATION_MAP_SYMBOLS)
         domination_list = []
         for pid in keys:
             domination_list.append( DOMINATION_MAP_SYMBOLS[ dominations[pid] ] )

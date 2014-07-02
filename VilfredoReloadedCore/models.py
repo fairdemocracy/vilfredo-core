@@ -109,6 +109,7 @@ def findGeometricMedian(dataPoints):
 def save_object(obj, filename):
     with open(filename, 'wb') as output:
         pickle.dump(obj, output, pickle.HIGHEST_PROTOCOL)
+        output.close()
 
 def enum(**enums):
     return type('Enum', (), enums)
@@ -2629,7 +2630,7 @@ class Question(db.Model):
         return set(votes[A.id]['confused']) < set(votes[B.id]['oppose'])\
             and set(votes[B.id]['confused']) < set(votes[A.id]['endorse'])
     
-    def calculate_domination_map_qualified(self, generation=None, proposals=None):
+    def calculate_domination_map_qualified(self, generation=None, proposals=None):  
         '''
         .. function:: calculate_domination_map_qualified([generation=None])
 
