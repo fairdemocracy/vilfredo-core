@@ -1816,6 +1816,8 @@ class Question(db.Model):
             else:
                 app.logger.debug("calculate_proposal_relation_ids: Cache file %s not found", filepath)
 
+        # return 
+        
         if algorithm == 2:
             # app.logger.debug("************** USING ALGORITHM 2 ************")
             app.logger.debug('calculate_proposal_relation_ids: NON CACHED DATA')
@@ -2598,14 +2600,16 @@ class Question(db.Model):
             else:
                 app.logger.debug("Cache file %s not found", filepath)
 
+        # return
+        
         if algorithm == 2:
             # app.logger.debug("************** USING ALGORITHM 2 ************")
-            app.logger.debug('def calculate_domination_map_qualified: NON CACHED DATA')
+            app.logger.debug('calculate_domination_map_qualified: NON CACHED DATA')
             dom_map = self.calculate_domination_map_qualified(generation=generation,
                                                                proposals=proposals)
         else:
             # app.logger.debug("************** USING ALGORITHM 1 ************")
-            app.logger.debug('def calculate_domination_map_original: NON CACHED DATA')
+            app.logger.debug('calculate_domination_map_original: NON CACHED DATA')
             dom_map = self.calculate_domination_map_original(generation=generation,
                                                              proposals=proposals)
         if app.config['CACHE_COMPLEX_DOM']:
@@ -2613,9 +2617,17 @@ class Question(db.Model):
 
         return dom_map
 
-    @staticmethod
-    def test_for_full_domination(votes, pid1, pid2):
-        pass
+    def full_domination(self, votes, A, B):
+        app.logger.debug("Testing Partials A = PID %s and B = PID %s", A.id, B.id)
+        test1 = set(votes[A.id]['confused']) < set(votes[B.id]['oppose'])
+        app.logger.debug("Test1: A? %s < B- %s ==> %s", votes[A.id]['confused'], votes[B.id]['oppose'], test1)
+        
+        test2 = set(votes[B.id]['confused']) < set(votes[A.id]['endorse'])
+        app.logger.debug("Test2: B? %s < A+ %s ==> %s", votes[B.id]['confused'], votes[A.id]['endorse'], test2)
+        
+        votes[B.id]['confused'] < votes[A.id]['endorse']
+        return set(votes[A.id]['confused']) < set(votes[B.id]['oppose'])\
+            and set(votes[B.id]['confused']) < set(votes[A.id]['endorse'])
     
     def calculate_domination_map_qualified(self, generation=None, proposals=None):
         '''
@@ -2702,31 +2714,30 @@ class Question(db.Model):
                     proposal1.id,
                     proposal2.id,
                     partial_understanding)
-                
 
                 if (who_dominates == endorser_ids[proposal1.id]): # newgraph
                     # dominating
                     if partial_understanding:
-                        if votes[proposal1.id]['confused'] < votes[proposal2.id]['oppose']\
-                                and votes[proposal2.id]['confused'] < votes[proposal1.id]['endorse']:
+                        app.logger.debug("Testing Partials A = PID %s and B = PID %s", proposal1.id, proposal2.id)
+                        app.logger.debug("Test1: A? %s < B- %s", votes[proposal1.id]['confused'], votes[proposal2.id]['oppose'])
+                        app.logger.debug("Test2: B? %s < A+ %s", votes[proposal2.id]['confused'], votes[proposal1.id]['endorse'])
+
+                        if self.full_domination(votes, proposal1, proposal2):
+                            app.logger.debug("Partial converts...")
                             domination_map[proposal1.id][proposal2.id] = 5
                         else:
+                            app.logger.debug("Partial does not convert...")
                             domination_map[proposal1.id][proposal2.id] = 3
-                    # if partial_understanding:
-                    #    domination_map[proposal1.id][proposal2.id] = 3
                     else:
                         domination_map[proposal1.id][proposal2.id] = 1
                     # dominating.add(proposal2)
                 elif (who_dominates == endorser_ids[proposal2.id]):
                     # dominated
                     if partial_understanding:
-                        if votes[proposal2.id]['confused'] < votes[proposal1.id]['oppose']\
-                                and votes[proposal1.id]['confused'] < votes[proposal2.id]['endorse']:
+                        if self.full_domination(votes, proposal2, proposal1):
                             domination_map[proposal1.id][proposal2.id] = 6
                         else:
                             domination_map[proposal1.id][proposal2.id] = 4
-                    # if partial_understanding:
-                    #    domination_map[proposal1.id][proposal2.id] = 4
                     else:
                         domination_map[proposal1.id][proposal2.id] = 2
                     # dominated.add(proposal2)
