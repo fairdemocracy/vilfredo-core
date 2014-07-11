@@ -4109,6 +4109,8 @@ class Question(db.Model):
             user_level_type=GraphLevelType.layerss])
 
         Generates the string to create a voting graph from Graphviz.
+        This version does not personalise the graph for each user -
+        this is now done at the front end.
 
         :param proposals: set of proposals
         :type proposals: set or None
