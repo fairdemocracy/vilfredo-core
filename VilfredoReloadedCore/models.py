@@ -1371,10 +1371,11 @@ class Question(db.Model):
             history_data[entry.proposal_id] = entry
         return history_data
 
-    def voting_map(self, generation=None): #newgrap fix
+    def voting_map(self, generation=None): #newgraph
         gen = 1
         voting_map = dict()
-        while gen <= self.generation:
+        generation = generation or self.generation
+        while gen <= generation:
             gen_proposals = self.get_proposals_list(gen)
             generation_votes = dict()
             confused_count = 0
@@ -1802,6 +1803,8 @@ class Question(db.Model):
         algorithm = algorithm or app.config['ALGORITHM_VERSION']
                 
         generation = generation or self.generation
+        
+        app.logger.debug("calculate_proposal_relation_ids called with gen %s", generation)
 
         import os
 
@@ -1945,7 +1948,7 @@ class Question(db.Model):
             proposal_relations[proposal1.id]['dominating'] = dominating
             proposal_relations[proposal1.id]['dominated'] = dominated
             # Add whether or not the proposal is fully understood
-            proposal_relations[proposal1.id]['understood'] = proposal1.is_completely_understood()
+            proposal_relations[proposal1.id]['understood'] = proposal1.is_completely_understood(generation=generation)
 
         return proposal_relations
     
@@ -2629,6 +2632,142 @@ class Question(db.Model):
         votes[B.id]['confused'] < votes[A.id]['endorse']
         return set(votes[A.id]['confused']) < set(votes[B.id]['oppose'])\
             and set(votes[B.id]['confused']) < set(votes[A.id]['endorse'])
+    
+    def set_domination_table_entry():
+        pass
+    
+    def calculate_domination_map_qualified_v2(self, generation=None, proposals=None):  
+        '''
+        .. function:: Turbo version of calculate_domination_map_qualified([generation=None])
+
+        Calculates the complete map of dominations. For each proposal
+        it calculates which dominate and which are dominated.
+
+        :param generation: question generation. today 2
+        :type generation: int
+        :rtype: dict
+        '''
+        app.logger.debug("CALCULATE_DOMINATION_MAP_QUALIFIED CALLED...")
+
+        generation = generation or self.generation
+        app.logger.debug("calculate_domination_map_qualified: called with generation %s", generation)
+        domination_map = dict()
+        endorser_ids = dict()
+
+        all_proposals = proposals or self.get_proposals_list(generation)
+        
+        # Get all votes sorted into sets by type for this genration
+        votes = self.all_votes_by_type(generation=generation)
+        app.logger.debug("votes ==> %s", votes)
+
+        # app.logger.debug("Processing %s proposals", len(all_proposals))
+
+        for p in all_proposals:
+            endorser_ids[p.id] = p.set_of_endorser_ids(generation)
+
+        outer_counter = 0
+
+        for proposal1 in all_proposals:
+            domination_map[proposal1.id] = dict()
+
+            outer_counter = outer_counter + 1
+            # app.logger.debug("********************* OUTER PROPOSAL COUNTER = %s ********************* ", outer_counter)
+
+            inner_counter = 0
+
+            for proposal2 in all_proposals:
+                inner_counter = inner_counter + 1
+                # Test for same proposal
+                if (proposal1 == proposal2):
+                    domination_map[proposal1.id][proposal1.id] = -1
+                    continue
+                # Test if reverse value already set
+                # -- make sure IDs are numerically sorted
+                # elif proposal1.id < proposal2.id:
+                
+                # Reverse values for the domination map
+                reverse_values = {-2: -2, -1: -1, 0: 0, 1: 2, 2: 1, 3: 4, 4: 3, 5: 6, 6: 5}
+                
+                try:
+                    domination_map[proposal1.id][proposal2.id] = reverse_values[domination_map[proposal2.id][proposal1.id]]
+                    continue
+                except NameError:
+                    app.logger.debug("domination_map entry [%s][%s] was not defined",
+                        proposal2.id,
+                        proposal1.id)
+
+                qualified_voters = Proposal.\
+                    intersection_of_qualfied_endorser_ids(proposal1,
+                                                          proposal2,
+                                                          generation)
+
+                app.logger.debug("Proposal %s votes == %s", proposal1.id, endorser_ids[proposal1.id])
+                app.logger.debug("Proposal %s votes == %s", proposal2.id, endorser_ids[proposal2.id])
+                
+                app.logger.debug("Complex Domination: qualified_voters for %s and %s ==> %s",
+                    proposal1.id,
+                    proposal2.id,
+                    qualified_voters)
+                
+
+                who_dominates = Proposal.\
+                    who_dominates_who_qualified(endorser_ids[proposal1.id],
+                                                endorser_ids[proposal2.id],
+                                                qualified_voters)
+                app.logger.debug("who dominates returned ==> %s", who_dominates)
+
+                '''
+                ^ = intersection
+                < = subset
+                \ = set minus. (A\B= elements that are in A but not in B)
+                0 = empty set.
+                => = implies
+
+                if A? < B- AND B? < A+
+                then A > B
+                '''
+
+                partial_understanding = len(votes[proposal1.id]['confused']) > 0 or len(votes[proposal2.id]['confused']) > 0
+                
+                app.logger.debug("Partial Understanding for relation %s --> %s = %s",
+                    proposal1.id,
+                    proposal2.id,
+                    partial_understanding)
+
+                if (who_dominates == endorser_ids[proposal1.id]): # newgraph
+                    # dominating
+                    if partial_understanding:
+                        app.logger.debug("Testing Partials A = PID %s and B = PID %s", proposal1.id, proposal2.id)
+                        app.logger.debug("Test1: A? %s < B- %s", votes[proposal1.id]['confused'], votes[proposal2.id]['oppose'])
+                        app.logger.debug("Test2: B? %s < A+ %s", votes[proposal2.id]['confused'], votes[proposal1.id]['endorse'])
+
+                        if self.full_domination(votes, proposal1, proposal2):
+                            app.logger.debug("Partial converts...")
+                            domination_map[proposal1.id][proposal2.id] = 5
+                        else:
+                            app.logger.debug("Partial does not convert...")
+                            domination_map[proposal1.id][proposal2.id] = 3
+                    else:
+                        domination_map[proposal1.id][proposal2.id] = 1
+                    # dominating.add(proposal2)
+                elif (who_dominates == endorser_ids[proposal2.id]):
+                    # dominated
+                    if partial_understanding:
+                        if self.full_domination(votes, proposal2, proposal1):
+                            domination_map[proposal1.id][proposal2.id] = 6
+                        else:
+                            domination_map[proposal1.id][proposal2.id] = 4
+                    else:
+                        domination_map[proposal1.id][proposal2.id] = 2
+                    # dominated.add(proposal2)
+                elif who_dominates == -2:
+                    # both proposals have the same voters
+                    domination_map[proposal1.id][proposal2.id] = -2
+                else:
+                    domination_map[proposal1.id][proposal2.id] = 0
+
+        # app.logger.debug("Complex Domination: Domination Map ==> %s", domination_map)
+        return domination_map
     
     def calculate_domination_map_qualified(self, generation=None, proposals=None):  
         '''
@@ -3375,12 +3514,13 @@ class Question(db.Model):
                 app.logger.debug("Generating map with proposals...")
                 app.logger.debug("DEBUG_MAP Generating map with proposals %s...", map_proposals)
 
-                voting_graph = self.make_graphviz_map(
+                voting_graph = self.make_graphviz_map_plain(
                     proposals=map_proposals,
                     generation=generation,
                     proposal_level_type=proposal_level_type,
                     user_level_type=user_level_type,
                     algorithm=algorithm)
+                
                 # Save the dot specification as a dot file
                 app.logger.debug("Writing dot file %s.dot", filepath)
                 dot_file = open(filepath+".dot", "w")
@@ -3429,8 +3569,1001 @@ class Question(db.Model):
         return proposal_endorsers
 
     
+    def create_new_graph(self, generation=None): # newgraph
+        generation = generation or self.generation
+        proposals = self.get_proposals_list(generation)
+        # dom_map = self.calculate_domination_map(generation=generation, algorithm=2)
+        relations = self.calculate_proposal_relation_ids(generation=generation, algorithm=2)
+        app.logger.debug("relations ==> %s", relations)
+        proposals_above = dict()
+        proposals_below = dict()
+
+        understood_undominated = []
+        for prop in list(proposals):
+            if len(relations[prop.id]['dominated']) == 0 and relations[prop.id]['understood']:
+                # proposals_above[prop] = []
+                understood_undominated.append(prop)
+                proposals.remove(prop)
+        app.logger.debug('understood_undominated = %s', understood_undominated)
+        
+        app.logger.debug('Remaining proposals = %s', proposals)
+
+        notunderstood_undominated = []
+        for prop in list(proposals):
+            if len(relations[prop.id]['dominated']) == 0 and not relations[prop.id]['understood']:
+                notunderstood_undominated.append(prop)
+                proposals.remove(prop)
+        app.logger.debug('notunderstood_undominated = %s', notunderstood_undominated)
+        
+        app.logger.debug('Remaining proposals = %s', proposals)
+
+                
+        proposals_covered = dict()
+        for (proposal, relation) in relations.iteritems():
+            proposals_covered[proposal] = relation['dominating']
+        app.logger.debug("proposals_covered %s\n",
+                         proposals_covered)
+        
+        app.logger.debug('proposals_covered = %s', proposals_covered)
+        
+        return True
 
 
+    # the newgraph 
+    def make_new_graphviz_map(self,
+                          proposals=None,
+                          generation=None,
+                          algorithm=None):
+        '''
+        .. function:: make_new_graphviz_map(
+            [proposals=None,
+            generation=None,
+            algorithm=None])
+
+        Generates the string to create a voting graph from Graphviz.
+
+        :param proposals: set of proposals
+        :type proposals: set or None
+        :param generation: the generation
+        :type generation: int or None
+        :param algorithm: the algorithm to use
+        :type algorithm: int or None
+        :rtype: string
+        '''
+        generation = generation or self.generation
+
+        # get set of all proposals -- debugging
+        proposals = proposals or self.get_proposals(generation)
+        app.logger.debug("DEBUG_MAP create map using proposals %s in generation %s\n",
+                         proposals, generation)
+
+        proposal_ids = get_ids_from_proposals(proposals)
+        app.logger.debug("DEBUG_MAP: map pids %s", proposal_ids)
+
+        # get pareto
+        pareto = self.calculate_pareto_front(proposals=proposals,
+                                             generation=generation,
+                                             algorithm=algorithm)
+        app.logger.debug("pareto %s\n",
+                         pareto)
+
+        # get set of all endorsers
+        # endorsers = self.get_endorsers(generation)
+        endorsers = set()
+        for proposal in proposals:
+            endorsers.update(proposal.endorsers(generation))
+        app.logger.debug("endorsers %s\n",
+                         endorsers)
+
+        # get dict of all proposals => endorsers
+        proposal_endorsers = dict()
+        for proposal in proposals:
+            proposal_endorsers[proposal] =\
+                proposal.endorsers(generation)
+        app.logger.debug("proposal_endorsers %s\n",
+                         proposal_endorsers)
+
+        # get dict of all endorsers => proposals
+        endorser_proposals = dict()
+        for endorser in endorsers:
+            endorser_proposals[endorser] =\
+                endorser.get_endorsed_proposal_ids_new(self, generation, proposal_ids) # fix?
+        app.logger.debug("endorser_proposals %s\n",
+                         endorser_proposals)
+
+        # get dict of pareto proposals => endorsers
+        pareto_endorsers = dict()
+        for proposal in pareto:
+            pareto_endorsers[proposal.id] = proposal.endorsers(generation)
+        app.logger.debug("pareto proposals => endorsers %s\n",
+                         pareto_endorsers)
+
+        proposal_relations = self.calculate_proposal_relations(generation=generation,
+                                                               proposals=proposals,
+                                                               algorithm=algorithm) # algstuff
+        app.logger.debug("proposal_relations %s\n",
+                         proposal_relations)
+
+        proposals_below = dict()
+        proposals_above = dict()
+        for (proposal, relation) in proposal_relations.iteritems():
+            proposals_below[proposal] = relation['dominating']
+            proposals_above[proposal] = relation['dominated']
+        app.logger.debug("proposals_below %s\n",
+                         proposals_below)
+        app.logger.debug("proposals_above %s\n",
+                         proposals_above)
+
+        proposals_covered = self.get_covered(proposals_below, proposals) # hereiam
+        app.logger.debug("proposals_covered %s\n",
+                         proposals_covered)
+
+        if (proposal_level_type == GraphLevelType.num_votes):
+            proposal_levels = self.find_levels_based_on_size(
+                proposal_endorsers)
+        elif (proposal_level_type == GraphLevelType.layers):
+            proposal_levels = self.find_levels(proposals_covered, proposals)
+        else:
+            proposal_levels = list()
+            proposal_levels[0] = proposals
+
+        app.logger.debug("***proposal_levels %s\n",
+                         proposal_levels)
+
+        # debugging
+        combined_proposals = self.combine_proposals(
+            proposal_endorsers, proposals)
+
+        app.logger.debug("proposal_endorsers A %s\n",
+                         proposal_endorsers)
+
+        bundled_proposals = set()
+        for (proposal, relations) in combined_proposals.iteritems():
+            bundled_proposals.update(relations)
+            relations.add(proposal)
+
+        app.logger.debug("combined_proposals %s\n",
+                         combined_proposals)
+        app.logger.debug("bundled_proposals %s\n",
+                         bundled_proposals)
+
+        proposal_levels_keys = proposal_levels.keys()
+
+        # Begin creation of Graphviz string
+        title = self.string_safe(self.title)
+        voting_graph = 'digraph "%s" {\n' % (title) # hereiam
+
+        for l in proposal_levels_keys:
+            voting_graph += ' "pl' + str(l) +\
+                '" [shape=point fontcolor=white ' +\
+                'color=white fontsize=1]; \n'
+
+        for l in proposal_levels_keys:
+            if (l != proposal_levels_keys[0]):
+                voting_graph += ' -> '
+            voting_graph += '"pl' + str(l) + '" '
+
+        voting_graph += " [color=white] \n "
+
+        for l in proposal_levels_keys:
+            voting_graph += '{rank=same; "pl' + str(l) + '" '
+            for p in proposal_levels[l]:
+                if (p in bundled_proposals):
+                    continue
+                voting_graph += " " + str(p.id) + " "
+            voting_graph += "}\n"
+
+
+        keys = combined_proposals.keys()
+        for kc2p in keys:
+
+            details_table = '  '
+
+            if (kc2p in pareto):
+                color = "black"
+                peripheries = 0
+                endo = proposal_endorsers[kc2p]
+
+                if (highlight_user1 and highlight_user1 in endo):
+                    color = "red"
+                    peripheries = 1
+
+                if (highlight_proposal1):
+                    if (kc2p in proposals_below[highlight_proposal1] or
+                            kc2p in proposals_above[highlight_proposal1]):
+                        color = "red"
+                        peripheries = 1
+
+                app.logger.debug("DEBUG_MAP: endo = %s", endo)
+                app.logger.debug("DEBUG_MAP: endorsers = %s", endorsers)
+                
+                if (len(endo) == len(endorsers)):
+                    details_table = ' BGCOLOR="gold" '
+                else:
+                    details_table = ' BGCOLOR="lightblue" '
+
+                details = ' fillcolor=white style=filled color=' + color +\
+                    ' peripheries=' + str(peripheries) + ' '
+            else:
+                color = "black"
+                peripheries = 0
+
+                if (highlight_user1 and
+                        highlight_user1 in proposal_endorsers[kc2p]):
+                    color = "red"
+                    peripheries = 1
+
+                if (highlight_proposal1):
+                    if (kc2p in proposals_below[highlight_proposal1] or
+                            kc2p in proposals_above[highlight_proposal1]):
+                        color = "red"
+                        peripheries = 1
+
+                details = ' fillcolor=white color=' + color +\
+                    ' peripheries=' + str(peripheries) + ' '
+
+            voting_graph += self.write_bundled_proposals(
+                kc2p.id, combined_proposals[kc2p], self.room,
+                details,
+                details_table,
+                internal_links,
+                highlight_proposal1)
+
+        all_combined_proposals = set()
+        for s in combined_proposals.values():
+            all_combined_proposals.update(s)
+
+        for p in proposals:
+
+            app.logger.debug("Skip prop if in a bundle...")
+
+            app.logger.debug("continue if %s in %s or in %s\n",
+                             p,
+                             bundled_proposals,
+                             all_combined_proposals)
+
+            if (p in bundled_proposals):
+                app.logger.debug(
+                    "Prop %s is in bundled_proposals - skip...", p)
+                continue
+
+            if (p in all_combined_proposals):
+                app.logger.debug(
+                    "Prop %s is in all_combined_proposals - skip...", p)
+                continue
+
+            color = "black"
+            peripheries = 1
+
+            if (highlight_user1 and highlight_user1 in proposal_endorsers[p]):
+                color = "red"
+                peripheries = 2
+
+            if (highlight_proposal1):
+                if (highlight_proposal1 == p):
+                    color = "red"
+                    peripheries = 3
+
+                if (p in proposals_below[highlight_proposal1]
+                        or p in proposals_above[highlight_proposal1]):
+                    color = "red"
+                    peripheries = 2
+
+            if (p in pareto):
+                app.logger.debug("DEBUG_MAP: p = %s", p)
+                endo = p.endorsers(generation)
+
+                app.logger.debug("DEBUG_MAP: endo = %s", endo)
+                app.logger.debug("DEBUG_MAP: endorsers = %s", endorsers)
+                
+                if (len(endo) == len(endorsers)):
+                    fillcolor = '"gold"'
+                else:
+                    fillcolor = '"lightblue" '
+
+                if (not internal_links):
+                    urlquery = self.create_proposal_url(p, self.room)
+                    tooltip = self.create_proposal_tooltip(p)
+                    voting_graph += str(p.id) +\
+                        ' [id=p' + str(p.id) + ' label=' + str(p.id) +\
+                        ' shape=box fillcolor=' + fillcolor +\
+                        ' style=filled color=' + color + ' peripheries=' +\
+                        str(peripheries) + ' tooltip="' + tooltip +\
+                        '"  fontsize=11]'
+                else:
+                    urlquery = self.create_internal_proposal_url(p)
+                    voting_graph += str(p.id) +\
+                        ' [id=p' + str(p.id) + ' label=' + str(p.id) +\
+                        ' shape=box fillcolor=' + fillcolor +\
+                        ' style=filled color=' + color + ' peripheries=' +\
+                        str(peripheries) + ' tooltip="' +\
+                        self.create_proposal_tooltip(p) +\
+                        '"  fontsize=11 URL="' +\
+                        internal_links + urlquery + '" target="_top"]'
+                voting_graph += "\n"
+
+            else:
+                if (not internal_links):
+                    urlquery = self.create_proposal_url(p, self.room)
+                    tooltip = self.create_proposal_tooltip(p)
+                    voting_graph += str(p.id) +\
+                        ' [id=p' + str(p.id) + ' label=' + str(p.id) +\
+                        ' shape=box fillcolor="white" style="filled" color=' + color + ' peripheries=' +\
+                        str(peripheries) + ' tooltip="' +\
+                        tooltip +\
+                        '"  fontsize=11]'
+                else:
+                    urlquery = self.create_internal_proposal_url(p)
+                    voting_graph += str(p.id) +\
+                        ' [id=p' + str(p.id) + ' label=' + str(p.id) +\
+                        ' shape=box color=' +\
+                        color + ' peripheries=' + str(peripheries) +\
+                        ' tooltip="' +\
+                        self.create_proposal_tooltip(p) +\
+                        '"  fontsize=11 URL="' +\
+                        internal_links + urlquery + '" target="_top"]'
+                voting_graph += "\n"
+
+        for p in proposals:
+            pcolor = "black"
+            if (p in bundled_proposals):
+                continue
+
+            if (highlight_proposal1 and
+                    (highlight_proposal1 == p or
+                     p in proposals_below[highlight_proposal1])):
+                pcolor = "red"
+
+            pcs = proposals_covered[p]
+            for pc in pcs:
+                color = pcolor
+                if (pc in bundled_proposals):
+                    continue
+
+                if (highlight_user1 and highlight_user1 in proposal_endorsers[pc]):
+                    color = "red"
+
+                # An empty array is trivially dominated by everything.
+                #
+                # But that is so trivial that it simplifies the graph
+                # if we just do not show those lines.
+                if (pc in proposal_endorsers and len(proposal_endorsers[pc]) == 0):
+                    color = "white"
+
+                if (highlight_proposal1 and
+                        (highlight_proposal1 == pc or
+                         pc in proposals_above[highlight_proposal1])):
+                    color = "red"
+
+                '''
+                left_prop_id = ''
+                if (pc in combined_proposals):
+                    for prop in combined_proposals[pc]:
+                        if (left_prop_id):
+                            left_prop_id += '_'
+                        left_prop_id += 'p' + str(prop.id)
+                else:
+                    left_prop_id += 'p' + str(pc.id)
+
+                right_prop_id = ''
+                if (p in combined_proposals):
+                    for prop in combined_proposals[p]:
+                        if (right_prop_id):
+                            right_prop_id += '_'
+                        right_prop_id += 'p' + str(prop.id)
+                else:
+                    right_prop_id += 'p' + str(p.id)
+                '''
+
+                left_prop_id = self.calculate_propsal_node_id(
+                    pc,
+                    combined_proposals)
+                right_prop_id = self.calculate_propsal_node_id(
+                    p,
+                    combined_proposals)
+
+                edge_id = 'id="' + left_prop_id + '&#45;&#45;' +\
+                    right_prop_id + '"'
+
+                voting_graph += ' ' + str(pc.id) + ' -> ' + str(p.id) +\
+                    ' [' + edge_id + ' class="edge" color="' + color + '"]'
+                voting_graph += " \n"
+
+        for e in endorsers:
+            ecolor = "blue"
+            if (e in bundled_users):
+                continue
+
+            ecs = endorsers_covered[e]
+
+            if (highlight_user1 and
+                    (highlight_user1 == e or
+                     highlight_user1 in endorsers_above[e])):
+                ecolor = "red"
+
+            for ec in ecs:
+                color = ecolor
+                if (ec in bundled_users):
+                    continue
+
+                if (highlight_proposal1 in endorser_proposals[ec]):
+                    color = "red"
+
+                #
+                # Calculate left and right user ids
+                #
+                left_usernode_id = self.calculate_user_node_id(
+                    e,
+                    combined_users)
+
+                right_usernode_id = self.calculate_user_node_id(
+                    ec,
+                    combined_users)
+
+                if e.id == 2:
+                    app.logger.debug("left_usernode_id ==> %s", left_usernode_id)
+                    app.logger.debug("right_usernode_id ==> %s", right_usernode_id)
+
+                # edge_id = 'id="u' + str(e.id) + '&#45;&#45;' +\
+                #    'u' + str(ec.id) + '"'
+                
+                edge_id = 'id="' + left_usernode_id + '&#45;&#45;' +\
+                    right_usernode_id + '"'
+
+                voting_graph += '"' + e.username + '" -> "' + ec.username +\
+                    '"' +\
+                    ' [' + edge_id + ' class="edge" color="' + color + '"]'
+                voting_graph += " \n"
+
+        new_proposals = dict()
+        for e in endorsers:
+            new_proposals[e] = self.new_proposals_to_an_endorser(
+                endorser_proposals,
+                e,
+                endorsers_covered)
+
+        for p in proposals:
+
+            if (p in bundled_proposals):
+                continue
+
+            endorsers_to_this = self.new_endorsers_to_a_proposal(
+                proposal_endorsers,
+                p,
+                proposals_covered)
+
+            app.logger.debug("Proposal p ==> %s\n", p)
+
+            app.logger.debug("endorsers_to_this ==> %s\n", endorsers_to_this)
+
+            app.logger.debug("new_proposals ==> %s\n", new_proposals)
+
+            for e in endorsers_to_this:
+
+                app.logger.debug("Endorser e ==> %s\n", e)
+
+                if (e in bundled_users):
+                    app.logger.debug("e in bundled_users: continue...\n")
+                    continue
+
+                if (p.id not in new_proposals[e]):
+                    app.logger.debug("%s not in %s: continue...\n",
+                                     p, new_proposals[e])
+                    continue
+
+                color = "blue"
+
+                if (highlight_user1 and
+                        (highlight_user1 == e or
+                         highlight_user1 in endorsers_above[e])):
+                    color = "red"
+
+                keys = combined_users.keys()
+                if (e in keys):
+                    if (highlight_user1 in combined_users[e]):
+                        color = "red"
+
+                if (highlight_proposal1 and
+                        (highlight_proposal1 == p or
+                         p in proposals_below[highlight_proposal1])):
+                    color = "red"
+
+                usernode_id = self.calculate_user_node_id(
+                    e,
+                    combined_users)
+
+                propnode_id = self.calculate_propsal_node_id(
+                    p,
+                    combined_proposals)
+
+                # if p.id == 1:
+                #    app.logger.debug("propnode_id ==> %s", propnode_id)
+                #    app.logger.debug("usernode_id ==> %s", usernode_id)
+
+                # edge_id = 'id="u' + str(e.id) + '&#45;&#45;' +\
+                #    propnode_id + '"'
+
+                edge_id = 'id="' + usernode_id + '&#45;&#45;' +\
+                    propnode_id + '"'
+
+                voting_graph += ' "' + e.username + '" -> ' + str(p.id) +\
+                    ' [' + edge_id + ' class="edge" color="' + color + '"]'
+                voting_graph += " \n"
+
+        voting_graph += "\n}"
+
+        return voting_graph
+    
+    # oldgraph
+    def make_graphviz_map_plain(self,
+                          proposals=None,
+                          generation=None,
+                          proposal_level_type=GraphLevelType.layers,
+                          user_level_type=GraphLevelType.layers,
+                          algorithm=None):
+        '''
+        .. function:: make_graphviz_map_plain(
+            [proposals=None,
+            generation=None,
+            proposal_level_type=GraphLevelType.layers,
+            user_level_type=GraphLevelType.layerss])
+
+        Generates the string to create a voting graph from Graphviz.
+
+        :param proposals: set of proposals
+        :type proposals: set or None
+        :param generation: the generation
+        :type generation: int or None
+        :param proposal_level_type: required layout of user nodes
+        :type proposal_level_type: GraphLevelType
+        :param user_level_type: required layout of user nodes
+        :type user_level_type: GraphLevelType
+        :rtype: string
+        '''
+        app.logger.debug("make_graphviz_map_plain called....")
+        
+        generation = generation or self.generation
+
+        # get set of all proposals -- debugging
+        proposals = proposals or self.get_proposals(generation)
+        app.logger.debug("DEBUG_MAP create map using proposals %s in generation %s\n",
+                         proposals, generation)
+
+        proposal_ids = get_ids_from_proposals(proposals)
+        app.logger.debug("DEBUG_MAP: map pids %s", proposal_ids)
+
+        # get pareto
+        pareto = self.calculate_pareto_front(proposals=proposals,
+                                             generation=generation,
+                                             algorithm=algorithm)
+        app.logger.debug("pareto %s\n",
+                         pareto)
+
+        # get set of all endorsers
+        # endorsers = self.get_endorsers(generation)
+        endorsers = set()
+        for proposal in proposals:
+            endorsers.update(proposal.endorsers(generation))
+        app.logger.debug("endorsers %s\n",
+                         endorsers)
+
+        # get dict of all proposals => endorsers
+        proposal_endorsers = dict()
+        for proposal in proposals:
+            proposal_endorsers[proposal] =\
+                proposal.endorsers(generation)
+        app.logger.debug("proposal_endorsers %s\n",
+                         proposal_endorsers)
+
+        # get dict of all endorsers => proposals
+        endorser_proposals = dict()
+        for endorser in endorsers:
+            endorser_proposals[endorser] =\
+                endorser.get_endorsed_proposal_ids_new(self, generation, proposal_ids) #
+        app.logger.debug("endorser_proposals %s\n",
+                         endorser_proposals)
+
+        # get dict of pareto proposals => endorsers
+        pareto_endorsers = dict()
+        for proposal in pareto:
+            pareto_endorsers[proposal.id] = proposal.endorsers(generation)
+        app.logger.debug("pareto proposals => endorsers %s\n",
+                         pareto_endorsers)
+
+        proposal_relations = self.calculate_proposal_relations(generation=generation,
+                                                               proposals=proposals,
+                                                               algorithm=algorithm) # algstuff
+        app.logger.debug("proposal_relations %s\n",
+                         proposal_relations)
+
+        proposals_below = dict() #oldgraph
+        for (proposal, relation) in proposal_relations.iteritems():
+            proposals_below[proposal] = relation['dominating']
+        app.logger.debug("proposals_below %s\n",
+                         proposals_below)
+
+        proposals_covered = self.get_covered(proposals_below, proposals)
+        app.logger.debug("proposals_covered %s\n",
+                         proposals_covered)
+
+        # Endorser relations
+        endorser_relations = self.calculate_endorser_relations_2(proposals=proposals, generation=generation)
+        app.logger.debug("DEBUG_MAP:: endorser_relations %s\n",
+                         endorser_relations)
+
+        endorsers_below = dict()
+        endorsers_above = dict()
+        for (endorser, relation) in endorser_relations.iteritems():
+            endorsers_below[endorser] = relation['dominating']
+            endorsers_above[endorser] = relation['dominated']
+        app.logger.debug("endorsers_below %s\n",
+                         endorsers_below)
+        app.logger.debug("endorsers_above %s\n",
+                         endorsers_above)
+
+        endorsers_covered = self.get_covered(endorsers_below, endorsers)
+        app.logger.debug("endorsers_covered %s\n",
+                         endorsers_covered)
+
+        endorsers_covering = self.get_covered(endorsers_above, endorsers)
+        app.logger.debug("endorsers_covering %s\n",
+                         endorsers_covering)
+
+        if (proposal_level_type == GraphLevelType.num_votes):
+            proposal_levels = self.find_levels_based_on_size(
+                proposal_endorsers)
+        elif (proposal_level_type == GraphLevelType.layers):
+            proposal_levels = self.find_levels(proposals_covered, proposals)
+        else:
+            proposal_levels = list()
+            proposal_levels[0] = proposals
+
+        app.logger.debug("***proposal_levels %s\n",
+                         proposal_levels)
+
+        if (user_level_type == GraphLevelType.num_votes):
+            user_levels = self.find_levels_based_on_size(endorser_proposals)
+                # reverse()
+        elif (user_level_type == GraphLevelType.layers):
+            user_levels = self.find_levels(endorsers_covering, endorsers)
+        # elif (user_level_type == "flat"):
+        else:
+            user_levels = list()
+            user_levels[0] = endorsers
+
+        app.logger.debug("user_levels %s\n",
+                         user_levels)
+
+        # debugging
+        combined_proposals = self.combine_proposals( # hereiam
+            proposal_endorsers, proposals)
+
+        app.logger.debug("proposal_endorsers A %s\n",
+                         proposal_endorsers)
+
+        bundled_proposals = set()
+        for (proposal, relations) in combined_proposals.iteritems():
+            bundled_proposals.update(relations)
+            relations.add(proposal)
+
+        app.logger.debug("combined_proposals %s\n",
+                         combined_proposals)
+        app.logger.debug("bundled_proposals %s\n",
+                         bundled_proposals)
+
+
+
+        # Bundle Users
+        app.logger.debug("DEBUG_MAP: proposal_endorsers = %s", proposal_endorsers)
+        app.logger.debug("DEBUG_MAP: endorsers = %s", endorsers)
+        
+        combined_users = self.combine_users(
+            proposal_endorsers, endorsers, generation, proposals)
+            
+        app.logger.debug("DEBUG_MAP: combined_users = %s", combined_users)
+
+        bundled_users = set()
+        for (endorser, relations) in combined_users.iteritems():
+            bundled_users.update(relations)
+            relations.append(endorser)
+
+        app.logger.debug("combined_users %s\n",
+                         combined_users)
+        app.logger.debug("bundled_users %s\n",
+                         bundled_users)
+
+        proposal_levels_keys = proposal_levels.keys()
+        user_levels_keys = user_levels.keys()
+
+        # Begin creation of Graphviz string
+        title = self.string_safe(self.title)
+        voting_graph = 'digraph "%s" {\n' % (title)
+
+        for l in proposal_levels_keys:
+            voting_graph += ' "pl' + str(l) +\
+                '" [shape=point fontcolor=white ' +\
+                'color=white fontsize=1]; \n'
+
+        for l in user_levels_keys:
+            voting_graph += ' "ul' + str(l) + '" [shape=point ' +\
+                'fontcolor=white ' +\
+                'color=white fontsize=1]; \n'
+
+        for l in proposal_levels_keys:
+            if (l != proposal_levels_keys[0]):
+                voting_graph += ' -> '
+            voting_graph += '"pl' + str(l) + '" '
+
+        for l in user_levels_keys:
+            voting_graph += ' -> '
+            voting_graph += '"ul' + str(l) + '" '
+
+        voting_graph += " [color=white] \n "
+
+        for l in proposal_levels_keys:
+            voting_graph += '{rank=same; "pl' + str(l) + '" '
+            for p in proposal_levels[l]:
+                if (p in bundled_proposals):
+                    continue
+                voting_graph += " " + str(p.id) + " "
+            voting_graph += "}\n"
+
+        for l in user_levels_keys:
+            voting_graph += '{rank=same; "ul' + str(l) + '" '
+            for u in user_levels[l]:
+                if (u in bundled_users):
+                    continue
+                voting_graph += '"' + u.username + '" '
+            voting_graph += "}\n"
+
+        for kc2u in combined_users:
+            details_table = '  '
+            color = "black"
+            fillcolor = "lightpink3"
+            peripheries = 0
+
+            details_table = ' BGCOLOR="lightpink3" '
+            details = ' fillcolor=white style=filled color=' +\
+                color + ' peripheries=' + str(peripheries) + ' '
+
+            voting_graph += self.write_bundled_users(
+                kc2u.username,
+                combined_users[kc2u],
+                self.room,
+                details,
+                details_table)
+
+        for e in endorsers:
+            if (e in bundled_users or e in combined_users):
+                continue
+
+            color = "lightpink3"
+            fillcolor = "lightpink3"
+            peripheries = 0
+
+            # Add id to user node
+            voting_graph += '"' + e.username + '" [id=u' + str(e.id) +\
+                ' shape=egg fillcolor=' +\
+                fillcolor +\
+                ' style=filled color=' + color + ' peripheries=' +\
+                str(peripheries) + ' style=filled  fontsize=11]'
+            voting_graph += "\n"
+
+        keys = combined_proposals.keys()
+        for kc2p in keys:
+
+            details_table = '  '
+
+            if (kc2p in pareto):
+                color = "black"
+                peripheries = 0
+                endo = proposal_endorsers[kc2p]
+
+                app.logger.debug("DEBUG_MAP: endo = %s", endo)
+                app.logger.debug("DEBUG_MAP: endorsers = %s", endorsers)
+                
+                if (len(endo) == len(endorsers)):
+                    details_table = ' BGCOLOR="gold" '
+                else:
+                    details_table = ' BGCOLOR="lightblue" '
+
+                details = ' fillcolor=white style=filled color=' + color +\
+                    ' peripheries=' + str(peripheries) + ' '
+            else:
+                color = "black"
+                peripheries = 0
+
+                details = ' fillcolor=white color=' + color +\
+                    ' peripheries=' + str(peripheries) + ' '
+
+            voting_graph += self.write_bundled_proposals(
+                kc2p.id, combined_proposals[kc2p], self.room,
+                details,
+                details_table)
+
+        all_combined_proposals = set()
+        for s in combined_proposals.values():
+            all_combined_proposals.update(s)
+
+        for p in proposals:
+
+            app.logger.debug("Skip prop if in a bundle...")
+
+            app.logger.debug("continue if %s in %s or in %s\n",
+                             p,
+                             bundled_proposals,
+                             all_combined_proposals)
+
+            if (p in bundled_proposals):
+                app.logger.debug(
+                    "Prop %s is in bundled_proposals - skip...", p)
+                continue
+
+            if (p in all_combined_proposals):
+                app.logger.debug(
+                    "Prop %s is in all_combined_proposals - skip...", p)
+                continue
+
+            color = "black"
+            peripheries = 1
+
+            if (p in pareto):
+                app.logger.debug("DEBUG_MAP: p = %s", p)
+                endo = p.endorsers(generation)
+
+                app.logger.debug("DEBUG_MAP: endo = %s", endo)
+                app.logger.debug("DEBUG_MAP: endorsers = %s", endorsers)
+                
+                if (len(endo) == len(endorsers)):
+                    fillcolor = '"gold"'
+                else:
+                    fillcolor = '"lightblue" '
+
+                urlquery = self.create_proposal_url(p, self.room)
+                tooltip = self.create_proposal_tooltip(p)
+                voting_graph += str(p.id) +\
+                    ' [id=p' + str(p.id) + ' label=' + str(p.id) +\
+                    ' shape=box fillcolor=' + fillcolor +\
+                    ' style=filled color=' + color + ' peripheries=' +\
+                    str(peripheries) + ' tooltip="' + tooltip +\
+                    '"  fontsize=11]'
+
+
+            else:
+                urlquery = self.create_proposal_url(p, self.room)
+                tooltip = self.create_proposal_tooltip(p)
+                voting_graph += str(p.id) +\
+                    ' [id=p' + str(p.id) + ' label=' + str(p.id) +\
+                    ' shape=box fillcolor="white" style="filled" color=' + color + ' peripheries=' +\
+                    str(peripheries) + ' tooltip="' +\
+                    tooltip +\
+                    '"  fontsize=11]'
+
+        for p in proposals:
+            pcolor = "black"
+            if (p in bundled_proposals):
+                continue
+
+            pcs = proposals_covered[p]
+            for pc in pcs:
+                color = pcolor
+                if (pc in bundled_proposals):
+                    continue
+
+                # An empty array is trivially dominated by everything.
+                #
+                # But that is so trivial that it simplifies the graph
+                # if we just do not show those lines.
+                if (pc in proposal_endorsers and len(proposal_endorsers[pc]) == 0):
+                    color = "white"
+
+
+                left_prop_id = self.calculate_propsal_node_id(
+                    pc,
+                    combined_proposals)
+                right_prop_id = self.calculate_propsal_node_id(
+                    p,
+                    combined_proposals)
+
+                edge_id = 'id="' + left_prop_id + '&#45;&#45;' +\
+                    right_prop_id + '"'
+
+                voting_graph += ' ' + str(pc.id) + ' -> ' + str(p.id) +\
+                    ' [' + edge_id + ' class="edge" color="' + color + '"]'
+                voting_graph += " \n"
+
+        for e in endorsers:
+            ecolor = "blue"
+            if (e in bundled_users):
+                continue
+
+            ecs = endorsers_covered[e]
+
+            for ec in ecs:
+                color = ecolor
+                if (ec in bundled_users):
+                    continue
+
+                #
+                # Calculate left and right user ids
+                #
+                left_usernode_id = self.calculate_user_node_id(
+                    e,
+                    combined_users)
+
+                right_usernode_id = self.calculate_user_node_id(
+                    ec,
+                    combined_users)
+
+                if e.id == 2:
+                    app.logger.debug("left_usernode_id ==> %s", left_usernode_id)
+                    app.logger.debug("right_usernode_id ==> %s", right_usernode_id)
+                
+                edge_id = 'id="' + left_usernode_id + '&#45;&#45;' +\
+                    right_usernode_id + '"'
+
+                voting_graph += '"' + e.username + '" -> "' + ec.username +\
+                    '"' +\
+                    ' [' + edge_id + ' class="edge" color="' + color + '"]'
+                voting_graph += " \n"
+
+        new_proposals = dict()
+        for e in endorsers:
+            new_proposals[e] = self.new_proposals_to_an_endorser(
+                endorser_proposals,
+                e,
+                endorsers_covered)
+
+        for p in proposals:
+
+            if (p in bundled_proposals):
+                continue
+
+            endorsers_to_this = self.new_endorsers_to_a_proposal(
+                proposal_endorsers,
+                p,
+                proposals_covered)
+
+            app.logger.debug("Proposal p ==> %s\n", p)
+
+            app.logger.debug("endorsers_to_this ==> %s\n", endorsers_to_this)
+
+            app.logger.debug("new_proposals ==> %s\n", new_proposals)
+
+            for e in endorsers_to_this:
+
+                app.logger.debug("Endorser e ==> %s\n", e)
+
+                if (e in bundled_users):
+                    app.logger.debug("e in bundled_users: continue...\n")
+                    continue
+
+                if (p.id not in new_proposals[e]):
+                    app.logger.debug("%s not in %s: continue...\n",
+                                     p, new_proposals[e])
+                    continue
+
+                color = "blue"
+
+                usernode_id = self.calculate_user_node_id(
+                    e,
+                    combined_users)
+
+                propnode_id = self.calculate_propsal_node_id(
+                    p,
+                    combined_proposals)
+
+                edge_id = 'id="' + usernode_id + '&#45;&#45;' +\
+                    propnode_id + '"'
+
+                voting_graph += ' "' + e.username + '" -> ' + str(p.id) +\
+                    ' [' + edge_id + ' class="edge" color="' + color + '"]'
+                voting_graph += " \n"
+
+        voting_graph += "\n}"
+
+        return voting_graph
+    
     # oldgraph
     def make_graphviz_map(self,
                           proposals=None,
@@ -3590,7 +4723,7 @@ class Question(db.Model):
                          user_levels)
 
         # debugging
-        combined_proposals = self.combine_proposals(
+        combined_proposals = self.combine_proposals( # hereiam
             proposal_endorsers, proposals)
 
         app.logger.debug("proposal_endorsers A %s\n",
@@ -4316,7 +5449,7 @@ class Question(db.Model):
     def create_proposal_url(self, proposal, room):
         return str(proposal.id) + '/' + room
 
-    def get_covered(self, elements_below, elements):
+    def get_covered(self, elements_below, elements): 
         '''
         .. function:: get_covered(elements_below, elements)
 
@@ -4346,7 +5479,7 @@ class Question(db.Model):
             covered[element] = covered_elements
         return covered
 
-    def find_levels(self, elements_covered, elements):
+    def find_levels(self, elements_covered, elements): # hereiam
         '''
         .. function:: find_levels(elements_covered, elements)
 
@@ -4432,7 +5565,7 @@ class Question(db.Model):
         app.logger.debug("proposals %s\n",
                          proposals)
 
-        if (proposals == 0):
+        if (not proposals):
             proposals = proposal_endorsers.keys()
         else:
             proposals = list(proposals)
@@ -5465,6 +6598,52 @@ class Proposal(db.Model):
             return Proposal.who_dominates_who(proposal1_voters,
                                               proposal2_voters)
 
+    @staticmethod
+    def who_dominates_who_qualified_2(proposal1_voters, proposal2_voters, qualified_voters): # newgraph
+        '''
+        .. function:: who_dominates_who_qualified(proposal1, proposal2)
+
+        Takes 2 SETS of Qualified ENDORSER IDs representing who endorsed each proposal
+        and calulates which proposal if any domiantes the other.
+        Returns either the dominating set, or an db.Integer value of:
+
+            - 0 if the sets of endorsers are different
+            - -1 if the sets of endorsers are the same
+
+        :param proposal1_voters: set of voters for proposal 1
+        :type proposal1_voters: set of int
+        :param proposal2_voters: set of voters for proposal 2
+        :type proposal2_voters: set of int
+        :rtype: interger or set of int
+        '''
+        # app.logger.debug("who_dominates_who_qualified called with voters %s and %s and qualified %s",
+        #    proposal1_voters, proposal2_voters, qualified_voters)
+        
+        # Remove unqualified voters from each proposal.
+        #   ie find intersection with qualified endorsers
+        #   (those that understand both proposal A and proposal B) ---- look
+        proposal1_qualified = proposal1_voters & qualified_voters
+        proposal2_qualified = proposal2_voters & qualified_voters
+
+        # If proposal1 and proposal2 are the same return -1
+        if (proposal1_qualified == proposal2_qualified):
+            return -2
+        # If proposal1 is empty return proposal2
+        elif (len(proposal1_qualified) == 0):
+            return proposal2_voters
+        # If proposal2 is empty return proposal1
+        elif (len(proposal2_qualified) == 0):
+            return proposal1_voters
+        # Check if proposal1 is a propoer subset of proposal2
+        elif (proposal1_qualified < proposal2_qualified):
+            return proposal2_voters
+        # Check if proposal2 is a proper subset of proposal1
+        elif (proposal2_qualified < proposal1_qualified):
+            return proposal1_voters
+        # proposal1 and proposal2 are different return 0
+        else:
+            return 0
+    
     @staticmethod
     def who_dominates_who_qualified(proposal1_voters, proposal2_voters, qualified_voters): # newgraph
         '''
