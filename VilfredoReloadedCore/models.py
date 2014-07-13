@@ -1371,7 +1371,7 @@ class Question(db.Model):
             history_data[entry.proposal_id] = entry
         return history_data
 
-    def voting_map(self, generation=None): #newgraph
+    def voting_map(self, generation=None):
         gen = 1
         voting_map = dict()
         generation = generation or self.generation
@@ -1890,6 +1890,91 @@ class Question(db.Model):
 
         return proposal_relations
 
+    def calculate_proposal_relation_ids_qualified_v2(self, generation=None, proposals=None):
+        '''
+        .. function:: calculate_proposal_relations([generation=None])
+
+        Calculates the complete map of dominations. For each proposal
+        it calculates which dominate and which are dominated.
+
+        :param generation: question generation.
+        :type generation: int
+        :rtype: dict
+        '''
+        generation = generation or self.generation
+
+        proposal_relations = dict()
+        endorser_ids = dict()
+
+        # all_proposals = self.get_proposals(generation)
+        all_proposals = proposals or self.get_proposals(generation)
+        
+        # Get all votes sorted into sets by type for this genration
+        votes = self.all_votes_by_type(generation=generation)
+        app.logger.debug("votes ==> %s", votes)
+
+        for p in all_proposals:
+            endorser_ids[p.id] = p.set_of_endorser_ids(generation)
+
+        for proposal1 in all_proposals:
+            dominating = set()
+            dominated = set()
+            proposal_relations[proposal1.id] = dict()
+
+            for proposal2 in all_proposals:
+                if (proposal1 == proposal2):
+                    continue
+
+                qualified_voters = Proposal.\
+                    intersection_of_qualfied_endorser_ids(proposal1,
+                                                          proposal2,
+                                                          generation)
+                # app.logger.debug("Complex Domination: qualified_voters ==> %s", qualified_voters)
+
+                who_dominates = Proposal.\
+                    who_dominates_who_qualified(endorser_ids[proposal1.id], # newgraph
+                                                endorser_ids[proposal2.id],
+                                                qualified_voters)
+
+                '''
+                app.logger.debug("Comparing endorser_ids %s %s and %s %s\n",
+                                 proposal1.id, endorser_ids[proposal1.id],
+                                 proposal2.id, endorser_ids[proposal2.id])
+                app.logger.debug("   ===> WDW Result = %s\n",
+                                 who_dominates)
+                '''
+
+                partial_understanding = len(votes[proposal1.id]['confused']) > 0 or len(votes[proposal2.id]['confused']) > 0
+
+                if (who_dominates == endorser_ids[proposal1.id]): # newgraph
+                    # dominating
+                    if partial_understanding:
+                        app.logger.debug("Testing Partials A = PID %s and B = PID %s", proposal1.id, proposal2.id)
+                        app.logger.debug("Test1: A? %s < B- %s", votes[proposal1.id]['confused'], votes[proposal2.id]['oppose'])
+                        app.logger.debug("Test2: B? %s < A+ %s", votes[proposal2.id]['confused'], votes[proposal1.id]['endorse'])
+
+                        if self.converts_to_full_domination(votes, proposal1, proposal2):
+                            app.logger.debug("Partial converts...")
+                            # domination_map[proposal1.id][proposal2.id] = 5
+                            dominating.add(proposal2.id)
+                        else:
+                            app.logger.debug("Partial does not convert...")
+                    else:
+                        domination_map[proposal1.id][proposal2.id] = 1
+                elif (who_dominates == endorser_ids[proposal2.id]):
+                    # dominated
+                    if partial_understanding and self.converts_to_full_domination(votes, proposal2, proposal1):
+                            dominated.add(proposal2.id)
+                    else:
+                        dominated.add(proposal2.id)
+
+            proposal_relations[proposal1.id]['dominating'] = dominating
+            proposal_relations[proposal1.id]['dominated'] = dominated
+            # Add whether or not the proposal is fully understood
+            proposal_relations[proposal1.id]['understood'] = proposal1.is_completely_understood(generation=generation)
+
+        return proposal_relations
+    
     def calculate_proposal_relation_ids_qualified(self, generation=None, proposals=None):
         '''
         .. function:: calculate_proposal_relations([generation=None])
@@ -2621,7 +2706,7 @@ class Question(db.Model):
 
         return dom_map
 
-    def full_domination(self, votes, A, B):
+    def converts_to_full_domination(self, votes, A, B):
         app.logger.debug("Testing Partials A = PID %s and B = PID %s", A.id, B.id)
         test1 = set(votes[A.id]['confused']) < set(votes[B.id]['oppose'])
         app.logger.debug("Test1: A? %s < B- %s ==> %s", votes[A.id]['confused'], votes[B.id]['oppose'], test1)
@@ -2741,7 +2826,7 @@ class Question(db.Model):
                         app.logger.debug("Test1: A? %s < B- %s", votes[proposal1.id]['confused'], votes[proposal2.id]['oppose'])
                         app.logger.debug("Test2: B? %s < A+ %s", votes[proposal2.id]['confused'], votes[proposal1.id]['endorse'])
 
-                        if self.full_domination(votes, proposal1, proposal2):
+                        if self.converts_to_full_domination(votes, proposal1, proposal2):
                             app.logger.debug("Partial converts...")
                             domination_map[proposal1.id][proposal2.id] = 5
                         else:
@@ -2753,7 +2838,7 @@ class Question(db.Model):
                 elif (who_dominates == endorser_ids[proposal2.id]):
                     # dominated
                     if partial_understanding:
-                        if self.full_domination(votes, proposal2, proposal1):
+                        if self.converts_to_full_domination(votes, proposal2, proposal1):
                             domination_map[proposal1.id][proposal2.id] = 6
                         else:
                             domination_map[proposal1.id][proposal2.id] = 4
@@ -2849,7 +2934,7 @@ class Question(db.Model):
                 '''
 
                 partial_understanding = len(votes[proposal1.id]['confused']) > 0 or len(votes[proposal2.id]['confused']) > 0
-                
+
                 app.logger.debug("Partial Understanding for relation %s --> %s = %s",
                     proposal1.id,
                     proposal2.id,
@@ -2862,7 +2947,7 @@ class Question(db.Model):
                         app.logger.debug("Test1: A? %s < B- %s", votes[proposal1.id]['confused'], votes[proposal2.id]['oppose'])
                         app.logger.debug("Test2: B? %s < A+ %s", votes[proposal2.id]['confused'], votes[proposal1.id]['endorse'])
 
-                        if self.full_domination(votes, proposal1, proposal2):
+                        if self.converts_to_full_domination(votes, proposal1, proposal2):
                             app.logger.debug("Partial converts...")
                             domination_map[proposal1.id][proposal2.id] = 5
                         else:
@@ -2874,7 +2959,7 @@ class Question(db.Model):
                 elif (who_dominates == endorser_ids[proposal2.id]):
                     # dominated
                     if partial_understanding:
-                        if self.full_domination(votes, proposal2, proposal1):
+                        if self.converts_to_full_domination(votes, proposal2, proposal1):
                             domination_map[proposal1.id][proposal2.id] = 6
                         else:
                             domination_map[proposal1.id][proposal2.id] = 4
@@ -2885,6 +2970,7 @@ class Question(db.Model):
                     # both proposals have the same voters
                     domination_map[proposal1.id][proposal2.id] = -2
                 else:
+                    # Not dominated
                     domination_map[proposal1.id][proposal2.id] = 0
 
         # app.logger.debug("Complex Domination: Domination Map ==> %s", domination_map)
@@ -3569,43 +3655,186 @@ class Question(db.Model):
         return proposal_endorsers
 
     
-    def create_new_graph(self, generation=None): # newgraph
+    '''
+    dom_map = {
+    2432L: {2432L: -1, 2439L: 3, 2412L: 0, 2413L: 0, 2414L: 0, 2415L: 0, 2416L: 0, 2423L: 0}, 
+    2439L: {2432L: 4, 2439L: -1, 2412L: 3, 2413L: 0, 2414L: 0, 2415L: 0, 2416L: 0, 2423L: 0}, 
+    2412L: {2432L: 0, 2439L: 4, 2412L: -1, 2413L: 0, 2414L: 0, 2415L: 4, 2416L: 0, 2423L: 4}, 
+    2413L: {2432L: 0, 2439L: 0, 2412L: 0, 2413L: -1, 2414L: 4, 2415L: 0, 2416L: 4, 2423L: 0}, 
+    2414L: {2432L: 0, 2439L: 0, 2412L: 0, 2413L: 3, 2414L: -1, 2415L: 0, 2416L: 0, 2423L: 3}, 
+    2415L: {2432L: 0, 2439L: 0, 2412L: 3, 2413L: 0, 2414L: 0, 2415L: -1, 2416L: 0, 2423L: 3}, 
+    2416L: {2432L: 0, 2439L: 0, 2412L: 0, 2413L: 3, 2414L: 0, 2415L: 0, 2416L: -1, 2423L: 0}, 
+    2423L: {2432L: 0, 2439L: 0, 2412L: 3, 2413L: 0, 2414L: 4, 2415L: 4, 2416L: 0, 2423L: -1}
+    }
+    '''
+    def find_domination_cases(self, proposals, dom_map, generation):
+        '''
+        .. function:: find_domination_cases(
+            proposals,
+            dom_map,
+            generation)
+
+        Finds the domination case for each proposal..
+
+        :param dom_map: the domination table
+        :type dom_map: dict
+        :param generation: the generation
+        :type generation: int
+        :rtype: dict
+        '''
+        cases = dict()
+
+        for proposal in proposals:
+            dom_set_full = set(dom_map[proposal.id].values())
+            # Remove elements not related to domination
+            other_values = {-1,-2,0,1,3,5}
+            dom_set = dom_set_full - other_values
+            app.logger.debug("dom_set for %s = %s", proposal.id, dom_set)
+
+            if proposal.is_completely_understood(generation=generation):
+                if not len(dom_set):
+                    cases[proposal.id] = 1
+                elif dom_set == {2}:
+                    cases[proposal.id] = 2
+                elif dom_set == {4}:
+                    cases[proposal.id] = 3
+                elif dom_set == {2,4}:
+                    cases[proposal.id] = 4
+            else:
+                if not len(dom_set):
+                    cases[proposal.id] = 5
+                elif dom_set == {6}:
+                    cases[proposal.id] = 6
+                elif dom_set == {4}:
+                    cases[proposal.id] = 7
+                elif dom_set == {6,4}:
+                    cases[proposal.id] = 8
+
+        return cases
+        
+    def find_domination_cases_v1(self, proposals, dom_map, generation):
+        '''
+        .. function:: find_domination_cases(
+            proposals,
+            dom_map,
+            generation)
+
+        Finds the domination case for each proposal..
+
+        :param dom_map: the domination table
+        :type dom_map: dict
+        :param generation: the generation
+        :type generation: int
+        :rtype: dict
+        '''
+        cases = dict()
+
+        full = {6, 2}
+        partial = {4}
+        both = {4, 6, 2}
+
+        for proposal in proposals:
+            dom_set = set(dom_map[proposal.id].values())
+            # Remove identity
+            dom_set.remove(-1)
+            app.logger.debug("dom_set for %s = %s", proposal.id, dom_set)
+
+            if proposal.is_completely_understood(generation=generation):
+                if not len(dom_set & both):
+                    cases[proposal.id] = 1
+                elif partial in dom_set:
+                    if len(full & dom_set):
+                        cases[proposal.id] = 4
+                    else:
+                        cases[proposal.id] = 3
+                else:
+                    cases[proposal.id] = 2
+            else:
+                if not len(dom_set & both):
+                    cases[proposal.id] = 5
+                elif partial in dom_set:
+                    if len(full & dom_set):
+                        cases[proposal.id] = 8
+                    else:
+                        cases[proposal.id] = 7
+                else:
+                    cases[proposal.id] = 6
+        return cases
+
+    def find_proposals_below(self, dom_map):
+        '''
+        .. function:: find_proposals_below(
+            dom_map)
+
+        Finds the proposals below each proposal on the graph
+
+        :param dom_map: the domination table
+        :type dom_map: dict
+        :rtype: dict
+        '''
+        below = dict()
+        
+        for (pid, relations) in dom_map.iteritems():
+            below[pid] = set()
+            for (propid, relation) in relations.iteritems():
+                if relation in {1,3,5}:
+                    below[pid].add(propid)
+        
+        return below
+            
+
+    def create_new_graph(self, generation=None): # newgraph workhere
         generation = generation or self.generation
         proposals = self.get_proposals_list(generation)
-        # dom_map = self.calculate_domination_map(generation=generation, algorithm=2)
+        app.logger.debug('All Proposals = %s', proposals)
+
+        dom_map = self.calculate_domination_map(generation=generation, algorithm=2)
+        app.logger.debug('dom map = %s', dom_map)
+        cases = q146.find_domination_cases(proposals=proposals, dom_map=dom_map, generation=1)
+        app.logger.debug('cases = %s', cases)
+
         relations = self.calculate_proposal_relation_ids(generation=generation, algorithm=2)
         app.logger.debug("relations ==> %s", relations)
         proposals_above = dict()
         proposals_below = dict()
 
+        levels = dict()
+        top_level = []
+
+        proposals_covered = dict()
+
+        # Step 1
+        app.logger.debug("*** Step 1 ***")
         understood_undominated = []
         for prop in list(proposals):
             if len(relations[prop.id]['dominated']) == 0 and relations[prop.id]['understood']:
-                # proposals_above[prop] = []
-                understood_undominated.append(prop)
+                top_level.append(prop.id)
+                proposals_covered[prop.id] = set()
                 proposals.remove(prop)
-        app.logger.debug('understood_undominated = %s', understood_undominated)
-        
-        app.logger.debug('Remaining proposals = %s', proposals)
 
         notunderstood_undominated = []
         for prop in list(proposals):
             if len(relations[prop.id]['dominated']) == 0 and not relations[prop.id]['understood']:
-                notunderstood_undominated.append(prop)
+                top_level.append(prop.id)
                 proposals.remove(prop)
-        app.logger.debug('notunderstood_undominated = %s', notunderstood_undominated)
-        
+
         app.logger.debug('Remaining proposals = %s', proposals)
 
-                
-        proposals_covered = dict()
-        for (proposal, relation) in relations.iteritems():
-            proposals_covered[proposal] = relation['dominating']
-        app.logger.debug("proposals_covered %s\n",
-                         proposals_covered)
+        levels[0] = top_level
+
+        app.logger.debug('After adding Pareto = %s', levels)
+
+        level_id = 1
+
+        # Step 3
+        app.logger.debug("*** Step 3 ***")
         
-        app.logger.debug('proposals_covered = %s', proposals_covered)
-        
+        to_add = []
+
+        for prop in list(proposals):
+            if cases[prop] == 7:
+                pass
+
         return True
 
 
@@ -4184,7 +4413,7 @@ class Question(db.Model):
         app.logger.debug("proposals_below %s\n",
                          proposals_below)
 
-        proposals_covered = self.get_covered(proposals_below, proposals)
+        proposals_covered = self.get_covered(proposals_below, proposals) #here
         app.logger.debug("proposals_covered %s\n",
                          proposals_covered)
 
@@ -5451,6 +5680,37 @@ class Question(db.Model):
     def create_proposal_url(self, proposal, room):
         return str(proposal.id) + '/' + room
 
+    def get_elements_covered(self, elements_below): 
+        '''
+        .. function:: get_covered(elements_below, elements)
+
+        Returns all elements with a list of
+        elements below them on the graph.
+
+        :param elements_below: what elements lie below each element.
+        :type elements_below: dict
+        :param elements: set of all elements on the graph.
+        :type elements: set
+        :rtype: dict
+        '''
+        covered = dict()
+        elements = elements_below.keys()
+        for element in elements:
+            covered_elements = set()
+            below = elements_below[element]
+            for element1 in below:
+                for element2 in below:
+                    next_element = False
+                    under_element2 = elements_below[element2]
+                    if (element1 in under_element2):
+                        next_element = True
+                        break
+                if (next_element):
+                    continue
+                covered_elements.add(element1)
+            covered[element] = covered_elements
+        return covered
+    
     def get_covered(self, elements_below, elements): 
         '''
         .. function:: get_covered(elements_below, elements)
@@ -6492,7 +6752,7 @@ class Proposal(db.Model):
         ).count()
         return current_endorsements == 0
     
-    def get_endorser_id_by_type(self, endorsement_type=None, generation=None): #newgraph
+    def get_endorser_id_by_type(self, endorsement_type=None, generation=None):
         '''
         .. function:: endorsers([generation=None])
 
