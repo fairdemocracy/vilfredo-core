@@ -3711,7 +3711,7 @@ class Question(db.Model):
                     cases[proposal.id] = 8
 
         return cases
-        
+
     def find_domination_cases_v1(self, proposals, dom_map, generation):
         '''
         .. function:: find_domination_cases(
@@ -3773,15 +3773,14 @@ class Question(db.Model):
         :rtype: dict
         '''
         below = dict()
-        
+
         for (pid, relations) in dom_map.iteritems():
             below[pid] = set()
             for (propid, relation) in relations.iteritems():
                 if relation in {1,3,5}:
                     below[pid].add(propid)
-        
+
         return below
-            
 
     def create_new_graph(self, generation=None): # newgraph workhere
         generation = generation or self.generation
@@ -3790,18 +3789,17 @@ class Question(db.Model):
 
         dom_map = self.calculate_domination_map(generation=generation, algorithm=2)
         app.logger.debug('dom map = %s', dom_map)
-        cases = q146.find_domination_cases(proposals=proposals, dom_map=dom_map, generation=1)
+        cases = self.find_domination_cases(proposals=proposals, dom_map=dom_map, generation=generation)
         app.logger.debug('cases = %s', cases)
 
         relations = self.calculate_proposal_relation_ids(generation=generation, algorithm=2)
         app.logger.debug("relations ==> %s", relations)
-        proposals_above = dict()
         proposals_below = dict()
 
         levels = dict()
         top_level = []
-
-        proposals_covered = dict()
+        graph = []
+        proposals_below = dict()
 
         # Step 1
         app.logger.debug("*** Step 1 ***")
@@ -3809,6 +3807,8 @@ class Question(db.Model):
         for prop in list(proposals):
             if len(relations[prop.id]['dominated']) == 0 and relations[prop.id]['understood']:
                 top_level.append(prop.id)
+                graph.append(prop.id)
+                proposals_below[prop.id] = []
                 proposals_covered[prop.id] = set()
                 proposals.remove(prop)
 
@@ -3816,30 +3816,69 @@ class Question(db.Model):
         for prop in list(proposals):
             if len(relations[prop.id]['dominated']) == 0 and not relations[prop.id]['understood']:
                 top_level.append(prop.id)
+                graph.append(prop.id)
+                proposals_below[prop.id] = []
                 proposals.remove(prop)
 
         app.logger.debug('Remaining proposals = %s', proposals)
 
-        levels[0] = top_level
+        app.logger.debug('After adding Pareto = %s', proposals_below)
 
-        app.logger.debug('After adding Pareto = %s', levels)
+        # Step 2
+        app.logger.debug("*** Step 2 ***")
+        start_graph_len = len(graph)
+        app.logger.debug("Beginning Step 2 with %s proposals left", start_graph_len)
+        while True:
+            for prop in list(proposals):
+                if cases[prop.id] in [2,6]:
+                    for (dominating_prop, relation) in dom_map[prop.id].iteritems():
+                        if relation in [2,6] and dominating_prop in graph:
+                            proposals_below[dominating_prop].append(prop.id)
+                            graph.append(prop.id)
+                            proposals.remove(prop)
+            # Quit if no new proposals were added to the graph
+            if len(graph) == start_graph_len:
+                break
+            else:
+                start_graph_len = len(graph)
 
-        level_id = 1
-
-        # Step 3
+        adding = []
+        # Step 3 Add partially dominated all in one go
         app.logger.debug("*** Step 3 ***")
-        
-        to_add = []
-
         for prop in list(proposals):
-            if cases[prop] == 7:
-                pass
+            if cases[prop.id] in [3,7]:
+                for (dominating_prop, relation) in dom_map[prop.id].iteritems():
+                    if relation == 4 and dominating_prop in graph:
+                        proposals_below[dominating_prop].append(prop.id)
+                        adding.append(prop.id)
+                        # proposals.remove(prop)
+        
+        graph = graph + adding
 
-        return True
+        app.logger.debug("proposals_below ==> %s", proposals_below)
+        
+        # Step 4
+        app.logger.debug("*** Step 4 ***")
+
+        # Step 5
+        app.logger.debug("*** Step 5 ***")
+
+        # Step 6 - Add remaining to the pareto front
+        '''
+        app.logger.debug("*** Step 6 ***")
+        for prop in list(proposals):
+            graph.append(prop.id)
+            proposals_below[prop.id] = []
+            proposals.remove(prop)
+        '''
+
+        app.logger.debug("Dominations ==> %s", proposals_below)
+
+        return proposals_below
 
 
     # the newgraph 
-    def make_new_graphviz_map(self,
+    def make_new_graphviz_map_off(self,
                           proposals=None,
                           generation=None,
                           algorithm=None):
