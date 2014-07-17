@@ -3796,7 +3796,6 @@ class Question(db.Model):
         app.logger.debug("relations ==> %s", relations)
         proposals_below = dict()
 
-        levels = dict()
         top_level = []
         graph = []
         proposals_below = dict()
@@ -3809,7 +3808,6 @@ class Question(db.Model):
                 top_level.append(prop.id)
                 graph.append(prop.id)
                 proposals_below[prop.id] = []
-                proposals_covered[prop.id] = set()
                 proposals.remove(prop)
 
         notunderstood_undominated = []
@@ -3821,7 +3819,6 @@ class Question(db.Model):
                 proposals.remove(prop)
 
         app.logger.debug('Remaining proposals = %s', proposals)
-
         app.logger.debug('After adding Pareto = %s', proposals_below)
 
         # Step 2
@@ -3830,7 +3827,31 @@ class Question(db.Model):
         app.logger.debug("Beginning Step 2 with %s proposals left", start_graph_len)
         while True:
             for prop in list(proposals):
-                if cases[prop.id] in [2,6]:
+                if cases[prop.id] in [2,6,8,4]:
+                    add_these = []
+                    all_dominators_in_map = True
+                    for (dominating_prop, relation) in dom_map[prop.id].iteritems():
+                        if relation in [2,6] and dominating_prop in graph:
+                            add_these.append(dominating_prop)
+                        else:
+                            all_dominators_in_map = False
+                            break
+
+                    if all_dominators_in_map:
+                        for dominating_prop in add_these:
+                            proposals_below[dominating_prop].append(prop.id)
+                            graph.append(prop.id)
+                            proposals.remove(prop)
+
+            # Quit if no new proposals were added to the graph
+            if len(graph) == start_graph_len:
+                break
+            else:
+                start_graph_len = len(graph)
+        '''
+        while True:
+            for prop in list(proposals):
+                if cases[prop.id] in [2,6,8,4]:
                     for (dominating_prop, relation) in dom_map[prop.id].iteritems():
                         if relation in [2,6] and dominating_prop in graph:
                             proposals_below[dominating_prop].append(prop.id)
@@ -3841,6 +3862,8 @@ class Question(db.Model):
                 break
             else:
                 start_graph_len = len(graph)
+        '''
+        return proposals_below
 
         adding = []
         # Step 3 Add partially dominated all in one go
@@ -3851,26 +3874,69 @@ class Question(db.Model):
                     if relation == 4 and dominating_prop in graph:
                         proposals_below[dominating_prop].append(prop.id)
                         adding.append(prop.id)
-                        # proposals.remove(prop)
+                        proposals.remove(prop)
         
+        app.logger.debug("Step 3 added %s", adding)
         graph = graph + adding
 
         app.logger.debug("proposals_below ==> %s", proposals_below)
         
         # Step 4
         app.logger.debug("*** Step 4 ***")
+        for prop in list(proposals):
+            if cases[prop.id] in [3,7]:
+                graph.append(prop.id)
+                proposals_below[prop.id] = []
 
         # Step 5
         app.logger.debug("*** Step 5 ***")
+        start_graph_len = len(graph)
+        app.logger.debug("Beginning Step 5 with %s proposals left", start_graph_len)
+        while True:
+            for prop in list(proposals):
+                if cases[prop.id] in [2,6,8,4]:
+                    add_these = []
+                    all_dominators_in_map = True
+                    for (dominating_prop, relation) in dom_map[prop.id].iteritems():
+                        if relation in [2,6] and dominating_prop in graph:
+                            add_these.append(dominating_prop)
+                        else:
+                            all_dominators_in_map = False
+                            break
+
+                    if all_dominators_in_map:
+                        for dominating_prop in add_these:
+                            proposals_below[dominating_prop].append(prop.id)
+                            graph.append(prop.id)
+                            proposals.remove(prop)
+
+            # Quit if no new proposals were added to the graph
+            if len(graph) == start_graph_len:
+                break
+            else:
+                start_graph_len = len(graph)
+        '''
+        while True:
+            for prop in list(proposals):
+                if cases[prop.id] in [2,6,8,4]:
+                    for (dominating_prop, relation) in dom_map[prop.id].iteritems():
+                        if relation in [2,6] and dominating_prop in graph:
+                            proposals_below[dominating_prop].append(prop.id)
+                            graph.append(prop.id)
+                            proposals.remove(prop)
+            # Quit if no new proposals were added to the graph
+            if len(graph) == start_graph_len:
+                break
+            else:
+                start_graph_len = len(graph)
+        '''
 
         # Step 6 - Add remaining to the pareto front
-        '''
         app.logger.debug("*** Step 6 ***")
         for prop in list(proposals):
             graph.append(prop.id)
             proposals_below[prop.id] = []
             proposals.remove(prop)
-        '''
 
         app.logger.debug("Dominations ==> %s", proposals_below)
 
