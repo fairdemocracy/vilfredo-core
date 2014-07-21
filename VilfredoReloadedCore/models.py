@@ -1404,6 +1404,24 @@ class Question(db.Model):
             app.logger.debug("proposal %s votes = %s", proposal.id, all_endorsment_types[proposal.id])
         return all_endorsment_types
 
+    def get_proposals_list_by_id(self, generation=None):
+        '''
+        .. function:: get_proposals()
+
+        Returns a set of proposals for the current generation of
+        the question.
+
+        :param generation: question generation.
+        :type generation: int
+        :rtype: set
+        '''
+        generation = generation or self.generation
+        proposals_list = self.get_proposals_list(generation)
+        proposals_by_id = dict()
+        for prop in proposals_list:
+            proposals_by_id[prop.id] = prop
+        return proposals_by_id
+    
     def get_proposals_list(self, generation=None):
         '''
         .. function:: get_proposals()
@@ -3532,7 +3550,160 @@ class Question(db.Model):
             keys.append(k)
         return inv
 
+    def get_new_voting_graph(self,
+                         generation=None,
+                         map_type='all',
+                         proposal_level_type=GraphLevelType.layers,
+                         user_level_type=GraphLevelType.layers,
+                         algorithm=None): # oldgraph
+        '''
+        .. function:: get_voting_graph(generation, map_type)
+
+        Generates the svg map file from the dot string and returns the map URL.
+
+        :param generation: the question generation
+        :type generation: Integer
+        :param map_type: map type
+        :type map_type: string
+        :rtype: string or Boolean
+        '''
+        # Generate filename
+        '''
+        filename = make_map_filename(self.id,
+                                     generation,
+                                     map_type,
+                                     proposal_level_type,
+                                     user_level_type)
+        '''
+
+        filename = make_map_filename_hashed(self,
+                                            generation,
+                                            map_type,
+                                            proposal_level_type,
+                                            user_level_type,
+                                            algorithm)
+        # app.logger.debug('Filename: %s hashed: %s', filename, filename_hashed)
+        # filename = filename_hashed
+
+        app.logger.debug('Filename Hashed: %s', filename)
+
+        filepath = map_path + filename
+        app.logger.debug("Filepath = %s", filepath)
+
+        import os
+        if not os.path.exists(map_path):
+            try:
+                os.makedirs(map_path)
+            except IOError:
+                app.logger.debug('Failed to create map path %s', map_path)
+                return False
+
+        # Create the SVG file if it doesn't exist
+        if not os.path.isfile(filepath + '.svg'):
+
+            # Create DOT file if it doesn't exist
+            if not os.path.isfile(filepath + '.dot'):
+                # Create the dot specification of the map
+                app.logger.debug("dot file not found: create")
+                if map_type == 'pareto':
+                    app.logger.debug("Generating pareto graph...")
+                    #map_proposals = self.\
+                    #   get_pareto_front(generation=generation, calculate_if_missing=True)
+                    map_proposals = self.calculate_pareto_front(generation=generation,
+                                                                algorithm=algorithm)
+                else:
+                    map_proposals = self.\
+                        get_proposals(generation=generation)
+
+                app.logger.debug("Generating map with proposals...")
+                app.logger.debug("DEBUG_MAP Generating map with proposals %s...", map_proposals)
+
+                '''
+                voting_graph = self.create_new_graph(
+                    proposals=map_proposals,
+                    generation=generation,
+                    proposal_level_type=proposal_level_type,
+                    user_level_type=user_level_type,
+                    algorithm=algorithm)
+                '''
+                
+                voting_graph = self.create_new_graph(
+                    generation=generation)
+                
+                # Save the dot specification as a dot file
+                app.logger.debug("Writing dot file %s.dot", filepath)
+                dot_file = open(filepath+".dot", "w")
+                dot_file.write(voting_graph.encode('utf8'))
+                dot_file.close()
+
+                if not os.path.isfile(filepath + '.dot'):
+                    app.logger.debug('Failed to create dot file %s.dot',
+                                     filepath)
+                    return False
+
+            else:
+                app.logger.debug("%s.dot file found...", filepath)
+
+            # Generate svg file from the dot file using "dot"
+            import pydot
+            graph = pydot.graph_from_dot_file(filepath+'.dot')
+
+            # It is required on some systems to set the path to the Graphviz
+            # dot file (Dreamhost, possibly because it uses Passenger)
+            if app.config['GRAPHVIZ_DOT_PATH'] is not None:
+                app.logger.debug('Setting Graphviz path to %s', app.config['GRAPHVIZ_DOT_PATH'])
+                path = {'dot': app.config['GRAPHVIZ_DOT_PATH']}
+                graph.set_graphviz_executables(path)
+
+            graph.write_svg(filepath+'.svg')
+
+            if not os.path.isfile(filepath + '.svg'):
+                app.logger.debug('Failed to create svg file %s.svg',
+                                 filepath)
+                return False
+
+        # Return voting graph file path
+        return filename + ".svg"
+    
     def get_voting_graph(self,
+                         generation=None,
+                         map_type='all',
+                         proposal_level_type=GraphLevelType.layers,
+                         user_level_type=GraphLevelType.layers,
+                         algorithm=None): # oldgraph
+        '''
+        .. function:: get_voting_graph(generation, map_type)
+
+        Generates the svg map file from the dot string and returns the map URL.
+
+        :param generation: the question generation
+        :type generation: Integer
+        :param map_type: map type
+        :type map_type: string
+        :rtype: string or Boolean
+        '''
+        algorithm = algorithm or app.config['ALGORITHM_VERSION']
+
+        if algorithm == 1:
+            # Generate old voting graph
+            return self.get_old_voting_graph(
+                generation=generation,
+                map_type=map_type,
+                proposal_level_type=proposal_level_type,
+                user_level_type=user_level_type,
+                algorithm=algorithm)
+        elif algorithm == 2:
+            # Generate new voting graph based on Complex Algorithm
+            return self.get_new_voting_graph(
+                generation=generation,
+                map_type=map_type,
+                proposal_level_type=proposal_level_type,
+                user_level_type=user_level_type,
+                algorithm=algorithm)
+        else:
+            return False
+
+    def get_old_voting_graph(self,
                          generation=None,
                          map_type='all',
                          proposal_level_type=GraphLevelType.layers,
@@ -3737,11 +3908,12 @@ class Question(db.Model):
                     below[pid].add(propid)
 
         return below
-    
-    
+
     def create_new_graph(self, generation=None): # newgraph workhere
         generation = generation or self.generation
         proposals = self.get_proposals_list(generation)
+        all_proposals = copy.copy(proposals)
+        proposals_by_id = self.get_proposals_list_by_id(generation)
 
         dom_map = self.calculate_domination_map(generation=generation, algorithm=2)
         app.logger.debug('dom map = %s', dom_map)
@@ -3785,6 +3957,9 @@ class Question(db.Model):
 
         app.logger.debug('Proposals remaining after step 1 = %s', proposals)
         app.logger.debug('Graph sfter adding Pareto in Step 1 = %s', proposals_below)
+
+        app.logger.debug('pareto_understood = %s', pareto_understood)
+        app.logger.debug('pareto_not_understood = %s', pareto_not_understood)
 
         # Step 2
         app.logger.debug("*** Step 2 ***")
@@ -3882,13 +4057,13 @@ class Question(db.Model):
             proposals_below[prop.id] = []
             proposals.remove(prop)
 
-        return proposals_below
+        # return proposals_below
         
         app.logger.debug("proposals_below ==> %s", proposals_below)
 
         proposal_levels = self.find_levels_complex(proposals_below)
         app.logger.debug("proposal_levels ==> %s", proposal_levels)
-        
+
         proposal_levels_keys = proposal_levels.keys()
         app.logger.debug("proposal_levels_keys ==> %s", proposal_levels_keys)
 
@@ -3911,23 +4086,25 @@ class Question(db.Model):
         for l in proposal_levels_keys:
             voting_graph += '{rank=same; "pl' + str(l) + '" '
             for p in proposal_levels[l]:
-                voting_graph += " " + str(p.id) + " "
+                voting_graph += " " + str(proposals_by_id[p].id) + " "
             voting_graph += "}\n"
-            
-        for p in proposals:
+
+
+        for p in all_proposals:
             color = "black"
             peripheries = 1
-            
-            if p in pareto_understood:
+
+            if p.id in pareto_understood:
                 fillcolor = '"lightblue" '
-            elif p in pareto_not_understood:
-                fillcolor = '"lightblue" '
+            elif p.id in pareto_not_understood:
+                fillcolor = '"lightcyan" '
             else:
                 fillcolor = '"white" '
             
             tooltip = self.create_proposal_tooltip(p)
-            
-            if p in pareto_understood or p in pareto_not_understood:
+            app.logger.debug("tootltip = %s", tooltip)
+
+            if p.id in pareto_understood or p.id in pareto_not_understood:
                 voting_graph += str(p.id) +\
                     ' [id=p' + str(p.id) + ' label=' + str(p.id) +\
                     ' shape=box fillcolor=' + fillcolor +\
@@ -3942,20 +4119,20 @@ class Question(db.Model):
                     tooltip +\
                     '"  fontsize=11]'
 
-        for p in proposals:
+        for proposal in all_proposals:
             pcolor = "black"
 
-            pcs = proposals_covered[p]
+            pcs = proposals_below[proposal.id]
             for pc in pcs:
                 color = pcolor
 
-                left_prop_id = 'p' + str(pc.id)
-                right_prop_id = 'p' + str(p.id)
+                left_prop_id = 'p' + str(proposals_by_id[pc].id)
+                right_prop_id = 'p' + str(proposal.id)
 
                 edge_id = 'id="' + left_prop_id + '&#45;&#45;' +\
                     right_prop_id + '"'
 
-                voting_graph += ' ' + str(pc.id) + ' -> ' + str(p.id) +\
+                voting_graph += ' ' + str(proposals_by_id[pc].id) + ' -> ' + str(proposal.id) +\
                     ' [' + edge_id + ' class="edge" color="' + color + '"]'
                 voting_graph += " \n"
 
