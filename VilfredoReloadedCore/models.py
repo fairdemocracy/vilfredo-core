@@ -3600,7 +3600,7 @@ class Question(db.Model):
                 app.logger.debug("Generating map with proposals...")
                 app.logger.debug("DEBUG_MAP Generating map with proposals %s...", map_proposals)
 
-                voting_graph = self.make_graphviz_map_plain(
+                voting_graph = self.make_graphviz_map(
                     proposals=map_proposals,
                     generation=generation,
                     proposal_level_type=proposal_level_type,
@@ -3674,7 +3674,7 @@ class Question(db.Model):
             dom_map,
             generation)
 
-        Finds the domination case for each proposal..
+        Finds the domination case for each proposal.
 
         :param dom_map: the domination table
         :type dom_map: dict
@@ -3717,55 +3717,6 @@ class Question(db.Model):
         
         return cases
 
-    def find_domination_cases_v1(self, proposals, dom_map, generation):
-        '''
-        .. function:: find_domination_cases(
-            proposals,
-            dom_map,
-            generation)
-
-        Finds the domination case for each proposal..
-
-        :param dom_map: the domination table
-        :type dom_map: dict
-        :param generation: the generation
-        :type generation: int
-        :rtype: dict
-        '''
-        cases = dict()
-
-        full = {6, 2}
-        partial = {4}
-        both = {4, 6, 2}
-
-        for proposal in proposals:
-            dom_set = set(dom_map[proposal.id].values())
-            # Remove identity
-            dom_set.remove(-1)
-            app.logger.debug("dom_set for %s = %s", proposal.id, dom_set)
-
-            if proposal.is_completely_understood(generation=generation):
-                if not len(dom_set & both):
-                    cases[proposal.id] = 1
-                elif partial in dom_set:
-                    if len(full & dom_set):
-                        cases[proposal.id] = 4
-                    else:
-                        cases[proposal.id] = 3
-                else:
-                    cases[proposal.id] = 2
-            else:
-                if not len(dom_set & both):
-                    cases[proposal.id] = 5
-                elif partial in dom_set:
-                    if len(full & dom_set):
-                        cases[proposal.id] = 8
-                    else:
-                        cases[proposal.id] = 7
-                else:
-                    cases[proposal.id] = 6
-        return cases
-
     def find_proposals_below(self, dom_map):
         '''
         .. function:: find_proposals_below(
@@ -3786,7 +3737,8 @@ class Question(db.Model):
                     below[pid].add(propid)
 
         return below
-
+    
+    
     def create_new_graph(self, generation=None): # newgraph workhere
         generation = generation or self.generation
         proposals = self.get_proposals_list(generation)
@@ -3799,10 +3751,15 @@ class Question(db.Model):
         relations = self.calculate_proposal_relation_ids(generation=generation, algorithm=2)
         app.logger.debug("relations ==> %s", relations)
         proposals_below = dict()
+        
+        pareto_understood = []
+        pareto_not_understood = []
 
         top_level = []
         graph = []
         proposals_below = dict()
+        for proposal in proposals:
+            proposals_below[proposal.id] = []
         
         app.logger.debug('Proposals at start = %s', proposals)
 
@@ -3812,6 +3769,7 @@ class Question(db.Model):
         for prop in list(proposals):
             if len(relations[prop.id]['dominated']) == 0 and relations[prop.id]['understood']:
                 top_level.append(prop.id)
+                pareto_understood.append(prop.id)
                 graph.append(prop.id)
                 proposals_below[prop.id] = []
                 proposals.remove(prop)
@@ -3820,6 +3778,7 @@ class Question(db.Model):
         for prop in list(proposals):
             if len(relations[prop.id]['dominated']) == 0 and not relations[prop.id]['understood']:
                 top_level.append(prop.id)
+                pareto_not_understood.append(prop.id)
                 graph.append(prop.id)
                 proposals_below[prop.id] = []
                 proposals.remove(prop)
@@ -3923,9 +3882,86 @@ class Question(db.Model):
             proposals_below[prop.id] = []
             proposals.remove(prop)
 
-        app.logger.debug("Dominations ==> %s", proposals_below)
-
         return proposals_below
+        
+        app.logger.debug("proposals_below ==> %s", proposals_below)
+
+        proposal_levels = self.find_levels_complex(proposals_below)
+        app.logger.debug("proposal_levels ==> %s", proposal_levels)
+        
+        proposal_levels_keys = proposal_levels.keys()
+        app.logger.debug("proposal_levels_keys ==> %s", proposal_levels_keys)
+
+        # Begin creation of Graphviz string
+        title = self.string_safe(self.title)
+        voting_graph = 'digraph "%s" {\n' % (title)
+
+        for l in proposal_levels_keys:
+            voting_graph += ' "pl' + str(l) +\
+                '" [shape=point fontcolor=white ' +\
+                'color=white fontsize=1]; \n'
+
+        for l in proposal_levels_keys:
+            if (l != proposal_levels_keys[0]):
+                voting_graph += ' -> '
+            voting_graph += '"pl' + str(l) + '" '
+
+        voting_graph += " [color=white] \n "
+
+        for l in proposal_levels_keys:
+            voting_graph += '{rank=same; "pl' + str(l) + '" '
+            for p in proposal_levels[l]:
+                voting_graph += " " + str(p.id) + " "
+            voting_graph += "}\n"
+            
+        for p in proposals:
+            color = "black"
+            peripheries = 1
+            
+            if p in pareto_understood:
+                fillcolor = '"lightblue" '
+            elif p in pareto_not_understood:
+                fillcolor = '"lightblue" '
+            else:
+                fillcolor = '"white" '
+            
+            tooltip = self.create_proposal_tooltip(p)
+            
+            if p in pareto_understood or p in pareto_not_understood:
+                voting_graph += str(p.id) +\
+                    ' [id=p' + str(p.id) + ' label=' + str(p.id) +\
+                    ' shape=box fillcolor=' + fillcolor +\
+                    ' style=filled color=' + color + ' peripheries=' +\
+                    str(peripheries) + ' tooltip="' + tooltip +\
+                    '"  fontsize=11]'
+            else:
+                voting_graph += str(p.id) +\
+                    ' [id=p' + str(p.id) + ' label=' + str(p.id) +\
+                    ' shape=box fillcolor="white" style="filled" color=' + color + ' peripheries=' +\
+                    str(peripheries) + ' tooltip="' +\
+                    tooltip +\
+                    '"  fontsize=11]'
+
+        for p in proposals:
+            pcolor = "black"
+
+            pcs = proposals_covered[p]
+            for pc in pcs:
+                color = pcolor
+
+                left_prop_id = 'p' + str(pc.id)
+                right_prop_id = 'p' + str(p.id)
+
+                edge_id = 'id="' + left_prop_id + '&#45;&#45;' +\
+                    right_prop_id + '"'
+
+                voting_graph += ' ' + str(pc.id) + ' -> ' + str(p.id) +\
+                    ' [' + edge_id + ' class="edge" color="' + color + '"]'
+                voting_graph += " \n"
+
+        voting_graph += "\n}"
+
+        return voting_graph
 
 
     # the newgraph 
@@ -5831,6 +5867,80 @@ class Question(db.Model):
             covered[element] = covered_elements
         return covered
 
+    def get_covered_complex(self, elements_below): 
+        '''
+        .. function:: get_covered(elements_below, elements)
+
+        Returns all elements with a list of
+        elements below them on the graph.
+
+        :param elements_below: what elements lie below each element.
+        :type elements_below: dict
+        :param elements: set of all elements on the graph.
+        :type elements: set
+        :rtype: dict
+        '''
+        elements = set(elements_below.keys())
+        covered = dict()
+        for element in elements:
+            covered_elements = set()
+            below = elements_below[element]
+            for element1 in below:
+                for element2 in below:
+                    next_element = False
+                    under_element2 = elements_below[element2]
+                    if (element1 in under_element2):
+                        next_element = True
+                        break
+                if (next_element):
+                    continue
+                covered_elements.add(element1)
+            covered[element] = covered_elements
+        return covered
+
+    def find_levels_complex(self, elements_covered): # hereiam
+        '''
+        .. function:: find_levels(elements_covered, elements)
+
+        Sorts the elements into lavels based on which elements cover
+        other elements.
+
+        :param elements_covered: what elements lie below each element.
+        :type elements_covered: dict
+        :param elements: set of all elements on the graph.
+        :type elements: set
+        :rtype: dict
+        '''
+
+        elements = set(elements_covered.keys())
+        elements_to_test = copy.copy(elements)
+        
+        app.logger.debug("find_levels called...\n")
+        app.logger.debug("elements_covered => %s", elements_covered)
+        app.logger.debug("elements => %s", elements)
+        
+        
+        # app.logger.debug("elements_to_test = %s\n", elements_to_test)
+        levels = dict()
+        level = 0
+        elements_added = set()
+        while (len(elements_added) < len(elements)):
+            levels[level] = set()
+            for element1 in elements_to_test:
+                next_element = False
+                for element2 in elements_to_test:
+                    if (element1 in elements_covered[element2]):
+                        next_element = True
+                        break
+                if (next_element):
+                    continue
+                levels[level].add(element1)
+                elements_added.add(element1)
+            elements_to_test = elements - elements_added
+            # app.logger.debug("elements_to_test = %s\n", elements_to_test)
+            level += 1
+        return levels
+    
     def find_levels(self, elements_covered, elements): # hereiam
         '''
         .. function:: find_levels(elements_covered, elements)
@@ -5845,6 +5955,8 @@ class Question(db.Model):
         :rtype: dict
         '''
         app.logger.debug("find_levels called...\n")
+        app.logger.debug("elements_covered => %s", elements_covered)
+        app.logger.debug("elements => %s", elements)
 
         elements = set(elements)
         elements_to_test = copy.copy(elements)
