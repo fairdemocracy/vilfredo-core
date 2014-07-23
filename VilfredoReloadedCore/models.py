@@ -4058,7 +4058,7 @@ class Question(db.Model):
             proposals.remove(prop)
 
         # return proposals_below
-        
+
         app.logger.debug("proposals_below ==> %s", proposals_below)
 
         proposal_levels = self.find_levels_complex(proposals_below)
@@ -4119,6 +4119,8 @@ class Question(db.Model):
                     tooltip +\
                     '"  fontsize=11]'
 
+        edge_type = {'full': 'normal', 'partial': 'onormal'}
+        
         for proposal in all_proposals:
             pcolor = "black"
 
@@ -4128,12 +4130,25 @@ class Question(db.Model):
 
                 left_prop_id = 'p' + str(proposals_by_id[pc].id)
                 right_prop_id = 'p' + str(proposal.id)
+                
+                # app.logger.debug("Check dom type for drawing arrowhead for proposal %s ==> %s", proposal.id, dom_map[proposal.id][pc])
+                
+                if dom_map[proposal.id][pc] in [3,4]:
+                    dom_type = 'partial'
+                else:
+                    dom_type = 'full'
 
                 edge_id = 'id="' + left_prop_id + '&#45;&#45;' +\
                     right_prop_id + '"'
 
-                voting_graph += ' ' + str(proposals_by_id[pc].id) + ' -> ' + str(proposal.id) +\
-                    ' [' + edge_id + ' class="edge" color="' + color + '"]'
+                #voting_graph += ' ' + str(proposals_by_id[pc].id) + ' -> ' + str(proposal.id) +\
+                #    ' [' + edge_id + ' class="edge" color="' + color + '" arrowhead="' + edge_type[dom_type] + '"]'
+                
+                # Change arrows to point in the direction of the domination
+                #
+                voting_graph += ' ' + str(proposal.id) + ' -> ' +  str(proposals_by_id[pc].id)  +\
+                    ' [' + edge_id + ' class="edge" color="' + color + '" arrowhead="' + edge_type[dom_type] + '"]'
+                
                 voting_graph += " \n"
 
         voting_graph += "\n}"
