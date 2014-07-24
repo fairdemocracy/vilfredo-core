@@ -3330,7 +3330,8 @@ def api_question_graph(question_id):
     algorithm = int(request.args.get('algorithm', app.config['ALGORITHM_VERSION']))
 
     # app.logger.debug('Question has %s endorsememnts', question.has_endorsememnts(generation))
-    if not question.has_endorsememnts(generation):
+    if not question.has_endorsememnts(generation=generation):
+        app.logger.debug("Question has no endorsements in generation %s", generation)
         return jsonify(message="No endorsements yet"), 204
 
     map_type = request.args.get('map_type', 'all')
@@ -3348,12 +3349,19 @@ def api_question_graph(question_id):
     app.logger.debug('filename_hashed ==> %s', filename_hashed)'''
 
     app.logger.debug("Call get_voting_graph()...")
-    graph_svg = question.get_voting_graph(
-        generation=generation,
-        map_type=map_type,
-        proposal_level_type=proposal_level_type,
-        user_level_type=user_level_type,
-        algorithm=algorithm)
+    
+    
+    if algorithm == 1:
+        graph_svg = question.get_old_voting_graph(
+            generation=generation,
+            map_type=map_type,
+            proposal_level_type=proposal_level_type,
+            user_level_type=user_level_type,
+            algorithm=algorithm)
+    else:
+        graph_svg = question.get_new_voting_graph(
+            generation=generation,
+            algorithm=algorithm)
 
     if not graph_svg:
         message = "There was a problem creating the graph"

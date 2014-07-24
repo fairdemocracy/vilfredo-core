@@ -123,6 +123,24 @@ map_path = app.config['MAP_PATH']
 def get_timestamp():
     return int(math.floor(time.time()))
 
+
+def make_new_map_filename_hashed(question,
+                             generation=None,
+                             algorithm=None):
+    algorithm = algorithm or app.config['ALGORITHM_VERSION']
+    generation = generation or question.generation
+    import hashlib, json, pickle
+    from flask import jsonify
+    m = hashlib.md5()
+    m.update(str(question.id) + str(generation))
+    m.update(str(app.config['ANONYMIZE_GRAPH']))
+    m.update(str(algorithm))
+    all_endorsers = question.get_proposal_endorsers(generation)
+    # app.logger.debug('*******************make_map_filename_hashed::proposal_endorsers ==> %s', proposal_endorsers)
+    # app.logger.debug('make_map_filename_hashed::json ==> %s', json.dumps(proposal_endorsers))
+    m.update(json.dumps(all_endorsers))
+    return m.hexdigest()
+
 def make_map_filename_hashed(question,
                              generation=None,
                              map_type="all",
@@ -1464,7 +1482,8 @@ class Question(db.Model):
 
     def has_endorsememnts(self, generation=None):
         generation = generation or self.generation
-        ids = list(self.get_proposal_ids())
+        app.logger.debug("has_endorsememnts: Generation: %s ", generation)
+        ids = list(self.get_proposal_ids(generation))
         app.logger.debug('has_endorsememnts: ids ==> %s', ids)
         if len(ids) == 0:
             return 0
@@ -3552,10 +3571,7 @@ class Question(db.Model):
 
     def get_new_voting_graph(self,
                          generation=None,
-                         map_type='all',
-                         proposal_level_type=GraphLevelType.layers,
-                         user_level_type=GraphLevelType.layers,
-                         algorithm=None): # oldgraph
+                         algorithm=None):
         '''
         .. function:: get_voting_graph(generation, map_type)
 
@@ -3576,11 +3592,8 @@ class Question(db.Model):
                                      user_level_type)
         '''
 
-        filename = make_map_filename_hashed(self,
+        filename = make_new_map_filename_hashed(self,
                                             generation,
-                                            map_type,
-                                            proposal_level_type,
-                                            user_level_type,
                                             algorithm)
         # app.logger.debug('Filename: %s hashed: %s', filename, filename_hashed)
         # filename = filename_hashed
@@ -3605,27 +3618,6 @@ class Question(db.Model):
             if not os.path.isfile(filepath + '.dot'):
                 # Create the dot specification of the map
                 app.logger.debug("dot file not found: create")
-                if map_type == 'pareto':
-                    app.logger.debug("Generating pareto graph...")
-                    #map_proposals = self.\
-                    #   get_pareto_front(generation=generation, calculate_if_missing=True)
-                    map_proposals = self.calculate_pareto_front(generation=generation,
-                                                                algorithm=algorithm)
-                else:
-                    map_proposals = self.\
-                        get_proposals(generation=generation)
-
-                app.logger.debug("Generating map with proposals...")
-                app.logger.debug("DEBUG_MAP Generating map with proposals %s...", map_proposals)
-
-                '''
-                voting_graph = self.create_new_graph(
-                    proposals=map_proposals,
-                    generation=generation,
-                    proposal_level_type=proposal_level_type,
-                    user_level_type=user_level_type,
-                    algorithm=algorithm)
-                '''
                 
                 voting_graph = self.create_new_graph(
                     generation=generation)
@@ -3838,7 +3830,7 @@ class Question(db.Model):
     2423L: {2432L: 0, 2439L: 0, 2412L: 3, 2413L: 0, 2414L: 4, 2415L: 4, 2416L: 0, 2423L: -1}
     }
     '''
-    def find_domination_cases(self, proposals, dom_map, generation):
+    def find_domination_cases(self, proposals, dom_map, generation): # jazz
         '''
         .. function:: find_domination_cases(
             proposals,
@@ -3874,6 +3866,9 @@ class Question(db.Model):
                     cases[proposal.id] = 3
                 elif dom_set == {2,4}:
                     cases[proposal.id] = 4
+                else:
+                    app.logger.debug("find_domination_cases: U Proposal %s dom_set:%s ", proposal.id, dom_set)
+                    cases[proposal.id] = 0
             else:
                 if not len(dom_set):
                     cases[proposal.id] = 5
@@ -3883,6 +3878,9 @@ class Question(db.Model):
                     cases[proposal.id] = 7
                 elif dom_set == {6,4}:
                     cases[proposal.id] = 8
+                else:
+                    app.logger.debug("find_domination_cases: NU Proposal %s dom_set:%s ", proposal.id, dom_set)
+                    cases[proposal.id] = 0
 
         app.logger.debug("find_domination_cases: all_dom_sets = %s", all_dom_sets)
         
@@ -3909,7 +3907,7 @@ class Question(db.Model):
 
         return below
 
-    def create_new_graph(self, generation=None): # newgraph workhere
+    def create_new_graph(self, generation=None): # newgraph jazz
         generation = generation or self.generation
         proposals = self.get_proposals_list(generation)
         all_proposals = copy.copy(proposals)
