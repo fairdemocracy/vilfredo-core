@@ -3569,11 +3569,9 @@ class Question(db.Model):
             keys.append(k)
         return inv
 
-    def get_new_voting_graph(self,
-                         generation=None,
-                         algorithm=None):
+    def get_complex_voting_graph(self, generation=None):
         '''
-        .. function:: get_voting_graph(generation, map_type)
+        .. function:: get_complex_voting_graph(generation, map_type)
 
         Generates the svg map file from the dot string and returns the map URL.
 
@@ -3591,6 +3589,9 @@ class Question(db.Model):
                                      proposal_level_type,
                                      user_level_type)
         '''
+        
+        algorithm = 2
+        generation = generation or self.generation
 
         filename = make_new_map_filename_hashed(self,
                                             generation,
@@ -3657,7 +3658,7 @@ class Question(db.Model):
         # Return voting graph file path
         return filename + ".svg"
     
-    def get_voting_graph(self,
+    def get_voting_graph_off(self,
                          generation=None,
                          map_type='all',
                          proposal_level_type=GraphLevelType.layers,
@@ -3688,19 +3689,15 @@ class Question(db.Model):
             # Generate new voting graph based on Complex Algorithm
             return self.get_new_voting_graph(
                 generation=generation,
-                map_type=map_type,
-                proposal_level_type=proposal_level_type,
-                user_level_type=user_level_type,
                 algorithm=algorithm)
         else:
             return False
 
-    def get_old_voting_graph(self,
+    def get_voting_graph(self,
                          generation=None,
                          map_type='all',
                          proposal_level_type=GraphLevelType.layers,
-                         user_level_type=GraphLevelType.layers,
-                         algorithm=None): # oldgraph
+                         user_level_type=GraphLevelType.layers): # oldgraph
         '''
         .. function:: get_voting_graph(generation, map_type)
 
@@ -3720,13 +3717,14 @@ class Question(db.Model):
                                      proposal_level_type,
                                      user_level_type)
         '''
+        
+        algorithm = 1
 
         filename = make_map_filename_hashed(self,
                                             generation,
                                             map_type,
                                             proposal_level_type,
-                                            user_level_type,
-                                            algorithm)
+                                            user_level_type)
         # app.logger.debug('Filename: %s hashed: %s', filename, filename_hashed)
         # filename = filename_hashed
 
@@ -3767,8 +3765,7 @@ class Question(db.Model):
                     proposals=map_proposals,
                     generation=generation,
                     proposal_level_type=proposal_level_type,
-                    user_level_type=user_level_type,
-                    algorithm=algorithm)
+                    user_level_type=user_level_type)
                 
                 # Save the dot specification as a dot file
                 app.logger.debug("Writing dot file %s.dot", filepath)
@@ -3867,7 +3864,7 @@ class Question(db.Model):
                 elif dom_set == {2,4}:
                     cases[proposal.id] = 4
                 else:
-                    app.logger.debug("find_domination_cases: U Proposal %s dom_set:%s ", proposal.id, dom_set)
+                    app.logger.debug("find_domination_cases: CASE NOT SET U Proposal %s dom_set:%s ", proposal.id, dom_set)
                     cases[proposal.id] = 0
             else:
                 if not len(dom_set):
@@ -3879,7 +3876,7 @@ class Question(db.Model):
                 elif dom_set == {6,4}:
                     cases[proposal.id] = 8
                 else:
-                    app.logger.debug("find_domination_cases: NU Proposal %s dom_set:%s ", proposal.id, dom_set)
+                    app.logger.debug("find_domination_cases: CASE NOT SET NU Proposal %s dom_set:%s ", proposal.id, dom_set)
                     cases[proposal.id] = 0
 
         app.logger.debug("find_domination_cases: all_dom_sets = %s", all_dom_sets)
@@ -3954,7 +3951,8 @@ class Question(db.Model):
                 proposals.remove(prop)
 
         app.logger.debug('Proposals remaining after step 1 = %s', proposals)
-        app.logger.debug('Graph sfter adding Pareto in Step 1 = %s', proposals_below)
+        app.logger.debug('Graph after adding Pareto in Step 1 = %s', graph)
+        app.logger.debug('proposals_below after adding Pareto in Step 1 = %s', proposals_below)
 
         app.logger.debug('pareto_understood = %s', pareto_understood)
         app.logger.debug('pareto_not_understood = %s', pareto_not_understood)
@@ -5120,8 +5118,7 @@ class Question(db.Model):
                           user_level_type=GraphLevelType.layers,
                           address_image='',
                           highlight_user1=None,
-                          highlight_proposal1=None,
-                          algorithm=None):
+                          highlight_proposal1=None):
         '''
         .. function:: make_graphviz_map(
             [proposals=None,

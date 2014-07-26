@@ -3352,16 +3352,14 @@ def api_question_graph(question_id):
     
     
     if algorithm == 1:
-        graph_svg = question.get_old_voting_graph(
+        graph_svg = question.get_voting_graph(
             generation=generation,
             map_type=map_type,
             proposal_level_type=proposal_level_type,
-            user_level_type=user_level_type,
-            algorithm=algorithm)
+            user_level_type=user_level_type)
     else:
-        graph_svg = question.get_new_voting_graph(
-            generation=generation,
-            algorithm=algorithm)
+        graph_svg = question.get_complex_voting_graph(
+            generation=generation)
 
     if not graph_svg:
         message = "There was a problem creating the graph"
