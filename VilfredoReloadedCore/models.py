@@ -5218,6 +5218,8 @@ class Question(db.Model):
 
         proposal_ids = get_ids_from_proposals(proposals)
         app.logger.debug("DEBUG_MAP: map pids %s", proposal_ids)
+        
+        algorithm = 1
 
         # get pareto
         pareto = self.calculate_pareto_front(proposals=proposals,
