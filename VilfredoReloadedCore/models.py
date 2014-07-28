@@ -3842,6 +3842,65 @@ class Question(db.Model):
         :type generation: int
         :rtype: dict
         '''
+        app.logger.debug("find_domination_cases V2c called....")
+        cases = dict()
+        # Add for debugging
+        all_dom_sets = dict()
+
+        for proposal in proposals:
+            dom_set_full = set(dom_map[proposal.id].values())
+            # Remove elements not related to domination
+            other_values = {-1,-2,0,1,3,5}
+            dom_set = dom_set_full - other_values
+            app.logger.debug("dom_set for %s = %s", proposal.id, dom_set)
+            all_dom_sets[proposal.id] = dom_set
+
+            if proposal.is_completely_understood(generation=generation):
+                if not len(dom_set):
+                    cases[proposal.id] = 1
+                elif dom_set == {4}:
+                    cases[proposal.id] = 3
+                elif {2, 6} & dom_set:
+                    if 4 in dom_set:
+                        cases[proposal.id] = 4
+                    else:
+                        cases[proposal.id] = 2
+                else:
+                    app.logger.debug("find_domination_cases: CASE NOT SET U Proposal %s dom_set:%s ", proposal.id, dom_set)
+                    cases[proposal.id] = 0
+            else:
+                if not len(dom_set):
+                    cases[proposal.id] = 5
+                elif dom_set == {4}:
+                    cases[proposal.id] = 7
+                elif {2, 6} & dom_set:
+                    if 4 in dom_set:
+                        cases[proposal.id] = 8
+                    else:
+                        cases[proposal.id] = 6
+                else:
+                    app.logger.debug("find_domination_cases: CASE NOT SET NU Proposal %s dom_set:%s ", proposal.id, dom_set)
+                    cases[proposal.id] = 0
+
+        app.logger.debug("find_domination_cases: all_dom_sets = %s", all_dom_sets)
+
+        return cases
+
+    def find_domination_cases_v1(self, proposals, dom_map, generation): # jazz
+        '''
+        .. function:: find_domination_cases(
+            proposals,
+            dom_map,
+            generation)
+
+        Finds the domination case for each proposal.
+
+        :param dom_map: the domination table
+        :type dom_map: dict
+        :param generation: the generation
+        :type generation: int
+        :rtype: dict
+        '''
         cases = dict()
         # Add for debugging
         all_dom_sets = dict()
@@ -3882,7 +3941,7 @@ class Question(db.Model):
         app.logger.debug("find_domination_cases: all_dom_sets = %s", all_dom_sets)
         
         return cases
-
+    
     def find_proposals_below(self, dom_map):
         '''
         .. function:: find_proposals_below(
