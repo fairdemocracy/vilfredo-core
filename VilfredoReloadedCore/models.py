@@ -3970,7 +3970,7 @@ class Question(db.Model):
         proposals_by_id = self.get_proposals_list_by_id(generation)
 
         dom_map = self.calculate_domination_map(generation=generation, algorithm=2)
-        app.logger.debug('dom map = %s', dom_map)
+        app.logger.debug('dom_map = %s', dom_map)
         cases = self.find_domination_cases(proposals=proposals, dom_map=dom_map, generation=generation)
         app.logger.debug('cases = %s', cases)
 
@@ -4138,9 +4138,12 @@ class Question(db.Model):
 
         # return proposals_below
 
-        app.logger.debug("proposals_below ==> %s", proposals_below)
+        app.logger.debug("final proposals_below ==> %s", proposals_below) # jazz
 
-        proposal_levels = self.find_levels_complex(proposals_below)
+        proposals_covered = self.get_covered_complex(proposals_below)
+        app.logger.debug("proposals_covered ==> %s", proposals_covered)
+
+        proposal_levels = self.find_levels_complex(proposals_covered)
         app.logger.debug("proposal_levels ==> %s", proposal_levels)
 
         proposal_levels_keys = proposal_levels.keys()
@@ -4203,7 +4206,7 @@ class Question(db.Model):
         for proposal in all_proposals:
             pcolor = "black"
 
-            pcs = proposals_below[proposal.id]
+            pcs = proposals_covered[proposal.id]
             for pc in pcs:
                 color = pcolor
 
@@ -5289,18 +5292,19 @@ class Question(db.Model):
         app.logger.debug("proposal_relations %s\n",
                          proposal_relations)
 
-        proposals_below = dict() #oldgraph
+        proposals_below = dict() #oldgraph jazz
         proposals_above = dict()
         for (proposal, relation) in proposal_relations.iteritems():
             proposals_below[proposal] = relation['dominating']
             proposals_above[proposal] = relation['dominated']
-        app.logger.debug("proposals_below %s\n",
-                         proposals_below)
-        app.logger.debug("proposals_above %s\n",
+        app.logger.debug("proposals_above ==> %s\n",
                          proposals_above)
+        
+        app.logger.debug("proposals_below ==> %s\n",
+                         proposals_below)
 
         proposals_covered = self.get_covered(proposals_below, proposals)
-        app.logger.debug("proposals_covered %s\n",
+        app.logger.debug("proposals_covered ==> %s\n",
                          proposals_covered)
 
         # Endorser relations
@@ -6109,7 +6113,7 @@ class Question(db.Model):
             covered[element] = covered_elements
         return covered
     
-    def get_covered(self, elements_below, elements): 
+    def get_covered(self, elements_below, elements): # jazz
         '''
         .. function:: get_covered(elements_below, elements)
 
