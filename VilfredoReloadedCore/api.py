@@ -62,7 +62,7 @@ PWD_RESET_LIFETIME = 3600*24*2
 # &hellip; ....
 # &NotGreaterLess;
 
-DOMINATION_MAP_SYMBOLS = {-2: '&approx;', -1: '&equiv;', 0: '&hellip;', 1: '^', 2: '<', 3: '&uHar;', 4: '&lHar;', 5: '<span class="partial2full">&uHar;</span>', 6: '<span class="partial2full">&lHar;</span>'}
+DOMINATION_MAP_SYMBOLS = {-2: '&approx;', -1: '&equiv;', 0: '&hellip;', 1: '^', 2: '<', 3: '&uHar;', 4: '&lHar;', 5: '<span class="partial2full">^</span>', 6: '<span class="partial2full"><</span>'}
 
 '''
 from flask_login import LoginManager
