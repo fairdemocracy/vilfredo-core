@@ -2934,9 +2934,16 @@ class Question(db.Model):
                 
                 inner_counter = inner_counter + 1
                 # app.logger.debug("INNER PROPOSAL COUNTER = %s", inner_counter)
-                
+
                 if (proposal1 == proposal2):
                     domination_map[proposal1.id][proposal1.id] = -1
+                    continue                
+                
+                # Check if the two proposals are equivalent jazz
+                elif votes[proposal1.id]['oppose'] == votes[proposal2.id]['oppose'] and\
+                        votes[proposal1.id]['endorse'] == votes[proposal2.id]['endorse'] and\
+                        votes[proposal1.id]['confused'] == votes[proposal2.id]['confused']:
+                    domination_map[proposal1.id][proposal2.id] = -1
                     continue
 
                 qualified_voters = Proposal.\
@@ -2951,7 +2958,6 @@ class Question(db.Model):
                     proposal1.id,
                     proposal2.id,
                     qualified_voters)
-                
 
                 who_dominates = Proposal.\
                     who_dominates_who_qualified(endorser_ids[proposal1.id],
@@ -3886,62 +3892,6 @@ class Question(db.Model):
 
         return cases
 
-    def find_domination_cases_v1(self, proposals, dom_map, generation): # jazz
-        '''
-        .. function:: find_domination_cases(
-            proposals,
-            dom_map,
-            generation)
-
-        Finds the domination case for each proposal.
-
-        :param dom_map: the domination table
-        :type dom_map: dict
-        :param generation: the generation
-        :type generation: int
-        :rtype: dict
-        '''
-        cases = dict()
-        # Add for debugging
-        all_dom_sets = dict()
-
-        for proposal in proposals:
-            dom_set_full = set(dom_map[proposal.id].values())
-            # Remove elements not related to domination
-            other_values = {-1,-2,0,1,3,5}
-            dom_set = dom_set_full - other_values
-            app.logger.debug("dom_set for %s = %s", proposal.id, dom_set)
-            all_dom_sets[proposal.id] = dom_set
-
-            if proposal.is_completely_understood(generation=generation):
-                if not len(dom_set):
-                    cases[proposal.id] = 1
-                elif dom_set == {2}:
-                    cases[proposal.id] = 2
-                elif dom_set == {4}:
-                    cases[proposal.id] = 3
-                elif dom_set == {2,4}:
-                    cases[proposal.id] = 4
-                else:
-                    app.logger.debug("find_domination_cases: CASE NOT SET U Proposal %s dom_set:%s ", proposal.id, dom_set)
-                    cases[proposal.id] = 0
-            else:
-                if not len(dom_set):
-                    cases[proposal.id] = 5
-                elif dom_set == {6}:
-                    cases[proposal.id] = 6
-                elif dom_set == {4}:
-                    cases[proposal.id] = 7
-                elif dom_set == {6,4}:
-                    cases[proposal.id] = 8
-                else:
-                    app.logger.debug("find_domination_cases: CASE NOT SET NU Proposal %s dom_set:%s ", proposal.id, dom_set)
-                    cases[proposal.id] = 0
-
-        app.logger.debug("find_domination_cases: all_dom_sets = %s", all_dom_sets)
-        
-        return cases
-    
     def find_proposals_below(self, dom_map):
         '''
         .. function:: find_proposals_below(
@@ -4171,7 +4121,6 @@ class Question(db.Model):
                 voting_graph += " " + str(proposals_by_id[p].id) + " "
             voting_graph += "}\n"
 
-
         for p in all_proposals:
             color = "black"
             peripheries = 1
@@ -4202,7 +4151,7 @@ class Question(db.Model):
                     '"  fontsize=11]'
 
         edge_type = {'full': 'normal', 'partial': 'onormal'}
-        
+
         for proposal in all_proposals:
             pcolor = "black"
 
