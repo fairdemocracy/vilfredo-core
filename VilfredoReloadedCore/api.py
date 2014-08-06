@@ -3374,6 +3374,63 @@ def api_question_graph(question_id):
                    proposal_level_type=proposal_level_type,
                    user_level_type=user_level_type), 200
 
+
+@app.route('/api/v1/questions/<int:question_id>/results',
+           methods=['GET'])
+def api_question_results(question_id):
+    '''
+    .. http:post:: questions/(int:question_id)/results
+
+        A map of voting results for a question.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET questions/42/voting_map HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+        :param question_id: question id
+        :type question_id: int
+        :param generation: generation
+        :type generation: int
+        :statuscode 200: no error
+        :statuscode 400: bad request
+    '''
+    app.logger.debug("api_question_results called with %s...\n",
+                     question_id)
+
+    if question_id is None:
+        app.logger.debug("ERROR: question_id is None!\n")
+        abort(404)
+
+    question = models.Question.query.get(int(question_id))
+
+    if question is None:
+        app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
+        abort(404)
+
+    generation = int(request.args.get('generation', question.generation))
+
+    results = question.get_endorsement_results(generation)
+    
+    # app.logger.debug("results ==> %s", results)
+
+    return jsonify(
+        question_id=str(question.id),
+        current_generation=str(question.generation),
+        requested_generation=str(generation),
+        num_items=str(len(results)),
+        results=results), 200
+
 @app.route('/api/v1/questions/<int:question_id>/voting_map',
            methods=['GET'])
 def api_question_voting_map(question_id):

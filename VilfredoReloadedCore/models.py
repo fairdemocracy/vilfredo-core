@@ -58,6 +58,13 @@ def candMedian(dataPoints):
 
     return [tempX/len(dataPoints),tempY/len(dataPoints)]
 
+def median(mylist):
+    sorts = sorted(mylist)
+    length = len(sorts)
+    if not length % 2:
+        return (sorts[length / 2] + sorts[length / 2 - 1]) / 2.0
+    return sorts[length / 2]
+
 def numersum(testMedian,dataPoint):
     # Provides the numerator of the weiszfeld algorithm depending on whether you are adjusting the candidate x or y
     return 1/math.sqrt((testMedian[0]-dataPoint[0])**2 + (testMedian[1]-dataPoint[1])**2)
@@ -1028,6 +1035,74 @@ class Question(db.Model):
         self.phase = 'writing'
         self.minimum_time = minimum_time
         self.maximum_time = maximum_time
+
+    def get_endorsement_results(self, generation=None): # jazz
+        '''
+        .. function:: get_endorsement_results([generation=None])
+
+        Calculate the median x and y for all endorsements of all proposals for 
+        this question.
+        Takes an optional generation value to check historic endorsements.
+
+        :param generation: question generation
+        :type generation: int or None
+        :rtype: dict
+        '''
+        generation = generation or self.generation
+
+        app.logger.debug('get_endorsement_results called for generation %s', generation)
+
+        voter_count = self.get_voter_count(generation)
+        app.logger.debug("There were %s voters in generation %s", voter_count, generation)
+
+        endorsements = db_session.query(Endorsement)\
+                .filter(Endorsement.question_id == self.id)\
+                .filter(Endorsement.generation == generation)\
+                .all()
+
+        if not endorsements:
+            return dict()
+        else:
+            endorsement_data = dict()
+            for endorsement in endorsements:
+                pid = endorsement.proposal_id
+                if not pid in endorsement_data:
+                    endorsement_data.update({pid: {'mapx': [endorsement.mapx], 
+                                                   'mapy': [endorsement.mapy]}})
+                else:
+                    endorsement_data[pid]['mapx'].append(endorsement.mapx)
+                    endorsement_data[pid]['mapy'].append(endorsement.mapy)
+            
+            # app.logger.debug("endorsement_data ==> %s", endorsement_data)
+            
+            results = dict()
+            for (pid, coords) in endorsement_data.iteritems():
+                results.update( {pid: {'median': {'medx': median(coords['mapx']),
+                                                  'medy': median(coords['mapy'])}} } )
+                '''
+                1L: {'mapx': [0.75, 0.65, 0.631388, 0.497361, 0.428218], 'mapy': [0.46, 0.16, 0.634726, 0.598698, 0.710889]}
+                '''
+                # Add error triangle points
+                not_voted = voter_count - len(coords['mapx'])
+                if not_voted > 0:
+                    
+                    app.logger.debug("Adding %s error points for pid %s", not_voted, pid)
+                    
+                    results[pid]['d_error'] = {'mapx': coords['mapx'] + [0] * not_voted, 
+                                               'mapy': coords['mapy'] + [0] * not_voted}
+                    results[pid]['e_error'] = {'mapx': coords['mapx'] + [1] * not_voted, 
+                                               'mapy': coords['mapy'] + [0] * not_voted}
+                    results[pid]['c_error'] = {'mapx': coords['mapx'] + [0.5] * not_voted,
+                                               'mapy': coords['mapy'] + [1] * not_voted}
+                
+                '''
+                results.update({pid: {'medx': median(coords['mapx']),
+                                      'medy': median(coords['mapy'])}}
+                '''
+                
+            app.logger.debug("results ==> %s", results)
+            
+            return results
 
     def consensus_found(self, algorithm=None):
         '''
