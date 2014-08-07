@@ -1084,16 +1084,17 @@ class Question(db.Model):
                 '''
                 # Add error triangle points
                 not_voted = voter_count - len(coords['mapx'])
+                not_voted = 1
                 if not_voted > 0:
-                    
+
                     app.logger.debug("Adding %s error points for pid %s", not_voted, pid)
-                    
-                    results[pid]['d_error'] = {'mapx': coords['mapx'] + [0] * not_voted, 
-                                               'mapy': coords['mapy'] + [0] * not_voted}
-                    results[pid]['e_error'] = {'mapx': coords['mapx'] + [1] * not_voted, 
-                                               'mapy': coords['mapy'] + [0] * not_voted}
-                    results[pid]['c_error'] = {'mapx': coords['mapx'] + [0.5] * not_voted,
-                                               'mapy': coords['mapy'] + [1] * not_voted}
+
+                    results[pid]['o_error'] = {'mapx': median(coords['mapx'] + [0] * not_voted), 
+                                               'mapy': median(coords['mapy'] + [0] * not_voted)}
+                    results[pid]['e_error'] = {'mapx': median(coords['mapx'] + [1] * not_voted), 
+                                               'mapy': median(coords['mapy'] + [0] * not_voted)}
+                    results[pid]['c_error'] = {'mapx': median(coords['mapx'] + [0.5] * not_voted),
+                                               'mapy': median(coords['mapy'] + [1] * not_voted)}
                 
                 '''
                 results.update({pid: {'medx': median(coords['mapx']),
