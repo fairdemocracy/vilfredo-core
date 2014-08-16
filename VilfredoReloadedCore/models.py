@@ -1063,43 +1063,46 @@ class Question(db.Model):
         if not endorsements:
             return dict()
         else:
+            app.logger.debug("endorsements ==> %s", endorsements)
+            
             endorsement_data = dict()
             for endorsement in endorsements:
                 pid = endorsement.proposal_id
                 if not pid in endorsement_data:
                     endorsement_data.update({pid: {'mapx': [endorsement.mapx], 
-                                                   'mapy': [endorsement.mapy]}})
+                                                   'mapy': [endorsement.mapy],
+                                                   'voters': {endorsement.user_id: {'mapx': endorsement.mapx,
+                                                                                    'mapy': endorsement.mapy,
+                                                                                    'username' : endorsement.endorser.username}}}})
                 else:
                     endorsement_data[pid]['mapx'].append(endorsement.mapx)
                     endorsement_data[pid]['mapy'].append(endorsement.mapy)
-            
-            # app.logger.debug("endorsement_data ==> %s", endorsement_data)
-            
+                    endorsement_data[pid]['voters'].update( {endorsement.user_id: {'mapx': endorsement.mapx,
+                                                                                   'mapy': endorsement.mapy,
+                                                                                   'username' : endorsement.endorser.username}} )
+
+            app.logger.debug("endorsement_data ==> %s", endorsement_data)
+
             results = dict()
             for (pid, coords) in endorsement_data.iteritems():
                 results.update( {pid: {'median': {'medx': median(coords['mapx']),
-                                                  'medy': median(coords['mapy'])}} } )
+                                                  'medy': median(coords['mapy'])},
+                                       'voters': coords['voters']} } )
                 '''
                 1L: {'mapx': [0.75, 0.65, 0.631388, 0.497361, 0.428218], 'mapy': [0.46, 0.16, 0.634726, 0.598698, 0.710889]}
                 '''
                 # Add error triangle points
                 not_voted = voter_count - len(coords['mapx'])
-                not_voted = 1
                 if not_voted > 0:
 
                     app.logger.debug("Adding %s error points for pid %s", not_voted, pid)
 
-                    results[pid]['o_error'] = {'mapx': median(coords['mapx'] + [0] * not_voted), 
+                    results[pid]['o_error'] = {'mapx': median(coords['mapx'] + [0] * not_voted),
                                                'mapy': median(coords['mapy'] + [0] * not_voted)}
-                    results[pid]['e_error'] = {'mapx': median(coords['mapx'] + [1] * not_voted), 
+                    results[pid]['e_error'] = {'mapx': median(coords['mapx'] + [1] * not_voted),
                                                'mapy': median(coords['mapy'] + [0] * not_voted)}
                     results[pid]['c_error'] = {'mapx': median(coords['mapx'] + [0.5] * not_voted),
                                                'mapy': median(coords['mapy'] + [1] * not_voted)}
-                
-                '''
-                results.update({pid: {'medx': median(coords['mapx']),
-                                      'medy': median(coords['mapy'])}}
-                '''
                 
             app.logger.debug("results ==> %s", results)
             
@@ -4128,14 +4131,6 @@ class Question(db.Model):
                             else:
                                 all_dominators_in_map = False
                                 break
-                        
-                        '''
-                        if relation in [2,6] and dominating_prop in graph: # WRONG !!!
-                            dominators.append(dominating_prop)
-                        else:
-                            all_dominators_in_map = False
-                            break
-                        '''
 
                     if all_dominators_in_map:
                         step5.append(prop.id)
@@ -4157,6 +4152,12 @@ class Question(db.Model):
         for prop in list(proposals):
             graph.append(prop.id)
             step6.append(prop.id)
+            
+            if relations[prop.id]['understood']:
+                pareto_understood.append(prop.id)
+            else:
+                pareto_not_understood.append(prop.id)
+            
             proposals_below[prop.id] = []
             proposals.remove(prop)
 
@@ -4210,8 +4211,16 @@ class Question(db.Model):
             
             tooltip = self.create_proposal_tooltip(p)
             app.logger.debug("tootltip = %s", tooltip)
+            
+            voting_graph += str(p.id) +\
+                ' [id=p' + str(p.id) + ' label=' + str(p.id) +\
+                ' shape=box fillcolor=' + fillcolor +\
+                ' style=filled color=' + color + ' peripheries=' +\
+                str(peripheries) + ' tooltip="' + tooltip +\
+                '"  fontsize=11]'
 
-            if p.id in pareto_understood or p.id in pareto_not_understood:
+            '''
+            if p.id in pareto_understood or p.id in pareto_not_understood or p.id in step6:
                 voting_graph += str(p.id) +\
                     ' [id=p' + str(p.id) + ' label=' + str(p.id) +\
                     ' shape=box fillcolor=' + fillcolor +\
@@ -4222,9 +4231,9 @@ class Question(db.Model):
                 voting_graph += str(p.id) +\
                     ' [id=p' + str(p.id) + ' label=' + str(p.id) +\
                     ' shape=box fillcolor="white" style="filled" color=' + color + ' peripheries=' +\
-                    str(peripheries) + ' tooltip="' +\
-                    tooltip +\
+                    str(peripheries) + ' tooltip="' + tooltip +\
                     '"  fontsize=11]'
+            '''
 
         edge_type = {'full': 'normal', 'partial': 'onormal'}
 
