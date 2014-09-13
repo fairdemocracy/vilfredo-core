@@ -59,6 +59,13 @@ ENDORSEMENT_TYPES = ['endorse', 'oppose', 'confused']
 COMMENT_TYPES = ['for', 'against', 'question', 'answer']
 PWD_RESET_LIFETIME = 3600*24*2
 
+# User question permissions
+CAN_VIEW = 1
+CAN_VOTE = 3
+CAN_PROPOSE = 5
+CAN_VOTE_AND_PROPOSE = 7
+
+
 # &hellip; ....
 # &NotGreaterLess;
 
@@ -782,11 +789,124 @@ def api_create_user():
     return jsonify(response), 201
 
 
+
 #
 # Get Questions
 #
 @app.route('/api/v1/questions', methods=['GET'])
 @app.route('/api/v1/questions/<int:question_id>', methods=['GET'])
+@requires_auth # added
+def api_get_questions(question_id=None):
+    '''
+    .. http:get:: /questions/(int:question_id)
+
+        A question or list of questions.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET /questions/42 HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+            {
+              "total_items": "3",
+              "items": "2",
+              "objects": [
+                {
+                  "last_move_on": "2013-08-12 09:51:38.632780",
+                  "created": "2013-08-12 09:51:38.632763",
+                  "title": "My question",
+                  "minimum_time": "0",
+                  "maximum_time": "604800",
+                  "id": 1,
+                  "blurb": "My blurb"
+                },
+                {
+                  "last_move_on": "2013-08-12 09:51:38.665584",
+                  "created": "2013-08-12 09:51:38.665570",
+                  "title": "Too Many Chefs",
+                  "minimum_time": "0",
+                  "maximum_time": "604800",
+                  "id": 3,
+                  "blurb": "How can they avoid spoiling the broth?"
+                }
+              ],
+              "page": "1",
+              "pages": "1"
+            }
+
+        :param question_id: question id
+        :type question_id: int
+        :param room: room title
+        :type room: string
+        :query page: page number. default is 1
+        :statuscode 200: no error
+        :statuscode 404: there's no user
+    '''
+    app.logger.debug("api_get_questions called...\n")
+    
+    # shark
+    
+    user = get_authenticated_user(request)
+
+    if question_id is not None:
+
+        question = models.Question.query.get(question_id)
+
+        if question is None:
+            return jsonify("Question not found"), 404
+        
+        # Check user permisiion
+        perm = question.get_permissions(user)
+        
+        if perm is None:
+            app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+            return jsonify("Question not found"), 404
+        
+        results = question.get_public()
+
+        # Test for jsonp request
+        if 'callback' in request.args:
+            d = json.dumps(dict(question=results))
+            return request.args['callback'] + '(' + d + ');', 200
+        else:
+            return jsonify(question=results), 200
+
+    else:
+        questions = user.get_active_questions()
+        items = len(questions)
+
+        results = []
+        for q in questions:
+            results.append(q.get_public())
+
+        # Test for jsonp request
+        if 'callback' in request.args:
+            d = json.dumps(dict(items=str(items),
+                           questions=results))
+            return request.args['callback'] + '(' + d + ');', 200
+        
+        else:
+            return jsonify(items=str(items),
+                           questions=results), 200
+
+
+
+#
+# Get Questions
+#
+# @app.route('/api/v1/questions', methods=['GET'])
+# @app.route('/api/v1/questions/<int:question_id>', methods=['GET'])
+# @requires_auth # added
 def api_get_questions(question_id=None):
     '''
     .. http:get:: /questions/(int:question_id)
@@ -982,6 +1102,7 @@ def api_create_question():
 
     # Set default threshold for voting map
     question.thresholds.append(models.Threshold(question))
+    user.invites.append(models.Invite(user, user.id, CAN_VOTE_AND_PROPOSE, question.id))
     db_session.commit()
 
     # url = {'url': url_for('api_get_questions', question_id=question.id)}
@@ -991,6 +1112,7 @@ def api_create_question():
 
 
 @app.route('/api/v1/questions/<int:question_id>/subscribers', methods=['GET'])
+@requires_auth # added
 def api_question_subscribers(question_id=None):
     '''
     .. http:get:: /questions/(int:question_id)/subscribers
@@ -1077,6 +1199,7 @@ def api_question_subscribers(question_id=None):
 @app.route('/api/v1/questions/<int:question_id>/proposals', methods=['GET'])
 @app.route('/api/v1/questions/<int:question_id>/proposals/<int:proposal_id>',
            methods=['GET'])
+@requires_auth # added
 def api_get_question_proposals(question_id=None, proposal_id=None):
     '''
     .. http:get:: /questions/(int:question_id)/proposals/(int:proposal_id)
@@ -1407,7 +1530,7 @@ def api_unsupport_proposal_comment(question_id, proposal_id, comment_id):
     '/api/v1/questions/<int:question_id>/proposals/' +
     '<int:proposal_id>/comments/<int:comment_id>',
     methods=['GET'])
-# @requires_auth
+@requires_auth # added
 def api_get_proposal_comments(question_id, proposal_id, comment_id=None):
     '''
     .. http:get:: /questions/(int:question_id)/proposals/(int:proposal_id)/comments/(int:comment_id)
@@ -2646,6 +2769,7 @@ def api_edit_proposal(question_id, proposal_id):
 @app.route('/api/v1/questions/<int:question_id>/proposals/' +
            '<int:proposal_id>/endorsers',
            methods=['GET'])
+@requires_auth # added
 def api_get_question_proposal_endorsers(question_id=None, proposal_id=None):
     '''
     .. http:get:: /questions/(int:question_id)/proposals/(int:proposal_id)/endorsers
@@ -2736,6 +2860,7 @@ def api_get_question_proposal_endorsers(question_id=None, proposal_id=None):
 # Get Pareto Front
 #
 @app.route('/api/v1/questions/<int:question_id>/pareto', methods=['GET'])
+@requires_auth # added
 def api_question_pareto(question_id=None):
     '''
     .. http:post:: /questions/(int:question_id)/pareto
@@ -2832,6 +2957,7 @@ def api_question_pareto(question_id=None):
 
 
 @app.route('/api/v1/questions/<int:question_id>/participation_table', methods=['GET'])
+@requires_auth # added
 def api_question_participation_table(question_id=None):
     '''
     .. http:post:: /questions/(int:question_id)/participation_table
@@ -2925,6 +3051,7 @@ def api_question_participation_table(question_id=None):
 
 
 @app.route('/api/v1/questions/<int:question_id>/key_players', methods=['GET'])
+@requires_auth # added
 def api_question_key_players(question_id=None):
     '''
     .. http:post:: /questions/(int:question_id)/key_players
@@ -3108,6 +3235,7 @@ def api_question_key_players_v1(question_id=None):
 
 @app.route('/api/v1/questions/<int:question_id>/endorser_effects',
            methods=['GET'])
+@requires_auth # added
 def api_question_endorser_effects(question_id=None):
     '''
     .. http:post:: /questions/(int:question_id)/endorser_effects
@@ -3267,6 +3395,7 @@ def replaceWithPublic(collection):
 #
 # http://[hostname]/api/v1.0/questions/47/graph?generation=2&map_type=pareto
 @app.route('/api/v1/questions/<int:question_id>/graph', methods=['GET'])
+@requires_auth # added
 def api_question_graph(question_id):
     '''
     .. http:get:: questions/(int:question_id)/graph
@@ -3377,6 +3506,7 @@ def api_question_graph(question_id):
 
 @app.route('/api/v1/questions/<int:question_id>/results',
            methods=['GET'])
+@requires_auth # added
 def api_question_results(question_id):
     '''
     .. http:post:: questions/(int:question_id)/results
@@ -3433,6 +3563,7 @@ def api_question_results(question_id):
 
 @app.route('/api/v1/questions/<int:question_id>/voting_map',
            methods=['GET'])
+@requires_auth # added
 def api_question_voting_map(question_id):
     '''
     .. http:post:: questions/(int:question_id)/voting_map
@@ -3491,6 +3622,7 @@ def api_question_voting_map(question_id):
 
 @app.route('/api/v1/questions/<int:question_id>/levels_map',
            methods=['GET'])
+@requires_auth # added
 def api_question_levels_map(question_id=None):
     '''
     .. http:post:: questions/(int:question_id)/levels_map
@@ -3556,6 +3688,7 @@ def api_question_levels_map(question_id=None):
 
 @app.route('/api/v1/questions/<int:question_id>/domination_map',
            methods=['GET'])
+@requires_auth # added
 def api_question_domination_map(question_id=None):
     '''
     .. http:post:: questions/(int:question_id)/domination_map
@@ -3647,6 +3780,7 @@ def api_question_domination_map(question_id=None):
 
 @app.route('/api/v1/questions/<int:question_id>/proposal_relations',
            methods=['GET'])
+@requires_auth # added
 def api_question_proposal_relations(question_id=None):
     '''
     .. http:post:: questions/(int:question_id)/proposal_relations
@@ -3770,6 +3904,7 @@ def api_question_proposal_relations(question_id=None):
 # Get Invitations
 @app.route('/api/v1/questions/<int:question_id>/invitations',
            methods=['GET'])
+@requires_auth # added
 def api_get_invitations(question_id):
     '''
     .. http:get:: /questions/(int:question_id)/invitations
@@ -3901,6 +4036,8 @@ def api_create_invitation(question_id):
         abort(400)
 
     invite_user_ids = request.json['invite_user_ids']
+    
+    permissions = int(request.json.get('permissions', CAN_VIEW))
 
     for id in invite_user_ids:
         try:
@@ -3917,7 +4054,7 @@ def api_create_invitation(question_id):
         abort(400)
 
     app.logger.debug("calling invite_all with users %s\n", invite_user_ids)
-    if user.invite_all(invite_user_ids, question):
+    if user.invite_all(invite_user_ids, permissions, question):
         app.logger.debug("invites created\n")
         db_session.commit()
         return jsonify(message="Invites sent"), 201
@@ -3930,6 +4067,7 @@ def api_create_invitation(question_id):
 @app.route('/api/v1/users/<int:user_id>/subscriptions', methods=['GET'])
 @app.route('/api/v1/users/<int:user_id>/subscriptions/<int:question_id>',
            methods=['GET'])
+@requires_auth # added
 def api_get_user_subscriptions(user_id, question_id=None):
     '''
     .. http:get:: users/(int:user_id)/subscriptions

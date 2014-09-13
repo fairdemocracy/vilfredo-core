@@ -318,6 +318,11 @@ class User(db.Model, UserMixin):
                               backref="sender", lazy='dynamic',
                               cascade="all, delete-orphan")
 
+    invites_received = db.relationship("Invite",
+                              primaryjoin="User.id==Invite.receiver_id",
+                              backref="owner", lazy='dynamic',
+                              cascade="all, delete-orphan")
+
     comments = db.relationship(
         'Comment',
         secondary=user_comments,
@@ -349,6 +354,13 @@ class User(db.Model, UserMixin):
         '''
         self.comments.append(comment)
 
+    def get_question_permission(self, question):
+        invite = self.invites_received.filter(Invite.question_id == question.id).first()
+        if invite:
+            return invite.permissions
+        else:
+            return False
+    
     def get_endorsement_count(self, question, generation=None):
         '''
         .. function:: get_endorsement_count(question[, generation=None])
@@ -437,6 +449,20 @@ class User(db.Model, UserMixin):
             Comment.proposal_id == proposal.id,
             Comment.generation == generation)).all()
 
+    def get_active_questions(self): # shark
+        '''
+        .. function:: get_active_questions()
+
+        Get all questions for this user for which he has permission,
+        either through being the author or through having been invited.
+
+        :rtype: list
+        '''
+        return db_session.query(Question).join(Invite).\
+            filter(Question.id == Invite.question_id).\
+            filter(Invite.receiver_id == self.id).\
+            all()
+
     def invite(self, receiver, question):
         # Only author can invite to own question and cannot invite himself
         '''
@@ -456,7 +482,7 @@ class User(db.Model, UserMixin):
             return True
         return False
 
-    def invite_all(self, receivers, question):
+    def invite_all(self, receivers, permissions, question):
         # Only author can invite to own question and cannot invite himself
         '''
         .. function:: invite(receiver, question)
@@ -473,7 +499,7 @@ class User(db.Model, UserMixin):
         if (self.id == question.author.id and self.id not in receivers):
             for receiver in receivers:
                 app.logger.debug('appending invite for user id %s', receiver)
-                self.invites.append(Invite(self, receiver, question.id))
+                self.invites.append(Invite(self, receiver, permissions, question.id))
             return True
         return False
 
@@ -696,7 +722,7 @@ class User(db.Model, UserMixin):
             proposal_ids.append(proposal.id)
         return proposal_ids
 
-    def get_all_proposals(self, question):
+    def get_all_proposals(self, question, generation=None): # jazz
         '''
         .. function:: get_proposals(question[, generation=None])
 
@@ -713,9 +739,12 @@ class User(db.Model, UserMixin):
             Proposal.generation == generation)
         ).all()
         '''
+        generation = generation or question.generation
+
         return db_session.query(Proposal).join(QuestionHistory).\
             filter(QuestionHistory.question_id == question.id).\
             filter(QuestionHistory.generation == generation).\
+            filter(Proposal.user_id == self.id).\
             all()
 
     def get_proposals(self, question, generation=None):
@@ -739,6 +768,7 @@ class User(db.Model, UserMixin):
         return db_session.query(Proposal).join(QuestionHistory).\
             filter(QuestionHistory.question_id == question.id).\
             filter(QuestionHistory.generation == generation).\
+            filter(QuestionHistory.user_id == self.id).\
             all()
 
     def delete_proposal(self, prop):
@@ -758,16 +788,15 @@ class User(db.Model, UserMixin):
         )).first()
         app.logger.debug("delete_proposal: Found: %s\n",
                          proposal)
-        if (proposal is not None
-                and proposal.question.phase == 'writing'
-                and
-                proposal.question.generation == proposal.generation_created):
-
-            # Delete entry from QuestionHistory table or not ???
+        if proposal is not None \
+                and proposal.question.phase == 'writing' \
+                and proposal.question.generation == proposal.generation_created:
             app.logger.debug("Removing proposal.....\n")
+            # Delete entry from QuestionHistory table or not ???
             self.proposals.remove(proposal)
             return True
-        return False
+        else:
+            return False
 
     def subscribe_to(self, question, how=None):
         '''
@@ -869,6 +898,7 @@ class Invite(db.Model):
                 'sender_id': self.sender_id,
                 'receiver_id': self.receiver_id,
                 'question_id': self.question_id,
+                'permissions': self.permissions,
                 'sender_url': url_for('api_get_users',
                                       user_id=self.sender_id),
                 'receiver_id': url_for('api_get_users',
@@ -877,16 +907,18 @@ class Invite(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     sender_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     receiver_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    question_id = db.Column(db.Integer)
+    question_id = db.Column(db.Integer, db.ForeignKey('question.id'))
+    permissions = db.Column(db.Integer, default=1)
 
     receiver = db.relationship("User",
                                primaryjoin="Invite.receiver_id==User.id",
                                backref="invitations",
                                lazy='static', single_parent=True)
 
-    def __init__(self, sender, receiver, question_id):
+    def __init__(self, sender, receiver, permissions, question_id):
         self.sender_id = sender.id
         self.question_id = question_id
+        self.permissions = permissions
 
         if isinstance(receiver, int):
             self.receiver_id = receiver
@@ -1004,6 +1036,8 @@ class Question(db.Model):
                                   cascade="all, delete-orphan")
     thresholds = db.relationship('Threshold', lazy='dynamic',
                               cascade="all, delete-orphan")
+    invites = db.relationship('Invite', lazy='dynamic', backref='question',
+                              cascade="all, delete-orphan")
 
     def __init__(self, author, title, blurb,
                  minimum_time=86400, maximum_time=604800, room=None):
@@ -1036,6 +1070,22 @@ class Question(db.Model):
         self.minimum_time = minimum_time
         self.maximum_time = maximum_time
 
+    def get_permissions(self, user): # shark
+        '''
+        .. function:: get_permissions()
+
+        Get user's permissions to access this question,
+        granted either through being the author or through having been invited
+        to participate.
+
+        :rtype: Integer
+        '''
+        invite = self.invites.filter_by(receiver_id=user.id).one()
+        if invite is None:
+            return 0
+        else:
+            return invite.permissions
+    
     def get_endorsement_results(self, generation=None): # jazz
         '''
         .. function:: get_endorsement_results([generation=None])

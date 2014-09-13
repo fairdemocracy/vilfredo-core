@@ -363,7 +363,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         #
         rv = self.open_with_json_auth('/api/v1/questions/1/invitations',
                                       'POST',
-                                      dict(invite_user_ids=[2, 3, 4, 5]),
+                                      dict(invite_user_ids=[2, 3, 4, 5], permissions=7),
                                       'john',
                                       'john123')
         self.assertEqual(rv.status_code, 201)
@@ -1203,21 +1203,6 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         app.logger.debug("Data retrieved from Get Proposal Relations = %s\n",
                          rv.data)
 
-        if MOVE_TO_GENERATION_2:
-            #
-            # Author moves question on to WRITING phase and GENERATION 2
-            #
-            app.logger.debug("Move question on to next generation")
-            rv = self.open_with_json_auth('/api/v1/questions/1',
-                                          'PATCH',
-                                          dict(move_on=True),
-                                          'john',
-                                          'john123')
-            self.assertEqual(rv.status_code, 200, self.get_message(rv))
-            # Log data received
-            app.logger.debug("Data retrieved from Edit Question (Move On) = %s\n",
-                             rv.data)
-
         if (MAKE_GRAPH):
             #
             # Create Voting Map
@@ -1247,11 +1232,93 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             #              "File URL not returned")
             
             # Stop here while debugging graph
-            return
 
+        
+        # gen 2
+        if MOVE_TO_GENERATION_2:
+            #
+            # Author moves question on to WRITING phase and GENERATION 2
+            #
+            app.logger.debug("Move question on to next generation")
+            rv = self.open_with_json_auth('/api/v1/questions/1',
+                                          'PATCH',
+                                          dict(move_on=True),
+                                          'john',
+                                          'john123')
+            self.assertEqual(rv.status_code, 200, self.get_message(rv))
+            # Log data received
+            app.logger.debug("Data retrieved from Edit Question (Move On) = %s\n",
+                             rv.data)
+            
+            #
+            # Create Proposals
+            #
+            bills_blurb = '''<p>This is getting interesting. I may stay up all night deliberating.</p>
+            '''
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals',
+                'POST',
+                dict(title='Bills 2nd Gen Proposal',
+                     blurb=bills_blurb),
+                'bill',
+                'bill123')
+            self.assertEqual(rv.status_code, 201)
+            # Log data received
+            app.logger.debug("Data retrieved from Create Proposal = %s\n",
+                             rv.data)
+
+            bills_other_blurb = '''<p>Once I've finished writing this I'm going to sell the rights to warner Brother.</p>'''
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals',
+                'POST',
+                dict(title='Bills Round 2 Proposal for Hollywood',
+                     blurb=bills_other_blurb,
+                     abstract='This is too expressionistic for an abstract'),
+                'bill',
+                'bill123')
+            self.assertEqual(rv.status_code, 201)
+            
+            # Propoosal 1
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/1/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="oppose",
+                    use_votemap=True,
+                    coords={'mapx': 0.75, 'mapy': 0.46}),
+                'bill',
+                'bill123')
+            self.assertEqual(rv.status_code, 201)
+            
+            # bills_prop1.endorse(john)
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/1/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="endorse",
+                    use_votemap=True,
+                    coords={'mapx': 0.65, 'mapy': 0.16}),
+                'john',
+                'john123')
+            self.assertEqual(rv.status_code, 201)
+
+            rv = self.open_with_json_auth(
+                '/api/v1/questions/1/proposals/1/endorsements',
+                'POST',
+                dict(
+                    # endorsement_type="confused",
+                    use_votemap=True,
+                    coords={'mapx': 0.68, 'mapy': 0.67}),
+                'jack',
+                'jack123')
+            self.assertEqual(rv.status_code, 201)
+        
+        
+        
         #
         # Update Endorsements
         #
+        '''
         # John ID=1 endorses proposal 2
         rv = self.open_with_json_auth(
             '/api/v1/questions/1/proposals/2/endorsements',
@@ -1261,7 +1328,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             'john123')
         self.assertEqual(rv.status_code, 201)
         
-        '''
+        
         #
         # Updates endorsement to OPPOSE
         app.logger.debug("John updates his endopsement to OPPOSE")

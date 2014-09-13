@@ -30,7 +30,13 @@ from . import app, models
 
 from .database import db_session
 
-from flask import render_template
+from flask import render_template, url_for, redirect
+
+
+def redirect_url():
+    return request.args.get('next') or \
+           request.referrer or \
+           url_for('index')
 
 
 # @app.route('/', methods=['GET', 'POST'])
@@ -44,7 +50,11 @@ def index():
 
 @app.route('/question/<int:question_id>')
 def display_question(question_id):
-    return render_template("question.html")
+    auth = request.cookies.get('vgaclient')
+    if not auth:
+        return redirect(redirect_url())
+    else:
+        return render_template("question.html")
 
 
 @app.route('/domination/<int:question_id>/gen/<int:generation>')
