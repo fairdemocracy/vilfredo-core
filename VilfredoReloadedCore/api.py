@@ -59,12 +59,6 @@ ENDORSEMENT_TYPES = ['endorse', 'oppose', 'confused']
 COMMENT_TYPES = ['for', 'against', 'question', 'answer']
 PWD_RESET_LIFETIME = 3600*24*2
 
-# User question permissions
-CAN_VIEW = 1
-CAN_VOTE = 3
-CAN_PROPOSE = 5
-CAN_VOTE_AND_PROPOSE = 7
-
 
 # &hellip; ....
 # &NotGreaterLess;
@@ -855,31 +849,29 @@ def api_get_questions(question_id=None):
     app.logger.debug("api_get_questions called...\n")
     
     # shark
-    
     user = get_authenticated_user(request)
 
     if question_id is not None:
 
         question = models.Question.query.get(question_id)
-
         if question is None:
             return jsonify("Question not found"), 404
         
-        # Check user permisiion
+        # Check user permission
         perm = question.get_permissions(user)
-        
         if perm is None:
             app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
             return jsonify("Question not found"), 404
-        
-        results = question.get_public()
+
+        question_data = question.get_public(user)
+        app.logger.debug("Qustion data ==> %s", question_data);
 
         # Test for jsonp request
         if 'callback' in request.args:
-            d = json.dumps(dict(question=results))
+            d = json.dumps(dict(question=question_data))
             return request.args['callback'] + '(' + d + ');', 200
         else:
-            return jsonify(question=results), 200
+            return jsonify(question=question_data), 200
 
     else:
         questions = user.get_active_questions()
@@ -1102,7 +1094,7 @@ def api_create_question():
 
     # Set default threshold for voting map
     question.thresholds.append(models.Threshold(question))
-    user.invites.append(models.Invite(user, user.id, CAN_VOTE_AND_PROPOSE, question.id))
+    user.invites.append(models.Invite(user, user.id, models.Question.VOTE_PROPOSE_READ, question.id))
     db_session.commit()
 
     # url = {'url': url_for('api_get_questions', question_id=question.id)}
@@ -2018,6 +2010,13 @@ def api_add_proposal_endorsement(question_id, proposal_id):
         message = {"message": "The question is not in the voting phase"}
         return jsonify(message), 403
 
+    # shark
+    # Check user permission: can vote?
+    perm = question.get_permissions(user)
+    if perm is None or not models.Question.VOTE & perm:
+        app.logger.debug("ACCESS ERROR: User %s with permission %s tried to vote on question %s", user.id, perm, question.id)
+        return jsonify("Question not found"), 404
+    
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
         abort(400)
@@ -2256,6 +2255,13 @@ def api_update_proposal_endorsement(question_id, proposal_id):
         message = {"message": "The question is not in the voting phase"}
         return jsonify(message), 403
 
+    # shark
+    # Check user permission: can vote?
+    perm = question.get_permissions(user)
+    if perm is None or not models.Question.VOTE & perm:
+        app.logger.debug("ACCESS ERROR: User %s with permission %s tried to vote on question %s", user.id, perm, question.id)
+        return jsonify("Question not found"), 404
+    
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
         abort(400)
@@ -2400,6 +2406,13 @@ def api_create_proposal(question_id):
     if question is None:
         abort(400)
 
+    # shark
+    # Check user permission: can propose?
+    perm = question.get_permissions(user)
+    if perm is None or not models.Question.PROPOSE & perm:
+        app.logger.debug("ACCESS ERROR: User %s with permission %s tried to propose on question %s", user.id, perm, question.id)
+        return jsonify("Question not found"), 404
+    
     if not request.json:
         app.logger.debug("Non json request received...\n")
         abort(400)
@@ -2486,9 +2499,17 @@ def api_delete_proposal(question_id, proposal_id):
 
     app.logger.debug("Authenticated User = %s\n", user.id)
 
-    if question_id is None or proposal_id is None:
-        abort(404)
-
+    # shark
+    # Check user permission: can vote?
+    question = models.Question.query.get(question_id)
+    if question is None:
+        return jsonify("Question not found"), 404
+    
+    perm = question.get_permissions(user)
+    if perm is None or not models.Question.PROPOSE & perm:
+        app.logger.debug("ACCESS ERROR: User %s with permission %s tried to delete a proposal on question %s", user.id, perm, question.id)
+        return jsonify("Question not found"), 404
+    
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
         abort(404)
@@ -2764,13 +2785,89 @@ def api_edit_proposal(question_id, proposal_id):
         message = {"message": "There was an error updating this proposal"}
         return jsonify(message), 400
 
+# shark
+# Get Question Participants
+@app.route('/api/v1/questions/<int:question_id>/permissions',
+           methods=['GET'])
+@requires_auth # added
+def api_get_question_participants(question_id):
+    '''
+    .. http:get:: /questions/(int:question_id)/permissions
+
+        A list of question invitee permissions.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET /questions/42/proposals/67/permissions HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+            {
+              "query_generation": "1",
+              "current_generation": "1",
+              "endorsers": [
+                {
+                  "username": "john",
+                  "url": "/users/1",
+                  "registered": "2013-08-15 18:10:23.877239",
+                  "id": "1",
+                  "last_seen": "2013-08-15 18:10:23.877268"
+                },
+                {
+                  "username": "susan",
+                  "url": "/users/2",
+                  "registered": "2013-08-15 18:10:23.938536",
+                  "id": "2",
+                  "last_seen": "2013-08-15 18:10:23.938550"
+                },
+                {
+                  "username": "harry",
+                  "url": "/users/5",
+                  "registered": "2013-08-15 18:10:23.981326",
+                  "id": "5",
+                  "last_seen": "2013-08-15 18:10:23.981341"
+                }
+              ],
+              "num_items": "3",
+              "question_id": "1"
+            }
+
+        :param question_id: question id
+        :type question_id: int
+        :statuscode 200: no error
+        :statuscode 400: bad request
+    '''
+    app.logger.debug("api_get_question_participants called...\n")
+
+    if question_id is None:
+        app.logger.debug("ERROR: question_id is None!\n")
+        abort(404)
+
+    question = models.Question.query.get(int(question_id))
+    if question is None:
+        abort(404)
+
+    permissions = question.get_participant_permissions()
+
+    return jsonify(question_id=str(question.id),
+                   num_items=str(len(permissions)), 
+                   permissions=permissions), 200
 
 # Get Proposal Endorsers
 @app.route('/api/v1/questions/<int:question_id>/proposals/' +
            '<int:proposal_id>/endorsers',
            methods=['GET'])
 @requires_auth # added
-def api_get_question_proposal_endorsers(question_id=None, proposal_id=None):
+def api_get_question_proposal_endorsers(question_id, proposal_id):
     '''
     .. http:get:: /questions/(int:question_id)/proposals/(int:proposal_id)/endorsers
 
@@ -3119,17 +3216,6 @@ def api_question_key_players(question_id=None):
     app.logger.debug("calculate_key_players returned: %s", key_players)
     # {3: set([<Proposal('3', Q:'1')>, <Proposal('4', Q:'1')>]), 4: set([<Proposal('3', Q:'1')>])}
 
-    '''
-    # Version 1
-    results = []
-    for (endorser, vote_for) in key_players.iteritems():
-        proposals = []
-        for proposal in vote_for:
-            proposals.append(proposal.id)
-        kp = {'user': endorser.get_public(), 'add_vote': proposals}
-        results.append(kp)
-    '''
-    # Version 2
     results = []
     for (endorser, vote_for) in key_players.iteritems():
         # Need to initialize values to stop knockout.js complaining
@@ -4037,7 +4123,7 @@ def api_create_invitation(question_id):
 
     invite_user_ids = request.json['invite_user_ids']
     
-    permissions = int(request.json.get('permissions', CAN_VIEW))
+    permissions = int(request.json.get('permissions', models.Question.READ))
 
     for id in invite_user_ids:
         try:

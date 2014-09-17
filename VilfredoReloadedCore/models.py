@@ -972,7 +972,16 @@ class Question(db.Model):
                                                        self.generation,
                                                        self.phase)
 
-    def get_public(self):
+    # User question permissions
+    READ = 1
+    VOTE = 2
+    PROPOSE = 4
+    # Combined
+    VOTE_READ = 3
+    PROPOSE_READ = 5
+    VOTE_PROPOSE_READ = 7
+    
+    def get_public(self, user=None):
         '''
         .. function:: get_public()
 
@@ -991,7 +1000,7 @@ class Question(db.Model):
 
         consensus_found = (self.get_inherited_proposal_count() == 1) and (self.get_new_proposal_count() == 0)
 
-        return {'id': str(self.id),
+        public = {'id': str(self.id),
                 'url': url_for('api_get_questions', question_id=self.id),
                 'title': self.title,
                 'blurb': self.blurb,
@@ -1012,6 +1021,27 @@ class Question(db.Model):
                 'author_url': url_for('api_get_users', user_id=self.user_id),
                 'mapx': str(threshold.mapx),
                 'mapy': str(threshold.mapy)}
+
+        # Add user permissions
+        permissions = None
+        if user:
+            permissions = self.get_permissions(user)
+            # Add participant permissions if user is question author
+            if user.id == self.author.id:
+                user_permissions = self.get_participant_permissions()
+                if user_permissions:
+                    public['user_permissions'] = user_permissions
+                else:
+                    public['user_permissions'] = list()
+
+        if permissions:
+            public['can_vote'] = bool(Question.VOTE & permissions)
+            public['can_propose'] = bool(Question.PROPOSE & permissions)
+        else:
+            public['can_vote'] = False
+            public['can_propose'] = False
+
+        return public
 
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(120), nullable=False)
@@ -1037,6 +1067,7 @@ class Question(db.Model):
     thresholds = db.relationship('Threshold', lazy='dynamic',
                               cascade="all, delete-orphan")
     invites = db.relationship('Invite', lazy='dynamic', backref='question',
+                              primaryjoin="Invite.question_id == Question.id",
                               cascade="all, delete-orphan")
 
     def __init__(self, author, title, blurb,
@@ -1070,6 +1101,22 @@ class Question(db.Model):
         self.minimum_time = minimum_time
         self.maximum_time = maximum_time
 
+    def get_participant_permissions(self):
+        '''
+        .. function:: get_participant_permissions()
+
+        Get a question's invitations and their associatd permissions.
+
+        :rtype: list
+        '''
+        participants = list()
+        invitations = self.invites.all()
+        if not invitations is None:
+            for invitation in invitations:
+                participants.append({'username': invitation.receiver.username, 'user_id': str(invitation.receiver.id), 'permissions': str(invitation.permissions)})
+
+        return participants
+    
     def get_permissions(self, user): # shark
         '''
         .. function:: get_permissions()
@@ -1380,25 +1427,6 @@ class Question(db.Model):
         :rtype: Generation
         '''
         return Generation(self, generation)
-
-    def get_participants(self, generation=None):
-        '''
-        .. function:: get_participants(generation)
-
-        Returns a set of participents.
-
-        :rtype: Generation
-        '''
-        participants = set()
-        
-        # Add author
-        participants.add(self.author)
-        
-        # Get writers
-        
-        # Get Voters
-        
-        return participants
 
     def minimum_time_passed(self):
         '''
