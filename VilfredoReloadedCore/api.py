@@ -2786,6 +2786,82 @@ def api_edit_proposal(question_id, proposal_id):
         return jsonify(message), 400
 
 # shark
+# Get users not yet invited to participate in a question
+@app.route('/api/v1/questions/<int:question_id>/not_invited',
+           methods=['GET'])
+@requires_auth # added
+def api_not_invited(question_id):
+    '''
+    .. http:get:: /questions/(int:question_id)/not_invited
+
+        A list of users not yet invited to participate in a question.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET /questions/42/not_invited HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+            {
+              "query_generation": "1",
+              "current_generation": "1",
+              "endorsers": [
+                {
+                  "username": "john",
+                  "url": "/users/1",
+                  "registered": "2013-08-15 18:10:23.877239",
+                  "id": "1",
+                  "last_seen": "2013-08-15 18:10:23.877268"
+                },
+                {
+                  "username": "susan",
+                  "url": "/users/2",
+                  "registered": "2013-08-15 18:10:23.938536",
+                  "id": "2",
+                  "last_seen": "2013-08-15 18:10:23.938550"
+                },
+                {
+                  "username": "harry",
+                  "url": "/users/5",
+                  "registered": "2013-08-15 18:10:23.981326",
+                  "id": "5",
+                  "last_seen": "2013-08-15 18:10:23.981341"
+                }
+              ],
+              "num_items": "3",
+              "question_id": "1"
+            }
+
+        :param question_id: question id
+        :type question_id: int
+        :statuscode 200: no error
+        :statuscode 400: bad request
+    '''
+    app.logger.debug("api_not_invited called...\n")
+
+    if question_id is None:
+        app.logger.debug("ERROR: question_id is None!\n")
+        abort(404)
+
+    question = models.Question.query.get(int(question_id))
+    if question is None:
+        abort(404)
+
+    not_invited = question.get_not_invited()
+
+    return jsonify(question_id=str(question.id),
+                   num_items=str(len(not_invited)), 
+                   not_invited=not_invited), 200
+
 # Get Question Participants
 @app.route('/api/v1/questions/<int:question_id>/permissions',
            methods=['GET'])
@@ -4143,7 +4219,7 @@ def api_create_invitation(question_id):
     if user.invite_all(invite_user_ids, permissions, question):
         app.logger.debug("invites created\n")
         db_session.commit()
-        return jsonify(message="Invites sent"), 201
+        return jsonify(message="Invites created"), 201
     else:
         abort(500)
 

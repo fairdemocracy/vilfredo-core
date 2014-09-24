@@ -24,7 +24,7 @@
 The database Bases
 '''
 
-from sqlalchemy import and_, or_, event, distinct
+from sqlalchemy import and_, or_, not_, event, distinct
 
 from database import db_session, db
 
@@ -1026,13 +1026,16 @@ class Question(db.Model):
         permissions = None
         if user:
             permissions = self.get_permissions(user)
+            
             # Add participant permissions if user is question author
+            
             if user.id == self.author.id:
                 user_permissions = self.get_participant_permissions()
                 if user_permissions:
                     public['user_permissions'] = user_permissions
                 else:
                     public['user_permissions'] = list()
+            
 
         if permissions:
             public['can_vote'] = bool(Question.VOTE & permissions)
@@ -1101,6 +1104,39 @@ class Question(db.Model):
         self.minimum_time = minimum_time
         self.maximum_time = maximum_time
 
+    # sharks
+    def get_not_invited(self):
+        '''
+        .. function:: get_not_invited()
+
+        Get a list of details of users not yet invited to the question.
+
+        :rtype: list
+        '''
+        
+        '''
+        SELECT `user`.id, `invite`.id FROM `user` 
+        LEFT JOIN `invite` 
+        ON user.id = invite.receiver_id 
+        AND `invite`.question_id = 2 
+        WHERE `invite`.id IS NULL
+        ORDER BY `user`.id
+        '''
+        not_invited = db.session.query(User).\
+            outerjoin(Invite, and_(Invite.receiver_id == User.id, Invite.question_id == self.id)).\
+            filter(Invite.id == None).\
+            all()
+        
+        app.logger.debug('not_invited ==> %s', not_invited)        
+        
+        users_to_invite = list()
+        if not_invited is None:
+            return users_to_invite
+        else:
+            for user in not_invited:
+                users_to_invite.append({'username': user.username, 'user_id': user.id})
+            return users_to_invite
+    
     def get_participant_permissions(self):
         '''
         .. function:: get_participant_permissions()
