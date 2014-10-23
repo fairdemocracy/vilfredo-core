@@ -46,6 +46,7 @@ MOVE_TO_GENERATION_2 = False
 USE_VOTEMAP = True
 CREATE_CONSENSUS = False
 ALGORITHM_VERSION = "1"
+SEND_EMAILS = False
 
 
 class RESTAPITestCase(unittest.TestCase):
@@ -381,7 +382,29 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         self.assertEqual(rv.status_code, 200)
         # Log data received
         app.logger.debug("Data retrieved from Get Invites = %s\n", rv.data)
-
+        
+        
+        #
+        # Create Email Invites
+        #
+        user_emails = 'jenny@test.com,bademail.com,procrastinator@test.com'
+        rv = self.open_with_json_auth('/api/v1/questions/1/emailinvitations',
+                                      'POST',
+                                      dict(user_emails=user_emails, permissions=7),
+                                      'john',
+                                      'john123')
+        self.assertEqual(rv.status_code, 201)
+        # Log data received
+        app.logger.debug("Data retrieved from Create Invite = %s\n", rv.data)
+        # self.assertEqual(rv.data.invites.rejected, 'bademail.com')
+        # self.assertEqual(rv.data.invites.num_invites_sent, '2')
+        if (SEND_EMAILS):
+            # Email invited users
+            with mail.record_messages() as outbox:
+                emails.email_question_invite(john, susan, johns_q)
+                emails.email_question_invite(john, bill, johns_q)
+                self.assertEqual(len(outbox), 2)
+        
         #
         # Create Subscriptions
         #
