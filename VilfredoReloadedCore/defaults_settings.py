@@ -66,9 +66,10 @@ MAIL_PORT = 25
 MAIL_USERNAME = 'admin'
 MAIL_PASSWORD = None
 MAIL_SUPPRESS_SEND = True
+MAIL_DEFAULT_SENDER = 'no_reply@localhost'
 
 from datetime import timedelta
-REMEMBER_COOKIE_DURATION = timedelta(days=3)
+REMEMBER_COOKIE_DURATION = timedelta(days=365)
 
 # administrator list
 ADMINS = ['admin@example.com']
