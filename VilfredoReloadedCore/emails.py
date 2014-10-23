@@ -44,8 +44,18 @@ def send_email(subject, sender, recipients, text_body, html_body):
     send_async_email(msg)
 
 
+def email_question_email_invite(sender, receiver_email, question):
+    # print "Sending email:", sender.username, question.title
+    send_email("Vilfredo Reloaded - Invitation to participate",
+               'admin@vilfredo-reloaded.com',
+               [receiver_email],
+               "User %s invites you to participate in question %s"
+               % (sender.username, question.title),
+               "User %s invites you to participate in question %s"
+               % (sender.username, question.title))
+
 def email_question_invite(sender, receiver, question):
-    print "Sending email:", sender.username, question.title
+    # print "Sending email:", sender.username, question.title
     send_email("Vilfredo Reloaded - Invitation to participate",
                'admin@vilfredo-reloaded.com',
                [receiver.email],
