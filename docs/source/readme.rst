@@ -198,7 +198,7 @@ Open sourcetree and clone the project:
 
 .. code:: sh
 
-	git@git.ahref.eu:vilfredo/vilfredo-reloaded-core.git
+	https://github.com/fairdemocracy/vilfredo-core.git
 
 choosing the directory. I used Desktop/projects/vilfredo-reloaded-core/
 
@@ -206,7 +206,7 @@ if not go to the directory where you want to clone it and type:
 
 .. code:: sh
 
-    git  clone git@git.ahref.eu:vilfredo/vilfredo-reloaded-core.git
+    git  clone https://github.com/fairdemocracy/vilfredo-core.git
 
 then go to the directory and check that the project is there
 
