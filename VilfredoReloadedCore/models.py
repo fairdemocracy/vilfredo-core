@@ -3940,6 +3940,13 @@ class Question(db.Model):
                 app.logger.debug('Failed to create map path %s', map_path)
                 return False
 
+        if not os.path.exists(work_file_dir):
+            try:
+                os.makedirs(work_file_dir)
+            except IOError:
+                app.logger.debug('Failed to create work_file_dir path %s', work_file_dir)
+                return False
+
         # Create the SVG file if it doesn't exist
         if not os.path.isfile(filepath + '.svg'):
 
