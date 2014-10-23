@@ -35,6 +35,7 @@ from sqlalchemy import and_
 from functools import wraps
 from flask import Response
 import json
+import uuid
 
 
 REST_API_VERSION = 'v1'
@@ -612,7 +613,6 @@ def api_request_password_reset():
         message = "Email address not found"
         return jsonify(message=message), 400
 
-    import uuid
     pwd_reset_token = uuid.uuid4().get_hex()
     timeout = models.get_timestamp() + PWD_RESET_LIFETIME
     pwd_reset = models.PWDReset(user, pwd_reset_token, timeout)
@@ -2786,11 +2786,182 @@ def api_edit_proposal(question_id, proposal_id):
         return jsonify(message), 400
 
 # shark
+
+# Get users not yet invited to participate in a question
+@app.route('/api/v1/users/associated_users',
+           methods=['GET'])
+@requires_auth
+def api_associated_users():
+    '''
+    .. http:get:: /users/associated_users
+
+        A list of associared users not yet invited to participate in a question.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET /users/2/associated_users HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+            {
+              "query_generation": "1",
+              "current_generation": "1",
+              "endorsers": [
+                {
+                  "username": "john",
+                  "url": "/users/1",
+                  "registered": "2013-08-15 18:10:23.877239",
+                  "id": "1",
+                  "last_seen": "2013-08-15 18:10:23.877268"
+                },
+                {
+                  "username": "susan",
+                  "url": "/users/2",
+                  "registered": "2013-08-15 18:10:23.938536",
+                  "id": "2",
+                  "last_seen": "2013-08-15 18:10:23.938550"
+                },
+                {
+                  "username": "harry",
+                  "url": "/users/5",
+                  "registered": "2013-08-15 18:10:23.981326",
+                  "id": "5",
+                  "last_seen": "2013-08-15 18:10:23.981341"
+                }
+              ],
+              "num_items": "3",
+              "question_id": "1"
+            }
+
+        :param question_id: question id
+        :type question_id: int
+        :statuscode 200: no error
+        :statuscode 400: bad request
+    '''
+    app.logger.debug("api_associated_users called...\n")
+    
+    user = get_authenticated_user(request)
+    if not user:
+        abort(401)
+
+    question_id = request.args.get('ignore_question', None)
+    
+    if not question_id:
+        message = "You must pass the question ID" %\
+                  question_id
+        return jsonify(message=message), 401
+    
+    app.logger.debug("api_associated_users ignore question with ID %s", question_id)
+
+    # If a question id is given, check it question exists.
+    # If not then abort
+    question = models.Question.query.get(int(question_id))
+    if question is None:
+        message = "Question with ID %s does not exist" %\
+                  question_id
+        return jsonify(message=message), 400
+
+    not_invited = user.get_associated_users(ignore_question_id=question_id)
+
+    return jsonify(question_id=str(question.id),
+                   num_items=str(len(not_invited)), 
+                   not_invited=not_invited), 200
+
+
 # Get users not yet invited to participate in a question
 @app.route('/api/v1/questions/<int:question_id>/not_invited',
            methods=['GET'])
-@requires_auth # added
+@requires_auth
 def api_not_invited(question_id):
+    '''
+    .. http:get:: /questions/(int:question_id)/not_invited
+
+        A list of users not yet invited to participate in a question.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET /questions/42/not_invited HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+            {
+              "query_generation": "1",
+              "current_generation": "1",
+              "endorsers": [
+                {
+                  "username": "john",
+                  "url": "/users/1",
+                  "registered": "2013-08-15 18:10:23.877239",
+                  "id": "1",
+                  "last_seen": "2013-08-15 18:10:23.877268"
+                },
+                {
+                  "username": "susan",
+                  "url": "/users/2",
+                  "registered": "2013-08-15 18:10:23.938536",
+                  "id": "2",
+                  "last_seen": "2013-08-15 18:10:23.938550"
+                },
+                {
+                  "username": "harry",
+                  "url": "/users/5",
+                  "registered": "2013-08-15 18:10:23.981326",
+                  "id": "5",
+                  "last_seen": "2013-08-15 18:10:23.981341"
+                }
+              ],
+              "num_items": "3",
+              "question_id": "1"
+            }
+
+        :param question_id: question id
+        :type question_id: int
+        :statuscode 200: no error
+        :statuscode 400: bad request
+    '''
+    app.logger.debug("api_not_invited called...\n")
+    
+    user = get_authenticated_user(request)
+    if not user:
+        abort(401)
+
+    if question_id is None:
+        app.logger.debug("ERROR: question_id is None!\n")
+        abort(404)
+
+    question = models.Question.query.get(int(question_id))
+    if question is None:
+        abort(404)
+
+    not_invited = user.get_uninvited_associated_users(question)
+
+    return jsonify(question_id=str(question.id),
+                   num_items=str(len(not_invited)), 
+                   not_invited=not_invited), 200
+
+# Get users not yet invited to participate in a question
+# @app.route('/api/v1/questions/<int:question_id>/not_invited',
+#           methods=['GET'])
+@requires_auth # added
+def api_not_invited_1(question_id):
     '''
     .. http:get:: /questions/(int:question_id)/not_invited
 
@@ -3603,8 +3774,6 @@ def api_question_graph(question_id):
     '''
     app.logger.debug("api_question_graph called...\n")
 
-    app.logger.debug("************** USING ALGORITHM %s ************", app.config['ALGORITHM_VERSION'])
-
     if question_id is None:
         app.logger.debug("ERROR: question_id is None!\n")
         abort(404)
@@ -3619,6 +3788,8 @@ def api_question_graph(question_id):
 
     # set Algorithm version
     algorithm = int(request.args.get('algorithm', app.config['ALGORITHM_VERSION']))
+    
+    app.logger.debug("************** USING ALGORITHM %s ************", algorithm)
 
     # app.logger.debug('Question has %s endorsememnts', question.has_endorsememnts(generation))
     if not question.has_endorsememnts(generation=generation):
@@ -4143,6 +4314,96 @@ def api_get_invitations(question_id):
     return jsonify(total_items=str(total_items), items=str(items),
                    page=str(page), pages=str(pages),
                    invitations=results), 200
+
+
+# Create Email Invitation
+@app.route('/api/v1/questions/<int:question_id>/emailinvitations',
+           methods=['POST'])
+@requires_auth
+def api_create_email_invitation(question_id):
+    '''
+    .. http:post:: questions/(int:question_id)/emailinvitations
+
+        Create invitations to a question.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            POST questions/45/invitations HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 201 OK
+            Content-Type: application/json
+
+            {
+              "message": "Invites sent"
+            }
+
+        :param question_id: question id
+        :type question_id: int
+        :json invite_user_ids: list of user ids to invite
+        :statuscode 201: no error
+        :statuscode 400: bad request
+    '''
+    app.logger.debug("api_create_email_invitation called...\n")
+
+    user = get_authenticated_user(request)
+    if not user:
+        abort(401)
+
+    if question_id is None:
+        abort(404)
+        
+    question = models.Question.query.get(int(question_id))
+    if question is None:
+        abort(400)
+
+    if not request.json:
+        abort(400)
+
+    if not 'user_emails' in request.json:
+        abort(400)
+    
+    permissions = int(request.json.get('permissions', models.Question.READ))
+    user_emails = request.json['user_emails']
+    email_list = user_emails.split(',')
+    
+    rejected = list()
+    invites_count = 0
+    
+    for email in email_list:
+        if not '@' in email:
+            app.logger.debug("@ not found in %s", email)
+            rejected.append(email)
+            continue
+        else:
+            instance = db_session.query(models.EmailInvite).filter_by(receiver_email=email).first()
+            if instance:
+                rejected.append(email)
+                continue
+            else:
+                token = uuid.uuid4().get_hex()
+                new_invite = models.EmailInvite(user, email, permissions, question_id, token)
+                db_session.add(new_invite)
+                invites_count = invites_count + 1
+                # Send email
+                # email_question_email_invite(user, email, question)
+    
+    if invites_count:
+        db_session.commit()
+    
+    rejected_addresses = ",".join(rejected)    
+    invites = [{'question_id': str(question_id),
+                'rejected': rejected_addresses,
+                'num_invites_sent': str(invites_count)}]
+    
+    return jsonify(invites=invites), 201
 
 
 # Create Invitation

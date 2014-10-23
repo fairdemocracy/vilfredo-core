@@ -126,6 +126,7 @@ GraphLevelType = enum(layers=1, num_votes=2, flat=3)
 QuestionPhaseType = enum(writing=1, voting=2, archive=3)
 
 map_path = app.config['MAP_PATH']
+work_file_dir = app.config['WORK_FILE_DIRECTORY']
 
 def get_timestamp():
     return int(math.floor(time.time()))
@@ -353,6 +354,82 @@ class User(db.Model, UserMixin):
         :rtype: None
         '''
         self.comments.append(comment)
+
+    def get_uninvited_associated_users(self, question):
+        '''
+        .. function:: get_uninvited_associated_users()
+
+        Get all users who participated in OTHER questions also participated in
+        by this user.
+
+        :rtype: list
+        '''
+        invited_uids = list()
+        current_invites = question.invites.all()
+        for invite in current_invites:
+            invited_uids.append(invite.receiver_id)
+
+        other_invitations = self.invites_received.\
+            filter(Invite.question_id != question.id).\
+            all()
+
+        other_question_ids = list()
+        for invite in other_invitations:
+            other_question_ids.append(invite.question_id)
+
+        associate_invites = db_session.query(Invite).\
+                filter(Invite.question_id.in_(other_question_ids)).\
+                filter(not_(Invite.receiver_id.in_(invited_uids))).\
+                group_by(Invite.receiver_id).\
+                all()
+
+        associates = list()
+        for invite in associate_invites:
+            associates.append({'username': invite.receiver.username, 'user_id': invite.receiver_id})
+        return associates
+    
+    def get_associated_users(self, ignore_question_id=None):
+        '''
+        .. function:: get_associated_users()
+
+        Get all users who participated in OTHER questions also participated in
+        by this user.
+
+        :rtype: list
+        '''
+        '''
+        invitations = self.invites_received.\
+        filter(Invite.question_id != ignore_question_id).\
+        all()
+        '''
+        invitations_query = self.invites_received
+        
+        #if ignore_question_id:
+        #invitations_query.filter(Invite.question_id != ignore_question_id)
+        
+        #invitations = invitations_query.all()
+        
+        invitations = db_session.query(Invite).filter(Invite.question_id != ignore_question_id).all()
+        
+        
+        return invitations
+
+        qids = list()
+        for invite in invitations:
+            qids.append(invite.question_id)
+
+        return qids
+        
+        associate_invites = db_session.query(Invite).\
+                filter(Invite.question_id.in_(qids)).\
+                filter(Invite.receiver_id != self.id).\
+                group_by(Invite.receiver_id).\
+                all()
+
+        associates = list()
+        for invite in associate_invites:
+            associates.append({'username': invite.receiver.username, 'user_id': invite.receiver_id})
+        return associates
 
     def get_question_permission(self, question):
         invite = self.invites_received.filter(Invite.question_id == question.id).first()
@@ -879,6 +956,48 @@ class User(db.Model, UserMixin):
         return "<User(ID='%s', '%s')>" % (self.id,
                                           self.username)
 
+class EmailInvite(db.Model):
+    '''
+    Stores users email invitaions to participate in questions
+    '''
+    __tablename__ = 'email_invite'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    receiver_email = db.Column(db.String(120))
+    question_id = db.Column(db.Integer, db.ForeignKey('question.id'))
+    permissions = db.Column(db.Integer, default=1)
+    token = db.Column(db.String(32), unique=True)
+    email_sent = db.Column(db.Boolean, unique=False, default=False)
+    
+    sender = db.relationship("User",
+                             primaryjoin="EmailInvite.sender_id==User.id",
+                             backref="email_invites_sent",
+                             lazy='static', single_parent=True)
+
+    def get_public(self):
+        '''
+        .. function:: get_public()
+
+        Return public propoerties as string values for REST responses.
+
+        :rtype: dict
+        '''
+        return {'id': str(self.id),
+                'sender_id': self.sender_id,
+                'receiver_email': self.receiver_email,
+                'question_id': self.question_id,
+                'permissions': self.permissions,
+                'sender_url': url_for('api_get_users',
+                                      user_id=self.sender_id)}
+                
+    def __init__(self, sender, receiver_email, permissions, question_id, token):
+        self.sender_id = sender.id
+        self.question_id = question_id
+        self.permissions = permissions
+        self.receiver_email = receiver_email
+        self.token = token
+
 
 class Invite(db.Model):
     '''
@@ -920,7 +1039,7 @@ class Invite(db.Model):
         self.question_id = question_id
         self.permissions = permissions
 
-        if isinstance(receiver, int):
+        if isinstance(receiver, (int, long)):
             self.receiver_id = receiver
         else:
             self.receiver_id = receiver.id
@@ -976,6 +1095,7 @@ class Question(db.Model):
     READ = 1
     VOTE = 2
     PROPOSE = 4
+    INVITE = 8
     # Combined
     VOTE_READ = 3
     PROPOSE_READ = 5
@@ -1071,6 +1191,9 @@ class Question(db.Model):
                               cascade="all, delete-orphan")
     invites = db.relationship('Invite', lazy='dynamic', backref='question',
                               primaryjoin="Invite.question_id == Question.id",
+                              cascade="all, delete-orphan")
+    email_invites = db.relationship('EmailInvite', lazy='dynamic', backref='question',
+                              primaryjoin="EmailInvite.question_id == Question.id",
                               cascade="all, delete-orphan")
 
     def __init__(self, author, title, blurb,
@@ -3939,7 +4062,7 @@ class Question(db.Model):
             except IOError:
                 app.logger.debug('Failed to create map path %s', map_path)
                 return False
-
+        
         if not os.path.exists(work_file_dir):
             try:
                 os.makedirs(work_file_dir)
