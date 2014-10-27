@@ -2870,7 +2870,7 @@ def api_associated_users():
                   question_id
         return jsonify(message=message), 400
 
-    not_invited = user.get_associated_users(ignore_question_id=question_id)
+    not_invited = user.get_uninvited_associated_users(question=question)
 
     return jsonify(question_id=str(question.id),
                    num_items=str(len(not_invited)), 
