@@ -369,42 +369,36 @@ class User(db.Model, UserMixin):
         for invite in current_invites:
             invited_uids.append(invite.receiver_id)
         
-        # return invited_uids;
-        
-        invites_received_query = self.invites_received.\
-            filter(Invite.question_id != question.id)
-                
-        if len(invited_uids):
-            # print 'Filtering out sender_ids in ' + repr(invited_uids)
-            invites_received_query = invites_received_query.filter(not_(Invite.sender_id.in_(invited_uids))) 
-        
-        invites_received = invites_received_query.all()
-        
-        # return invites_received
-        
-        invites_from_uids = set()
-        uninvited_associates = list()
-        for invite in invites_received:
-            uninvited_associates.append({'username': invite.receiver.username, 'user_id': invite.sender_id})
-            invites_from_uids.add(invite.sender_id)
-        
-        invites_to_other_questions_sent_query = self.invites.\
-            filter(Invite.question_id != question.id)
-        
-        if len(invited_uids):
-            invites_to_other_questions_sent_query = invites_to_other_questions_sent_query.\
-                filter(not_(Invite.receiver_id.in_(invited_uids)))
-        if len(invites_from_uids):
-            invites_to_other_questions_sent_query = invites_to_other_questions_sent_query.\
-                filter(not_(Invite.receiver_id.in_(invites_from_uids)))
-        
-        invites_to_other_questions_sent = invites_to_other_questions_sent_query.all()
-        
-        for invite in invites_to_other_questions_sent:
-            uninvited_associates.append({'username': invite.receiver.username, 'user_id': invite.receiver_id})
+        questions_participated = db_session.query(Invite.question_id)\
+            .filter(Invite.receiver_id == self.id)\
+            .all()
 
+        qids = set()
+        for item in questions_participated:
+            qids.add(item[0])
+        qids = list(qids)
+        
+        associates = db_session.query(Invite.receiver_id)\
+            .filter(Invite.question_id.in_(qids))\
+            .filter(Invite.receiver_id != self.id)\
+            .filter(not_(Invite.receiver_id.in_(invited_uids)))\
+            .all()
+        
+        uids = set()
+        for user in associates:
+            uids.add(user[0])
+        
+        uids = list(uids)
+        users = db_session.query(User)\
+            .filter(User.id.in_(uids))\
+            .all()
+        
+        uninvited_associates = list()
+        for user in users:
+            uninvited_associates.append({'username': user.username, 'user_id': user.id})
+        
         return uninvited_associates
-    
+
     def get_associated_users(self, ignore_question_id=None):
         '''
         .. function:: get_associated_users()
