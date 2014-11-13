@@ -36,18 +36,33 @@ def send_email(subject, sender_email, recipient_email, text_body):
     p = Popen(["/usr/sbin/sendmail", "-t"], stdin=PIPE)
     p.communicate(msg.as_string())
 
-def email_question_email_invite(sender, recipient_email, question):
+def send_question_email_invite_email(sender, recipient_email, question, token):
     # print "Sending email:", sender.username, question.title
+    body_template = \
+    """
+    Vilfredo user %s invites you to participate in the question "%s".
+    
+    If you are already a member of Vilfredo please sign in then click on the Join Question link below.
+    
+    If you are not yet signed up then please go here http://%s and create an account, then once you have logged in click on the 
+    Join Question link below.
+    
+    Join Question: http://%s
+    """
     send_email("Vilfredo - Invitation to participate",
-               'admin@vilfredo.org',
+               app.config['ADMINS'][0],
                recipient_email,
-               "User %s invites you to participate in question %s"
-               % (sender.username, question.title))
+               body_template % (sender.username, question.title, 
+                                app.config['SITE_DOMAIN'],
+                                app.config['SITE_DOMAIN']+'/invitation/'+token))
 
-def email_question_invite(sender, recipient, question):
+def send_question_invite_email(sender, recipient, question):
     # print "Sending email:", sender.username, question.title
+    body_template = \
+    """
+    Hi %s, Vilfredo user %s has invited you to participate in the question "%s".
+    """
     send_email("Vilfredo - Invitation to participate",
                'admin@vilfredo.org',
                recipient,
-               "User %s invites you to participate in question %s"
-               % (sender.username, question.title))
+               body_template % (recipient.username, sender.username, question.title))
