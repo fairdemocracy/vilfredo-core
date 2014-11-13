@@ -26,7 +26,7 @@ The Views
 
 from flask import session, request
 
-from . import app, models
+from . import app, models, api
 
 from .database import db_session
 
@@ -55,6 +55,19 @@ def display_question(question_id):
         return redirect(redirect_url())
     else:
         return render_template("question.html")
+        
+@app.route('/invitation/<token>')
+def add_invitation_from_token(token):
+    auth = request.cookies.get('vgaclient')
+    user = api.load_token(auth)
+    if not user:
+        return redirect(redirect_url())
+    else:
+        question_id = models.EmailInvite.accept(user, token)
+        if question_id == False:
+            return redirect(redirect_url())
+        else:
+            return redirect('/question/' + str(question_id))
 
 
 @app.route('/domination/<int:question_id>/gen/<int:generation>')

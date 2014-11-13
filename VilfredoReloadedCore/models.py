@@ -985,6 +985,7 @@ class EmailInvite(db.Model):
     permissions = db.Column(db.Integer, default=1)
     token = db.Column(db.String(32), unique=True)
     email_sent = db.Column(db.Boolean, unique=False, default=False)
+    accepted = db.Column(db.Boolean, unique=False, default=False)
     
     sender = db.relationship("User",
                              primaryjoin="EmailInvite.sender_id==User.id",
@@ -1013,6 +1014,32 @@ class EmailInvite(db.Model):
         self.permissions = permissions
         self.receiver_email = receiver_email
         self.token = token
+    
+    @staticmethod
+    def accept(user, token):
+        email_invitation = db_session.query(EmailInvite)\
+            .filter(and_(EmailInvite.accepted == 0, EmailInvite.token == token))\
+            .one()
+        if not email_invitation:
+            app.logger.debug("add_invitation_from_token Token not found: %s", token)
+            return False
+
+        app.logger.debug("Invitation found from %s", email_invitation.sender_id)
+
+        sender = User.query.get(email_invitation.sender_id)
+        if not sender:
+            app.logger.debug("add_invitation_from_token Sender not found with ID: %s", email_invitation.sender_id)
+            return False
+
+        app.logger.debug("Sender found %s", sender.id)
+        # Add invite, mark email_invitation as accepted and open question page
+        invite = Invite(sender, user, email_invitation.permissions, email_invitation.question_id)
+        app.logger.debug("Invite from %s for %s", invite.sender_id, invite.question_id)
+        # return False
+        email_invitation.accepted = 1
+        user.invites_received.append(invite)
+        db_session.commit()
+        return invite.question_id
 
 
 class Invite(db.Model):
