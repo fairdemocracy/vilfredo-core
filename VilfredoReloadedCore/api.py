@@ -28,7 +28,7 @@ REST API
 
 from flask import request,\
     url_for, jsonify, make_response, abort
-from . import app, models
+from . import app, models, emails
 from .auth import login_manager, login_serializer
 from .database import db_session
 from sqlalchemy import and_
@@ -4390,6 +4390,11 @@ def api_create_email_invitation(question_id):
             else:
                 token = uuid.uuid4().get_hex()
                 new_invite = models.EmailInvite(user, email, permissions, question_id, token)
+                
+                # send email aesynchronously - (Check sent)
+                emails.send_question_email_invite_email(user, email, question, token)
+                new_invite.email_sent = 1
+                
                 db_session.add(new_invite)
                 invites_count = invites_count + 1
                 # Send email
