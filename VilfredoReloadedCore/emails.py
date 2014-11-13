@@ -24,42 +24,30 @@
 Emails
 '''
 
-from flask_mail import Message
+from . import app
+from email.mime.text import MIMEText
+from subprocess import Popen, PIPE
 
-from . import app, mail
+def send_email(subject, sender_email, recipient_email, text_body):
+    msg = MIMEText(text_body)
+    msg["From"] = sender_email
+    msg["To"] = recipient_email
+    msg["Subject"] = subject
+    p = Popen(["/usr/sbin/sendmail", "-t"], stdin=PIPE)
+    p.communicate(msg.as_string())
 
-from decorators import async
-
-
-@async
-def send_async_email(msg):
-    with app.app_context():
-        mail.send(msg)
-
-
-def send_email(subject, sender, recipients, text_body, html_body):
-    msg = Message(subject, sender=sender, recipients=recipients)
-    msg.body = text_body
-    msg.html = html_body
-    send_async_email(msg)
-
-
-def email_question_email_invite(sender, receiver_email, question):
+def email_question_email_invite(sender, recipient_email, question):
     # print "Sending email:", sender.username, question.title
     send_email("Vilfredo - Invitation to participate",
                'admin@vilfredo.org',
-               [receiver_email],
-               "User %s invites you to participate in question %s"
-               % (sender.username, question.title),
+               recipient_email,
                "User %s invites you to participate in question %s"
                % (sender.username, question.title))
 
-def email_question_invite(sender, receiver, question):
+def email_question_invite(sender, recipient, question):
     # print "Sending email:", sender.username, question.title
     send_email("Vilfredo - Invitation to participate",
                'admin@vilfredo.org',
-               [receiver.email],
-               "User %s invites you to participate in question %s"
-               % (sender.username, question.title),
+               recipient,
                "User %s invites you to participate in question %s"
                % (sender.username, question.title))
