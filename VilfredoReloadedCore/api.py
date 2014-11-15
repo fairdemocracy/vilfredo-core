@@ -4383,8 +4383,13 @@ def api_create_email_invitation(question_id):
             rejected.append(email)
             continue
         else:
-            instance = db_session.query(models.EmailInvite).filter_by(receiver_email=email).first()
+            instance = db_session.query(models.EmailInvite)\
+                .filter(and_(models.EmailInvite.receiver_email == email,
+                             models.EmailInvite.sender_id == user.id,
+                             models.EmailInvite.question_id == question.id))\
+                .first()
             if instance:
+                app.logger.debug("Address %s already contacted", email)
                 rejected.append(email)
                 continue
             else:
