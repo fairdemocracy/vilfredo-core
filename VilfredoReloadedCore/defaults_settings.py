@@ -72,6 +72,6 @@ from datetime import timedelta
 REMEMBER_COOKIE_DURATION = timedelta(days=365)
 
 # administrator list
-ADMINS = ['admin@example.com']
+ADMINS = ['admin@' + SITE_DOMAIN]
 
 ANONYMIZE_GRAPH = False
