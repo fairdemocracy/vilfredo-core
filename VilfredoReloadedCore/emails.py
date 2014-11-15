@@ -35,6 +35,8 @@ def send_email(subject, sender_email, recipient_email, text_body):
     msg["Subject"] = subject
     p = Popen(["/usr/sbin/sendmail", "-t"], stdin=PIPE)
     p.communicate(msg.as_string())
+    # app.logger.debug("Return Code from email subprocess = %s", p.returncode)
+    return p.returncode
 
 def send_question_email_invite_email(sender, recipient_email, question, token):
     # print "Sending email:", sender.username, question.title
@@ -49,12 +51,12 @@ def send_question_email_invite_email(sender, recipient_email, question, token):
     
     Join Question: http://%s
     """
-    send_email("Vilfredo - Invitation to participate",
-               app.config['ADMINS'][0],
-               recipient_email,
-               body_template % (sender.username, question.title, 
-                                app.config['SITE_DOMAIN'],
-                                app.config['SITE_DOMAIN']+'/invitation/'+token))
+    return send_email("Vilfredo - Invitation to participate",
+                      app.config['ADMINS'][0],
+                      recipient_email,
+                      body_template % (sender.username, question.title, 
+                                       app.config['SITE_DOMAIN'],
+                                       app.config['SITE_DOMAIN']+'/invitation/'+token))
 
 def send_question_invite_email(sender, recipient, question):
     # print "Sending email:", sender.username, question.title
@@ -62,7 +64,7 @@ def send_question_invite_email(sender, recipient, question):
     """
     Hi %s, Vilfredo user %s has invited you to participate in the question "%s".
     """
-    send_email("Vilfredo - Invitation to participate",
-               'admin@vilfredo.org',
-               recipient,
-               body_template % (recipient.username, sender.username, question.title))
+    return send_email("Vilfredo - Invitation to participate",
+                      'admin@vilfredo.org',
+                      recipient,
+                      body_template % (recipient.username, sender.username, question.title))
