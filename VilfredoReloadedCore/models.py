@@ -1117,7 +1117,47 @@ class PWDReset(db.Model):
         self.email = user.email
         self.token = token
         self.timeout = timeout
+    
+    @staticmethod
+    def get_user_from_password_reset_token(token):
+        app.logger.debug("submit_password_reset_token called...\n")
 
+        pwd_reset = db_session.query(PWDReset)\
+            .filter(PWDReset.token == token)\
+            .first()
+
+        if not pwd_reset:
+            app.logger.debug("Token %s not listed...\n", token)
+            return False
+
+        elif get_timestamp() > pwd_reset.timeout:
+            app.logger.debug("Token expired...\n")
+            return False
+
+        return User.query.get(pwd_reset.user_id)
+
+    
+    @staticmethod
+    def submit_password_reset_token(token):
+        app.logger.debug("submit_password_reset_token called...\n")
+
+        pwd_reset = models.PWDReset.query.filter_by(token=token).first()
+
+        if not pwd_reset:
+            app.logger.debug("Token and user_id not listed...\n")
+            return False
+
+        elif models.get_timestamp() > pwd_reset.timeout:
+            app.logger.debug("Token expired...\n")
+            return False
+
+        user =  User.query.get(pwd_reset.userid)
+        if not user:
+            app.logger.debug("Token expired...\n")
+            return False
+    
+        auth_token = user.get_auth_token()
+        return auth_token
 
 class Question(db.Model):
     '''

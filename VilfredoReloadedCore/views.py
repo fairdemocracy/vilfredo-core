@@ -69,6 +69,17 @@ def add_invitation_from_token(token):
         else:
             return redirect('/question/' + str(question_id))
 
+@app.route('/resetpwd/<token>')
+def reset_password_from_token(token):
+    return render_template("resetpwd.html")
+
+@app.route('/resetpwd_v1')
+def reset_password_from_token_v1(token):
+    token = request.args.get('t')
+    if not token:
+        return redirect(redirect_url())
+    else:
+        return redirect('/resetpwd/' + token)
 
 @app.route('/domination/<int:question_id>/gen/<int:generation>')
 def display_domination(question_id, generation):

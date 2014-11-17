@@ -38,6 +38,33 @@ def send_email(subject, sender_email, recipient_email, text_body):
     # app.logger.debug("Return Code from email subprocess = %s", p.returncode)
     return p.returncode
 
+
+def send_password_reset_email_v2(user_id, email, token):
+    body_template = \
+    """
+    Click on the link below then enter the reset code.
+    
+    %s
+    
+    Reset Code: %s
+    """
+    return send_email("Vilfredo - Password Reset Request",
+                      app.config['ADMINS'][0],
+                      email,
+                      body_template % ('http://'+app.config['SITE_DOMAIN']+'/resetpwd', token))
+
+def send_password_reset_email(email, token):
+    body_template = \
+    """
+    Click on the link below to enter a new password.
+    
+    Reset Password: http://%s
+    """
+    return send_email("Vilfredo - Password Reset Request",
+                      app.config['ADMINS'][0],
+                      email,
+                      body_template % (app.config['SITE_DOMAIN']+'/resetpwd/'+token))
+
 def send_question_email_invite_email(sender, recipient_email, question, token):
     # print "Sending email:", sender.username, question.title
     body_template = \

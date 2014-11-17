@@ -366,7 +366,7 @@ def api_index():
 
 
 #
-# Get Auth Token
+# Get Auth Token wolf
 #
 @app.route('/api/v1/authtoken', methods=['GET'])
 @requires_auth
@@ -591,34 +591,45 @@ def api_update_user(user_id):
 
 
 #
-# Password reset request
+# Password reset request 
 #
 @app.route('/api/v1/request_password_reset', methods=['POST'])
 def api_request_password_reset():
-    app.logger.debug("api_request_password_reset called...\n")
+    app.logger.debug("api_request_password_reset called.....\n")
 
     if not request.json:
         app.logger.debug("Non json request received...\n")
         message = "Non json request received"
-        return jsonify(message=message), 400
+        return jsonify(message=message), 401
 
     elif not 'email' in request.json or request.json['email'] == '' \
             or len(request.json['email']) > MAX_LEN_EMAIL:
         message = "A valid email is required"
-        return jsonify(message=message), 400
+        return jsonify(message=message), 402
 
     email = request.json['email']
-    user = models.User.query.filter_by(email=email).one()
+    app.logger.debug("Reset Email given = %s\n", email)
+    user = models.User.query.filter_by(email=email).first()
+    app.logger.debug("DB OK")
     if not user:
-        message = "Email address not found"
-        return jsonify(message=message), 400
-
+        message = "That is not a registered email address."
+        return jsonify(message=message), 403
+    
+    pwd_reset = db_session.query(models.PWDReset)\
+            .filter(models.PWDReset.email == email)\
+            .first()
+    if pwd_reset:
+        message = "A password had already been requested for this address. Please check your spam folder."
+        return jsonify(message=message), 403
+    
     pwd_reset_token = uuid.uuid4().get_hex()
     timeout = models.get_timestamp() + PWD_RESET_LIFETIME
     pwd_reset = models.PWDReset(user, pwd_reset_token, timeout)
     db_session.add(pwd_reset)
     db_session.commit()
     # email reset token to user
+    ret_code = emails.send_password_reset_email(email, pwd_reset_token)
+    app.logger.debug("api_request_password_reset: Ret Code from send_password_reset_email = %s", ret_code)
     message = 'Password reset email sent'
     return jsonify(message=message), 201
 
@@ -661,43 +672,65 @@ def api_submit_password_reset_token():
     return jsonify(token=token), 200
 
 #
-# Set new password and genberate new authentication token
+# Set new password and generate new authentication token - wolf
 #
 @app.route('/api/v1/reset_password', methods=['POST'])
-@requires_auth
-def api_reset_password(token):
+def api_reset_password():
     app.logger.debug("api_reset_password called...\n")
 
-    user = get_authenticated_user(request)
+    '''
+    user = get_authenticated_user()
     if not user:
         response = {"message": "User not logged in"}
         return jsonify(response), 400
 
     app.logger.debug("Authenticated User = %s\n", user.id)
-
+    '''
+    
+    if not 'token' in request.json or request.json['token'] == '':
+        message = 'You must pass a password reset token'
+        return jsonify(message=message), 402
+    reset_token = request.json['token']
+    
     if not 'password' in request.json or not 'password2' in request.json or \
             request.json['password'] != request.json['password2'] or \
             request.json['password'] == '' or \
             len(request.json['password']) < MIN_LEN_PASSWORD or \
             len(request.json['password']) > MAX_LEN_PASSWORD:
-        message = "Passwords must match and must be between %s and %s characters" %\
-            (MIN_LEN_PASSWORD, MAX_LEN_PASSWORD)
+        message = "Passwords %s must match and must be between %s and %s characters" %\
+            (request.json['password'], MIN_LEN_PASSWORD, MAX_LEN_PASSWORD)
         return jsonify(message=message), 400
 
+    pwd_reset = db_session.query(models.PWDReset)\
+            .filter(models.PWDReset.token == reset_token)\
+            .first()
+    
+    if not pwd_reset:
+        response = {"message": "Invalid password reset token"}
+        return jsonify(response), 400
+    
+    user = models.User.query.get(pwd_reset.user_id)
+    if not user:
+        response = {"message": "User not found"}
+        return jsonify(response), 400
+
+    app.logger.debug("User from token = %s\n", user.id)
+    
     # Delete reset token entry
     db_session.delete(pwd_reset)
 
     # Set new password
-    user.set_password(request.json['password'])
+    new_password = request.json['password']
+    user.set_password(new_password)
     db_session.add(user)
     db_session.commit()
 
     # Generate new auth token
-    token = user.get_auth_token()
-    app.logger.debug("New token = %s\n", token)
+    authtoken = user.get_auth_token()
+    app.logger.debug("New auth token generated")
 
     message = 'Password reset'
-    return jsonify(message=message, token=token), 201
+    return jsonify(message=message, token=authtoken), 201
 
 
 #
