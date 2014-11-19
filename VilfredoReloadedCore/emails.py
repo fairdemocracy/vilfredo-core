@@ -54,6 +54,17 @@ def send_password_reset_email_v2(user_id, email, token):
                       body_template % ('http://'+app.config['SITE_DOMAIN']+'/resetpwd', token))
 
 def send_password_reset_email(email, token):
+    '''
+    .. function:: send_password_reset_email(email, token)
+
+    Send an email containing a link to allow someone to reset their password.
+
+    :param email: receiver email address
+    :type email: string
+    :param token: password reset token
+    :type token: string
+    :rtype: long
+    '''
     body_template = \
     """
     Click on the link below to enter a new password.
@@ -66,6 +77,21 @@ def send_password_reset_email(email, token):
                       body_template % (app.config['SITE_DOMAIN']+'/resetpwd/'+token))
 
 def send_question_email_invite_email(sender, recipient_email, question, token):
+    '''
+    .. function:: send_question_email_invite_email(sender, recipient_email, question, token)
+
+    Send an email containing a link to allow someone to participate in a question.
+
+    :param sender: User sending the invitation
+    :type email: User
+    :param recipient_email: recipient email address
+    :type recipient_email: string
+    :param question: The question the recipient is being invited to participate in
+    :type question: Question
+    :param token: email invitation token
+    :type token: string
+    :rtype: long
+    '''
     # print "Sending email:", sender.username, question.title
     body_template = \
     """
@@ -85,13 +111,3 @@ def send_question_email_invite_email(sender, recipient_email, question, token):
                                        app.config['SITE_DOMAIN'],
                                        app.config['SITE_DOMAIN']+'/invitation/'+token))
 
-def send_question_invite_email(sender, recipient, question):
-    # print "Sending email:", sender.username, question.title
-    body_template = \
-    """
-    Hi %s, Vilfredo user %s has invited you to participate in the question "%s".
-    """
-    return send_email("Vilfredo - Invitation to participate",
-                      'admin@vilfredo.org',
-                      recipient,
-                      body_template % (recipient.username, sender.username, question.title))
