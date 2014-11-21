@@ -73,6 +73,10 @@ def add_invitation_from_token(token):
 def reset_password_from_token(token):
     return render_template("resetpwd.html")
 
+@app.route('/lostpassword')
+def lost_password():
+    return render_template("lostpassword.html")
+
 @app.route('/resetpwd_v1')
 def reset_password_from_token_v1(token):
     token = request.args.get('t')
