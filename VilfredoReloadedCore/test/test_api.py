@@ -155,8 +155,7 @@ class RESTAPITestCase(unittest.TestCase):
                                      'POST',
                                       dict(title='My Token Question',
                                            blurb='My token blurb written while under the influence of an authentication token.',
-                                           room='test',
-                                           minimum_time=60),
+                                           room='test'),
                                            token)
             self.assertEqual(rv.status_code, 201)
             data = json.loads(rv.data)
@@ -299,8 +298,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                       'POST',
                                       dict(title='Wall of Text',
                                            blurb=blurb,
-                                           room='',
-                                           minimum_time=0),
+                                           room=''),
                                       'john',
                                       'john123')
         data = json.loads(rv.data)
@@ -333,8 +331,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                       'POST',
                                       dict(title='Another Question',
                                            blurb='Blah blah Blah blah Blah',
-                                           room='',
-                                           minimum_time=60),
+                                           room=''),
                                       'john',
                                       'john123')
         self.assertEqual(rv.status_code, 201)
@@ -343,8 +340,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                       'POST',
                                       dict(title='Too Many Chefs',
                                            blurb='How to Spoil the broth?',
-                                           room='',
-                                           minimum_time=60),
+                                           room=''),
                                       'harry',
                                       'harry123')
         self.assertEqual(rv.status_code, 201)
@@ -353,8 +349,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                       'POST',
                                       dict(title='Test Question',
                                            blurb='Should we run tests to make sure the system works?',
-                                           room='test',
-                                           minimum_time=60),
+                                           room='test'),
                                       'john',
                                       'john123')
         self.assertEqual(rv.status_code, 201)
@@ -1378,8 +1373,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                       'POST',
                                       dict(title='My boring question',
                                            blurb='My boring blurb',
-                                           room='test',
-                                           minimum_time=60),
+                                           room='test'),
                                       'john',
                                       'john123')
         self.assertEqual(rv.status_code, 201)

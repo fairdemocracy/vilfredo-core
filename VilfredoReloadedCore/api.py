@@ -1113,8 +1113,8 @@ def api_create_question():
     blurb = request.json.get('blurb')
     # Set optional parameters
     room = request.json.get('room', None)
-    minimum_time = request.json.get('minimum_time', 86400)
-    maximum_time = request.json.get('maximum_time', 604800)
+    minimum_time = request.json.get('minimum_time', 0)
+    maximum_time = request.json.get('maximum_time', 2592000)
 
     question = models.Question(user,
                                title,
@@ -2690,12 +2690,14 @@ def api_edit_question(question_id):
         return jsonify(message), 403
 
     if 'move_on' in request.json:
+        '''
         if not question.minimum_time_passed():
             app.logger.debug("Question cannot be moved on " +
                              "until minimum time has passed")
             message = {"message": "Question cannot be moved on " +
                                   "until minimum time has passed"}
             return jsonify(message), 405
+        '''
 
         phase = question.author_move_on(user_id)
         db_session.commit()
