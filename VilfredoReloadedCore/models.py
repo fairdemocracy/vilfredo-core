@@ -296,6 +296,7 @@ class User(db.Model, UserMixin):
     password = db.Column(db.String(120), nullable=False)
     registered = db.Column(db.DateTime)
     last_seen = db.Column(db.DateTime)
+
     # 1:M
     questions = db.relationship('Question', backref='author', lazy='dynamic',
                                 cascade="all, delete-orphan")
@@ -342,6 +343,13 @@ class User(db.Model, UserMixin):
     @staticmethod
     def get(userid):
         return User.query.filter_by(id=userid).first()
+
+    def __init__(self, username, email, password):
+        self.username = username
+        self.email = email
+        self.set_password(password)
+        self.registered = datetime.datetime.utcnow()
+        self.last_seen = datetime.datetime.utcnow()
 
     def support_comment(self, comment):
         '''
@@ -961,16 +969,55 @@ class User(db.Model, UserMixin):
         '''
         return check_password_hash(self.password, password)
 
-    def __init__(self, username, email, password):
-        self.username = username
-        self.email = email
-        self.set_password(password)
-        self.registered = datetime.datetime.utcnow()
-        self.last_seen = datetime.datetime.utcnow()
-
     def __repr__(self):
         return "<User(ID='%s', '%s')>" % (self.id,
                                           self.username)
+
+class VerifyEmail(db.Model):
+    '''
+    Stores record of a users email verification data
+    '''
+    __tablename__ = 'verify_email'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    email = db.Column(db.String(120))
+    token = db.Column(db.String(32), unique=True)
+    email_sent = db.Column(db.Boolean, unique=False, default=False)
+    timestamp = db.Column(db.DateTime)
+
+    user = db.relationship("User",
+                            primaryjoin="VerifyEmail.user_id==User.id",
+                            backref="verify_email",
+                            lazy='static', single_parent=True)
+
+    def __init__(self, user, email, token):
+        self.user_id = user.id
+        self.email = email
+        self.token = token
+        self.timestamp = datetime.datetime.utcnow()
+    
+    @staticmethod
+    def verify(user_id, token):
+        app.logger.debug("verify called...\n")
+
+        verify = models.VerifyEmail.query.filter_by(user_id=user_id,token=token).first()
+
+        if not verify:
+            app.logger.debug("Token and user_id not listed...\n")
+            return False
+
+        elif models.get_timestamp() > pwd_reset.timeout:
+            app.logger.debug("Token expired...\n")
+            return False
+
+        user =  User.query.get(pwd_reset.userid)
+        if not user:
+            app.logger.debug("Token expired...\n")
+            return False
+    
+        auth_token = user.get_auth_token()
+        return auth_token
 
 class EmailInvite(db.Model):
     '''

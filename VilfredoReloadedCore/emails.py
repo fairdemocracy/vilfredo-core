@@ -53,6 +53,29 @@ def send_password_reset_email_v2(user_id, email, token):
                       email,
                       body_template % ('http://'+app.config['SITE_DOMAIN']+'/resetpwd', token))
 
+def send_email_verification(user_id, email, token):
+    '''
+    .. function:: send_email_verification(email, token)
+
+    Send an email containing a link to allow someone to reset their password.
+
+    :param email: user email address
+    :type email: string
+    :param token: verification token
+    :type token: string
+    :rtype: long
+    '''
+    body_template = \
+    """
+    Click on the link below to activate your account.
+    
+    Activate Account: http://%s
+    """
+    return send_email("Vilfredo - Activate Your Account",
+                      app.config['ADMINS'][0],
+                      email,
+                      body_template % (app.config['SITE_DOMAIN']+'/activate'+'?u='+str(user_id)+'&t='+str(token)))
+
 def send_password_reset_email(email, token):
     '''
     .. function:: send_password_reset_email(email, token)

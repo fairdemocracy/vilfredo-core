@@ -366,7 +366,7 @@ def api_index():
 
 
 #
-# Get Auth Token wolf
+# Get Auth Token
 #
 @app.route('/api/v1/authtoken', methods=['GET'])
 @requires_auth
@@ -374,8 +374,13 @@ def api_get_auth_token():
     app.logger.debug("api_get_auth_token called...\n")
     user = get_authenticated_user(request)
     if not user:
-        app.logger.debug("user not found...\n")
-        abort(401)
+        return jsonify("User not found"), 400
+
+    # Check if user needs to verify his email address
+    verify_email = models.VerifyEmail.query.filter_by(user_id=user.id).first()
+    if verify_email:
+        return jsonify("User not yet verified email"), 400
+
     token = user.get_auth_token()
     app.logger.debug("token = %s\n", token)
 
@@ -811,7 +816,23 @@ def api_create_user():
                        request.json['password'])
     db_session.add(user)
     db_session.commit()
-    response = {'url': url_for('api_get_users', user_id=user.id)}
+
+    email_sent = False
+    # Send verification email
+    '''
+    email = request.json['email']
+    token = uuid.uuid4().get_hex()
+    verify_email = models.VerifyEmail(user, email, token)
+    ret_code = emails.send_email_verification(user.id, email, token)
+    app.logger.debug("api_create_user: Ret Code from send_email_verification = %s", ret_code)
+    verify_email.email_sent = 1
+    email_sent = True
+    db_session.add(verify_email)
+    db_session.commit()
+    '''
+
+    # Send response
+    response = {'url': url_for('api_get_users', user_id=user.id), 'email_sent': email_sent}
 
     return jsonify(response), 201
 
