@@ -984,22 +984,22 @@ class VerifyEmail(db.Model):
     email = db.Column(db.String(120))
     token = db.Column(db.String(32), unique=True)
     email_sent = db.Column(db.Boolean, unique=False, default=False)
-    timestamp = db.Column(db.DateTime)
+    timeout = db.Column(db.Integer)
 
     user = db.relationship("User",
                             primaryjoin="VerifyEmail.user_id==User.id",
                             backref="verify_email",
                             lazy='static', single_parent=True)
 
-    def __init__(self, user, email, token):
+    def __init__(self, user, email, token, timeout):
         self.user_id = user.id
         self.email = email
         self.token = token
-        self.timestamp = datetime.datetime.utcnow()
+        self.timeout = timeout
     
     @staticmethod
-    def verify(user_id, token):
-        app.logger.debug("verify called...\n")
+    def verify_email(user_id, token):
+        app.logger.debug("verify_email called...\n")
 
         verify = models.VerifyEmail.query.filter_by(user_id=user_id,token=token).first()
 
@@ -1007,13 +1007,13 @@ class VerifyEmail(db.Model):
             app.logger.debug("Token and user_id not listed...\n")
             return False
 
-        elif models.get_timestamp() > pwd_reset.timeout:
+        elif models.get_timestamp() > verify.timeout:
             app.logger.debug("Token expired...\n")
             return False
 
-        user =  User.query.get(pwd_reset.userid)
+        user =  User.query.get(verify.user_id)
         if not user:
-            app.logger.debug("Token expired...\n")
+            app.logger.debug("Unknown user...\n")
             return False
     
         auth_token = user.get_auth_token()
@@ -1183,7 +1183,7 @@ class PWDReset(db.Model):
 
         return User.query.get(pwd_reset.user_id)
 
-    
+
     @staticmethod
     def submit_password_reset_token(token):
         app.logger.debug("submit_password_reset_token called...\n")
@@ -1198,7 +1198,7 @@ class PWDReset(db.Model):
             app.logger.debug("Token expired...\n")
             return False
 
-        user =  User.query.get(pwd_reset.userid)
+        user =  User.query.get(pwd_reset.user_id)
         if not user:
             app.logger.debug("Token expired...\n")
             return False

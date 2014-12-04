@@ -24,7 +24,7 @@
 The Views
 '''
 
-from flask import session, request
+from flask import session, request, make_response
 
 from . import app, models, api
 
@@ -75,9 +75,45 @@ def reset_password_from_token(token):
 
 @app.route('/activate')
 def activate():
+    redirect_to_index = redirect(url_for('index'))
+    resp = make_response(redirect_to_index)
     user_id = request.args.get('u')
     token = request.args.get('t')
-    return redirect('/')
+    verify = models.VerifyEmail.query.filter_by(user_id=user_id,token=token).first()
+
+    if not user_id or not token:
+        app.logger.debug("Account Activation: Token and user_id not in link...\n")
+        resp.set_cookie('vgamessage', 'Sorry, that link is invalid!')
+        resp.set_cookie('vgastatus', 'error')
+        return resp
+
+    if not verify:
+        app.logger.debug("Account Activation: Token and user_id not listed...\n")
+        resp.set_cookie('vgamessage', 'Sorry we have no record of you registration. Please register again.')
+        resp.set_cookie('vgastatus', 'error')
+        return resp
+
+    elif models.get_timestamp() > verify.timeout:
+        app.logger.debug("Account Activation: Token expired...\n")
+        resp.set_cookie('vgamessage', 'Sorry, you took too long to activate your account. Please register again.')
+        resp.set_cookie('vgastatus', 'error')
+        return resp
+
+    user =  models.User.query.get(verify.user_id)
+    if not user:
+        app.logger.debug("Account Activation: Unknown user...\n")
+        resp.set_cookie('vgamessage', 'Sorry we have no record of you registration. Please register again.')
+        resp.set_cookie('vgastatus', 'error')
+        return resp
+
+    # app.logger.debug("Account Activation: Success! User %s %s activated!\n" % str(user.id), user.username)
+    auth_token = user.get_auth_token()
+    resp.set_cookie('vgaclient', auth_token)
+    resp.set_cookie('vgastatus', 'success')
+    resp.set_cookie('vgamessage', 'Hey %s! Your account is now active. Welcome to Vilfredo!' % user.username)
+
+    return resp
+
 
 @app.route('/lostpassword')
 def lost_password():

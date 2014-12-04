@@ -59,6 +59,7 @@ MAX_LEN_PROPOSAL_QUESTION_ANSWER = 300
 ENDORSEMENT_TYPES = ['endorse', 'oppose', 'confused']
 COMMENT_TYPES = ['for', 'against', 'question', 'answer']
 PWD_RESET_LIFETIME = 3600*24*2
+EMAIL_VERIFY_LIFETIME = 3600*24*2
 
 
 # &hellip; ....
@@ -151,7 +152,7 @@ def requires_auth(f):
         else:
             app.logger.debug('requires_auth: username and password not valid')
             # return authenticate()
-            return jsonify(message='username and password not valid'), 403
+            return jsonify('username and password not valid'), 403
     return decorated
 
 def requires_auth_off(f):
@@ -374,12 +375,13 @@ def api_get_auth_token():
     app.logger.debug("api_get_auth_token called...\n")
     user = get_authenticated_user(request)
     if not user:
-        return jsonify("User not found"), 400
+        return jsonify(message = "User not found"), 400
 
     # Check if user needs to verify his email address
     verify_email = models.VerifyEmail.query.filter_by(user_id=user.id).first()
     if verify_email:
-        return jsonify("User not yet verified email"), 400
+        return jsonify(message = "User email unverified.",
+                       user_message = "Before you can log in you must activate your account by clicking on the link we emailed to you when you registered."), 400
 
     token = user.get_auth_token()
     app.logger.debug("token = %s\n", token)
@@ -576,7 +578,7 @@ def api_update_user(user_id):
             is not True:
         message = "Username not available"
         # return jsonify(message=message), 400
-        return jsonify("Username not available"), 400
+        return jsonify(message = "Username not available"), 400
 
     elif models.User.email_available(request.json['email']) is not True:
             response = {'message': 'Someone has already registered with that email.'}
@@ -804,7 +806,7 @@ def api_create_user():
             is not True:
         message = "Username not available"
         return jsonify(message=message), 400
-        # return jsonify("Username not available"), 400
+        # return jsonify(message = "Username not available"), 400
         # return make_response(jsonify({'error': 'Username not available'}), 400)
 
     elif models.User.email_available(request.json['email']) is not True:
@@ -819,17 +821,16 @@ def api_create_user():
 
     email_sent = False
     # Send verification email
-    '''
     email = request.json['email']
     token = uuid.uuid4().get_hex()
-    verify_email = models.VerifyEmail(user, email, token)
+    timeout = models.get_timestamp() + EMAIL_VERIFY_LIFETIME
+    verify_email = models.VerifyEmail(user, email, token, timeout)
     ret_code = emails.send_email_verification(user.id, email, token)
     app.logger.debug("api_create_user: Ret Code from send_email_verification = %s", ret_code)
     verify_email.email_sent = 1
     email_sent = True
     db_session.add(verify_email)
     db_session.commit()
-    '''
 
     # Send response
     response = {'url': url_for('api_get_users', user_id=user.id), 'email_sent': email_sent}
@@ -909,13 +910,13 @@ def api_get_questions(question_id=None):
 
         question = models.Question.query.get(question_id)
         if question is None:
-            return jsonify("Question not found"), 404
+            return jsonify(message = "Question not found"), 404
         
         # Check user permission
         perm = question.get_permissions(user)
         if perm is None:
             app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
-            return jsonify("Question not found"), 404
+            return jsonify(message = "Question not found"), 404
 
         question_data = question.get_public(user)
         app.logger.debug("Qustion data ==> %s", question_data);
@@ -1015,7 +1016,7 @@ def api_get_questions(question_id=None):
 
         question = models.Question.query.get(int(question_id))
         if question is None:
-            return jsonify("Question not found"), 404
+            return jsonify(message = "Question not found"), 404
 
         results = question.get_public()
 
@@ -1463,19 +1464,19 @@ def api_support_proposal_comment(question_id, proposal_id, comment_id):
     app.logger.debug("Authenticated User = %s\n", user.id)
 
     if question_id is None or proposal_id is None or comment_id is None:
-        return jsonify("URI parameters missing"), 400
+        return jsonify(message = "URI parameters missing"), 400
 
     question = models.Question.query.get(int(question_id))
     if question is None:
-        return jsonify("Question not found"), 404
+        return jsonify(message = "Question not found"), 404
 
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
-        return jsonify("Proposal not found"), 404
+        return jsonify(message = "Proposal not found"), 404
 
     comment = models.Comment.query.get(int(comment_id))
     if comment is None:
-        return jsonify("Comment not found"), 404
+        return jsonify(message = "Comment not found"), 404
 
     # Support comment
     user.support_comments([comment])
@@ -1539,19 +1540,19 @@ def api_unsupport_proposal_comment(question_id, proposal_id, comment_id):
     app.logger.debug("Authenticated User = %s\n", user.id)
 
     if question_id is None or proposal_id is None or comment_id is None:
-        return jsonify("URI parameters missing"), 400
+        return jsonify(message = "URI parameters missing"), 400
 
     question = models.Question.query.get(int(question_id))
     if question is None:
-        return jsonify("Question not found"), 404
+        return jsonify(message = "Question not found"), 404
 
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
-        return jsonify("Proposal not found"), 404
+        return jsonify(message = "Proposal not found"), 404
 
     comment = models.Comment.query.get(int(comment_id))
     if comment is None:
-        return jsonify("Comment not found"), 404
+        return jsonify(message = "Comment not found"), 404
 
     # Support comment
     user.unsupport_comments([comment])
@@ -1751,16 +1752,16 @@ def api_update_proposal_comment(question_id, proposal_id, comment_id):
 
     comment = models.Comment.query.get(int(comment_id))
     if comment is None:
-        return jsonify("Comment not found"), 400
+        return jsonify(message = "Comment not found"), 400
 
     # Only the author can edit a comment
     if comment.user_id != user.id:
-        return jsonify("Only the author can edit a comment"), 403
+        return jsonify(message = "Only the author can edit a comment"), 403
 
     # Make sure there are no other supportes (other than author)
     supporters = comment.supporters.all()
     if len(supporters) != 1 and supporters[0] != user:
-        return jsonify("Comment supported by other users cannot be edited."), 403
+        return jsonify(message = "Comment supported by other users cannot be edited."), 403
 
     app.logger.debug("request.json = %s\n", request.json)
 
@@ -1784,12 +1785,12 @@ def api_update_proposal_comment(question_id, proposal_id, comment_id):
 
     # Check if update details are identical to existing details
     if comment_type == comment.comment_type and comment.comment == new_comment_text:
-        return jsonify("Update matches original"), 409
+        return jsonify(message = "Update matches original"), 409
 
     # Check if duplcate comment already exists
     existing_comment = models.Comment.fetch_if_exists(proposal, new_comment_text, comment_type)
     if (existing_comment and existing_comment.id != comment.id):
-        return jsonify("Identical comment found"), 400
+        return jsonify(message = "Identical comment found"), 400
 
     # Everything OK - update comment
     comment.comment = new_comment_text
@@ -1975,22 +1976,22 @@ def api_delete_proposal_comment(question_id, proposal_id, comment_id):
     app.logger.debug("Authenticated User = %s\n", user.id)
 
     if question_id is None or proposal_id is None or comment_id is None:
-        return jsonify("URI parameters missing"), 400
+        return jsonify(message = "URI parameters missing"), 400
 
     question = models.Question.query.get(int(question_id))
     if question is None:
-        return jsonify("Question not found"), 404
+        return jsonify(message = "Question not found"), 404
 
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
-        return jsonify("Proposal not found"), 404
+        return jsonify(message = "Proposal not found"), 404
 
     comment = models.Comment.query.get(int(comment_id))
     if comment is None:
-        return jsonify("Comment not found"), 404
+        return jsonify(message = "Comment not found"), 404
 
     if comment.supporters.count() > 1:
-        return jsonify("Comment has other supporters so cannot be deleted"), 404
+        return jsonify(message = "Comment has other supporters so cannot be deleted"), 404
 
     # Unsupport comment
     user.unsupport_comments([comment])
@@ -2069,7 +2070,7 @@ def api_add_proposal_endorsement(question_id, proposal_id):
     perm = question.get_permissions(user)
     if perm is None or not models.Question.VOTE & perm:
         app.logger.debug("ACCESS ERROR: User %s with permission %s tried to vote on question %s", user.id, perm, question.id)
-        return jsonify("Question not found"), 404
+        return jsonify(message = "Question not found"), 404
     
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
@@ -2314,7 +2315,7 @@ def api_update_proposal_endorsement(question_id, proposal_id):
     perm = question.get_permissions(user)
     if perm is None or not models.Question.VOTE & perm:
         app.logger.debug("ACCESS ERROR: User %s with permission %s tried to vote on question %s", user.id, perm, question.id)
-        return jsonify("Question not found"), 404
+        return jsonify(message = "Question not found"), 404
     
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
@@ -2465,7 +2466,7 @@ def api_create_proposal(question_id):
     perm = question.get_permissions(user)
     if perm is None or not models.Question.PROPOSE & perm:
         app.logger.debug("ACCESS ERROR: User %s with permission %s tried to propose on question %s", user.id, perm, question.id)
-        return jsonify("Question not found"), 404
+        return jsonify(message = "Question not found"), 404
     
     if not request.json:
         app.logger.debug("Non json request received...\n")
@@ -2557,12 +2558,12 @@ def api_delete_proposal(question_id, proposal_id):
     # Check user permission: can vote?
     question = models.Question.query.get(question_id)
     if question is None:
-        return jsonify("Question not found"), 404
+        return jsonify(message = "Question not found"), 404
     
     perm = question.get_permissions(user)
     if perm is None or not models.Question.PROPOSE & perm:
         app.logger.debug("ACCESS ERROR: User %s with permission %s tried to delete a proposal on question %s", user.id, perm, question.id)
-        return jsonify("Question not found"), 404
+        return jsonify(message = "Question not found"), 404
     
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
