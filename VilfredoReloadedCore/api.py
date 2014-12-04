@@ -4433,12 +4433,16 @@ def api_create_email_invitation(question_id):
     
     rejected = list()
     accepted = list()
+    already_sent = list()
     invites_count = 0
     
     for email in email_list:
+        email = email.strip()
         if not '@' in email:
             app.logger.debug("@ not found in %s", email)
-            rejected.append(email)
+            
+            if email not in rejected:
+                rejected.append(email)
             continue
         else:
             instance = db_session.query(models.EmailInvite)\
@@ -4448,7 +4452,8 @@ def api_create_email_invitation(question_id):
                 .first()
             if instance:
                 app.logger.debug("Address %s already contacted", email)
-                rejected.append(email)
+                if email not in already_sent:
+                    already_sent.append(email)
                 continue
             else:
                 accepted.append(email)
@@ -4467,11 +4472,13 @@ def api_create_email_invitation(question_id):
     if invites_count:
         db_session.commit()
     
+    addresses_already_sent = ",".join(already_sent) 
     rejected_addresses = ",".join(rejected) 
     accepted_addresses = ",".join(accepted)   
     invites = {'question_id': str(question_id),
                 'accepted': accepted_addresses,
                 'rejected': rejected_addresses,
+                'already_sent': addresses_already_sent,
                 'num_invites_sent': str(invites_count)}
     
     return jsonify(invites=invites), 201
