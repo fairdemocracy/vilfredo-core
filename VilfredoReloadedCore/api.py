@@ -4432,6 +4432,7 @@ def api_create_email_invitation(question_id):
     email_list = user_emails.split(',')
     
     rejected = list()
+    accepted = list()
     invites_count = 0
     
     for email in email_list:
@@ -4450,6 +4451,7 @@ def api_create_email_invitation(question_id):
                 rejected.append(email)
                 continue
             else:
+                accepted.append(email)
                 token = uuid.uuid4().get_hex()
                 new_invite = models.EmailInvite(user, email, permissions, question_id, token)
                 
@@ -4465,10 +4467,12 @@ def api_create_email_invitation(question_id):
     if invites_count:
         db_session.commit()
     
-    rejected_addresses = ",".join(rejected)    
-    invites = [{'question_id': str(question_id),
+    rejected_addresses = ",".join(rejected) 
+    accepted_addresses = ",".join(accepted)   
+    invites = {'question_id': str(question_id),
+                'accepted': accepted_addresses,
                 'rejected': rejected_addresses,
-                'num_invites_sent': str(invites_count)}]
+                'num_invites_sent': str(invites_count)}
     
     return jsonify(invites=invites), 201
 
