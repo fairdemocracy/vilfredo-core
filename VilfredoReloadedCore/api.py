@@ -34,7 +34,7 @@ from .database import db_session
 from sqlalchemy import and_
 from functools import wraps
 from flask import Response
-import json
+import json, os
 import uuid
 
 
@@ -820,17 +820,18 @@ def api_create_user():
     db_session.commit()
 
     email_sent = False
-    # Send verification email
-    email = request.json['email']
-    token = uuid.uuid4().get_hex()
-    timeout = models.get_timestamp() + EMAIL_VERIFY_LIFETIME
-    verify_email = models.VerifyEmail(user, email, token, timeout)
-    ret_code = emails.send_email_verification(user.id, email, token)
-    app.logger.debug("api_create_user: Ret Code from send_email_verification = %s", ret_code)
-    verify_email.email_sent = 1
-    email_sent = True
-    db_session.add(verify_email)
-    db_session.commit()
+    # Send verification email unless deactivate
+    if os.environ.get('EMAIL_VALIDATION_OFF', '0') == '0':    
+        email = request.json['email']
+        token = uuid.uuid4().get_hex()
+        timeout = models.get_timestamp() + EMAIL_VERIFY_LIFETIME
+        verify_email = models.VerifyEmail(user, email, token, timeout)
+        ret_code = emails.send_email_verification(user.id, email, token)
+        app.logger.debug("api_create_user: Ret Code from send_email_verification = %s", ret_code)
+        verify_email.email_sent = 1
+        email_sent = True
+        db_session.add(verify_email)
+        db_session.commit()
 
     # Send response
     response = {'url': url_for('api_get_users', user_id=user.id), 'email_sent': email_sent}
