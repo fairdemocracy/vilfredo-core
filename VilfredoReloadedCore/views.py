@@ -28,7 +28,7 @@ from flask import session, request, make_response
 
 from . import app, models, api
 
-from .database import db_session
+from database import db_session
 
 from flask import render_template, url_for, redirect
 
@@ -75,6 +75,7 @@ def reset_password_from_token(token):
 
 @app.route('/activate')
 def activate():
+    from .database import db_session
     redirect_to_index = redirect(url_for('index'))
     resp = make_response(redirect_to_index)
     user_id = request.args.get('u')
@@ -97,6 +98,9 @@ def activate():
         app.logger.debug("Account Activation: Token expired...\n")
         resp.set_cookie('vgamessage', 'Sorry, you took too long to activate your account. Please register again.')
         resp.set_cookie('vgastatus', 'error')
+        # Delete validation entry
+        db_session.delete(verify)
+        db_session.commit()
         return resp
 
     user =  models.User.query.get(verify.user_id)
@@ -104,9 +108,16 @@ def activate():
         app.logger.debug("Account Activation: Unknown user...\n")
         resp.set_cookie('vgamessage', 'Sorry we have no record of you registration. Please register again.')
         resp.set_cookie('vgastatus', 'error')
+        # Delete validation entry
+        db_session.delete(verify)
+        db_session.commit()
         return resp
 
     # app.logger.debug("Account Activation: Success! User %s %s activated!\n" % str(user.id), user.username)
+    # Delete validation entry
+    db_session.delete(verify)
+    db_session.commit()
+    # Log user in
     auth_token = user.get_auth_token()
     resp.set_cookie('vgaclient', auth_token)
     resp.set_cookie('vgastatus', 'success')

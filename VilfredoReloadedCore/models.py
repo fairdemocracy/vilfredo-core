@@ -998,6 +998,12 @@ class VerifyEmail(db.Model):
         self.timeout = timeout
     
     @staticmethod
+    def verified(verify):
+        app.logger.debug("verified called...\n")
+        db_session.delete(verify)
+        db_session.commit()
+    
+    @staticmethod
     def verify_email(user_id, token):
         app.logger.debug("verify_email called...\n")
 
