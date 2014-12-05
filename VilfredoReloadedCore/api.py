@@ -152,7 +152,7 @@ def requires_auth(f):
         else:
             app.logger.debug('requires_auth: username and password not valid')
             # return authenticate()
-            return jsonify('username and password not valid'), 403
+            return jsonify(message='username and password not valid'), 403
     return decorated
 
 def requires_auth_off(f):
