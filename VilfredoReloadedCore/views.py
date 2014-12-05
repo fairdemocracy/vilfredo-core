@@ -80,7 +80,6 @@ def activate():
     resp = make_response(redirect_to_index)
     user_id = request.args.get('u')
     token = request.args.get('t')
-    verify = models.VerifyEmail.query.filter_by(user_id=user_id,token=token).first()
 
     if not user_id or not token:
         app.logger.debug("Account Activation: Token and user_id not in link...\n")
@@ -88,6 +87,7 @@ def activate():
         resp.set_cookie('vgastatus', 'error')
         return resp
 
+    verify = models.VerifyEmail.query.filter_by(user_id=user_id,token=token).first()
     if not verify:
         app.logger.debug("Account Activation: Token and user_id not listed...\n")
         resp.set_cookie('vgamessage', 'Sorry we have no record of you registration. Please register again.')
