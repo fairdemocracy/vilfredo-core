@@ -128,7 +128,7 @@ def authenticate():
 def requires_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        app.logger.debug("Request authorization = %s\n", request.authorization)
+        # app.logger.debug("Request authorization = %s\n", request.authorization)
         auth = request.authorization
         if not auth:
             #return authenticate()
@@ -137,20 +137,20 @@ def requires_auth(f):
             #return authenticate()
             return jsonify(message='no username received'), 403
         if auth.password == '':
-            app.logger.debug('requires_auth: Token set')
+            # app.logger.debug('requires_auth: Token set')
             token_valid = load_token(auth.username)
             if token_valid:
-                app.logger.debug('requires_auth: Token is valid')
+                # app.logger.debug('requires_auth: Token is valid')
                 return f(*args, **kwargs)
             else:
-                app.logger.debug('requires_auth: Token is not valid')
+                # app.logger.debug('requires_auth: Token is not valid')
                 # return authenticate()
                 return jsonify(message='no password received, incorrect token supplied'), 403
         elif check_auth(auth.username, auth.password):
-            app.logger.debug('requires_auth: username and password valid')
+            # app.logger.debug('requires_auth: username and password valid')
             return f(*args, **kwargs)
         else:
-            app.logger.debug('requires_auth: username and password not valid')
+            # app.logger.debug('requires_auth: username and password not valid')
             # return authenticate()
             return jsonify(message='username and password not valid'), 403
     return decorated
@@ -711,11 +711,11 @@ def api_reset_password():
     pwd_reset = db_session.query(models.PWDReset)\
             .filter(models.PWDReset.token == reset_token)\
             .first()
-    
+
     if not pwd_reset:
         response = {"message": "Invalid password reset token"}
         return jsonify(response), 400
-    
+
     user = models.User.query.get(pwd_reset.user_id)
     if not user:
         response = {"message": "User not found"}
