@@ -7124,7 +7124,7 @@ class Proposal(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(120), nullable=False)
     blurb = db.Column(db.Text, nullable=False)
-    abstract = db.Column(db.Text)
+    abstract = db.Column(db.Text, nullable=False)
     generation_created = db.Column(db.Integer, default=1)
     created = db.Column(db.DateTime)
     source = db.Column(db.Integer, default=0)
