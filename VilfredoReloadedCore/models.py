@@ -7148,7 +7148,7 @@ class Proposal(db.Model):
         lazy='dynamic')
 
     def __init__(self, author, question, title, blurb,
-                 abstract=None, source=0):
+                 abstract='', source=0):
         '''
         .. function:: __init__(author, question, title, blurb
                 [, abstract=None, source=0])

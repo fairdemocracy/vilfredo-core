@@ -2487,7 +2487,7 @@ def api_create_proposal(question_id):
 
     title = request.json.get('title')
     blurb = request.json.get('blurb')
-    abstract = request.json.get('abstract', None)
+    abstract = request.json.get('abstract', '')
 
     source = 0
     if 'source' in request.json:
