@@ -1776,7 +1776,7 @@ def api_update_proposal_comment(question_id, proposal_id, comment_id):
     if 'new_comment_text' in request.json:
         if request.json['new_comment_text'] == '' \
                 or len(request.json['new_comment_text']) > MAX_LEN_PROPOSAL_COMMENT:
-            message = {"message": "Comment text must be no longer than " + MAX_LEN_PROPOSAL_COMMENT + " characters"}
+            message = {"message": "Comment text must be no longer than " + str(MAX_LEN_PROPOSAL_COMMENT) + " characters"}
             return jsonify(message), 400
         else:
             new_comment_text = request.json['new_comment_text']
@@ -1881,7 +1881,7 @@ def api_add_proposal_comment(question_id, proposal_id):
     if 'comment' in request.json:
         if request.json['comment'] == '' \
                 or len(request.json['comment']) > MAX_LEN_PROPOSAL_COMMENT:
-            message = {"message": "Comment text must be no longer than " + MAX_LEN_PROPOSAL_COMMENT + " characters"}
+            message = {"message": "Comment text must be no longer than " + str(MAX_LEN_PROPOSAL_COMMENT) + " characters"}
             return jsonify(message), 400
         else:
             comment = request.json['comment']
