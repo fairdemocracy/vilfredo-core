@@ -1861,7 +1861,7 @@ def api_add_proposal_comment(question_id, proposal_id):
 
     # Consider allowing comments during writing
     elif question.phase != 'voting':
-        message = {"message": "The question is not in the voting phase"}
+        message = {"message": "Adding comments is only allowed during the voting phase"}
         return jsonify(message), 403
 
     proposal = models.Proposal.query.get(int(proposal_id))
