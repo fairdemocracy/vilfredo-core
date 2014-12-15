@@ -77,26 +77,34 @@ def reset_password_from_token(token):
 def activate():
     from .database import db_session
     redirect_to_index = redirect(url_for('index'))
-    resp = make_response(redirect_to_index)
-    user_id = request.args.get('u')
+    resp = make_response(redirect_to_index)    
+
+    try:
+        user_id = int(request.args.get('u'))
+    except ValueError:
+        app.logger.debug("Account Activation: Non numeric user id supplied in link...\n")
+        resp.set_cookie('vgamessage', 'Sorry that link is invalid! Plase email support or try registring again.')
+        resp.set_cookie('vgastatus', 'error')
+        return resp
+    
     token = request.args.get('t')
 
-    if not user_id or not token:
-        app.logger.debug("Account Activation: Token and user_id not in link...\n")
-        resp.set_cookie('vgamessage', 'Sorry, that link is invalid!')
+    if not token:
+        app.logger.debug("Account Activation: Token not in link...\n")
+        resp.set_cookie('vgamessage', 'Sorry that link is invalid! Plase email support or try registring again.')
         resp.set_cookie('vgastatus', 'error')
         return resp
 
     verify = models.VerifyEmail.query.filter_by(user_id=user_id,token=token).first()
     if not verify:
         app.logger.debug("Account Activation: Token and user_id not listed...\n")
-        resp.set_cookie('vgamessage', 'Sorry we have no record of you registration. Please register again.')
+        resp.set_cookie('vgamessage', 'Sorry we have no record of you registration. Plase email support or try registring again.')
         resp.set_cookie('vgastatus', 'error')
         return resp
 
     elif models.get_timestamp() > verify.timeout:
         app.logger.debug("Account Activation: Token expired...\n")
-        resp.set_cookie('vgamessage', 'Sorry, you took too long to activate your account. Please register again.')
+        resp.set_cookie('vgamessage', 'Sorry, this token has expired. Please register again.')
         resp.set_cookie('vgastatus', 'error')
         # Delete validation entry
         db_session.delete(verify)
@@ -106,7 +114,7 @@ def activate():
     user =  models.User.query.get(verify.user_id)
     if not user:
         app.logger.debug("Account Activation: Unknown user...\n")
-        resp.set_cookie('vgamessage', 'Sorry we have no record of you registration. Please register again.')
+        resp.set_cookie('vgamessage', 'Sorry we have no record of you registration. Plase email support or try registring again.')
         resp.set_cookie('vgastatus', 'error')
         # Delete validation entry
         db_session.delete(verify)
