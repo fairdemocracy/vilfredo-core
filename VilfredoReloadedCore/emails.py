@@ -27,31 +27,43 @@ Emails
 from . import app
 from email.mime.text import MIMEText
 from subprocess import Popen, PIPE
+import os
 
 def send_email(subject, sender_email, recipient_email, text_body):
-    msg = MIMEText(text_body)
-    msg["From"] = sender_email
-    msg["To"] = recipient_email
-    msg["Subject"] = subject
-    p = Popen(["/usr/sbin/sendmail", "-t"], stdin=PIPE)
-    p.communicate(msg.as_string())
-    # app.logger.debug("Return Code from email subprocess = %s", p.returncode)
-    return p.returncode
+    if os.environ.get('EMAIL_OFF', '0') == '0':
+        msg = MIMEText(text_body)
+        msg["From"] = sender_email
+        msg["To"] = recipient_email
+        msg["Subject"] = subject
+        p = Popen(["/usr/sbin/sendmail", "-t"], stdin=PIPE)
+        p.communicate(msg.as_string())
+        return p.returncode
+    else:
+        app.logger.debug("emails.send_email: EMAIL_OFF is set - no email sent!")
+        return 1
 
+def send_moved_on_email(user, question):
+    '''
+    .. function:: send_email_verification(email, token)
 
-def send_password_reset_email_v2(user_id, email, token):
+    Send an email containing a link to allow someone to reset their password.
+
+    :param user: question participant
+    :type user: User
+    :param question: question
+    :type toquestionken: Question
+    :rtype: long
+    '''
     body_template = \
     """
-    Click on the link below then enter the reset code.
+    The question titled "%s" has now moved on to the %s stage.
     
-    %s
-    
-    Reset Code: %s
+    http://%s/question/%s
     """
-    return send_email("Vilfredo - Password Reset Request",
+    return send_email("Vilfredo - Question %s Now %s" % (question.title, question.phase),
                       app.config['ADMINS'][0],
-                      email,
-                      body_template % ('http://'+app.config['SITE_DOMAIN']+'/resetpwd', token))
+                      user.email,
+                      body_template % (question.title, question.phase, app.config['SITE_DOMAIN'], question.id))
 
 def send_email_verification(user_id, email, token):
     '''

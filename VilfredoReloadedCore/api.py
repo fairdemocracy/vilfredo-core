@@ -821,7 +821,7 @@ def api_create_user():
 
     email_sent = False
     # Send verification email unless deactivate
-    if os.environ.get('EMAIL_VALIDATION_OFF', '0') == '0':    
+    if os.environ.get('EMAIL_VALIDATION_OFF', '0') == '0':
         email = request.json['email']
         token = uuid.uuid4().get_hex()
         timeout = models.get_timestamp() + EMAIL_VERIFY_LIFETIME

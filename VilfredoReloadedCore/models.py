@@ -36,7 +36,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from flask.ext.login import UserMixin
 
-from . import app
+from . import app, emails
 
 from HTMLParser import HTMLParser
 
@@ -1675,8 +1675,29 @@ class Question(db.Model):
             db_session.commit()
 
         app.logger.debug('author_move_on question now generation %s', self.generation)
+
+        try:
+          SEND_EMAIL_NOTIFICATIONS
+        except NameError:
+          app.logger.debug("SEND_EMAIL_NOTIFICATIONS not defined! Not sending email notifications!")
+        else:
+          if SEND_EMAIL_NOTIFICATIONS:
+              # Send email notifications
+              self.notify_users_moved_on()
+          else:
+              app.logger.debug("SEND_EMAIL_NOTIFICATIONS set to False. Not sending email notifications!")
+
         return self.phase
 
+    def notify_users_moved_on(self):
+        invites = self.invites.all()
+        for invite in invites:
+            user = User.query.get(invite.receiver_id)
+            if user and user.email != '':
+                emails.send_moved_on_email(user, self)
+            else:
+                app.logger.debug("notify_users_moved_on - user %s not found" % user.id)
+    
     def move_to_writing(self):
         '''
         .. function:: move_to_writing()

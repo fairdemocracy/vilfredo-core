@@ -45,9 +45,10 @@ MAKE_GRAPH = True
 MOVE_TO_GENERATION_2 = False
 USE_VOTEMAP = True
 CREATE_CONSENSUS = False
-ALGORITHM_VERSION = "1"
+ALGORITHM_VERSION = "2"
 SEND_EMAILS = False
 os.environ["EMAIL_VALIDATION_OFF"] = '1'
+os.environ["EMAIL_OFF"] = '1'
 
 
 class RESTAPITestCase(unittest.TestCase):
