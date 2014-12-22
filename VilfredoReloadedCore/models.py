@@ -1427,8 +1427,8 @@ class Question(db.Model):
             return 0
         else:
             return invite.permissions
-    
-    def get_endorsement_results(self, generation=None): # jazz
+
+    def get_endorsement_results(self, generation=None): # snow
         '''
         .. function:: get_endorsement_results([generation=None])
 
@@ -1495,9 +1495,14 @@ class Question(db.Model):
                                                'mapy': median(coords['mapy'] + [0] * not_voted)}
                     results[pid]['c_error'] = {'mapx': median(coords['mapx'] + [0.5] * not_voted),
                                                'mapy': median(coords['mapy'] + [1] * not_voted)}
-                
+
+            # Add PF domination data
+            history = self.get_history(generation=generation)
+            for (proposal_id, data) in history.iteritems():
+                results[proposal_id]['dominated_by'] = data.dominated_by
+
             app.logger.debug("results ==> %s", results)
-            
+
             return results
 
     def consensus_found(self, algorithm=None):
@@ -3560,7 +3565,7 @@ class Question(db.Model):
         saves the dominations in the database.
 
         :param proposals: list of proposals
-        :type proposals: list or boolean
+        :type proposals: list
         :param exclude_user: user to exclude from the calculation
         :type exclude_user: User
         :param generation: question generation.
@@ -3588,18 +3593,18 @@ class Question(db.Model):
                                proposals=None,
                                exclude_user=None,
                                generation=None,
-                               save=False):
+                               save=True):
         '''
         .. function:: calculate_pareto_front_qualified([proposals=None,
                                              exclude_user=None,
                                              generation=None,
-                                             save=False])
+                                             save=True])
 
         Calculates the pareto front of the question, and optionally
         saves the dominations in the database.
 
         :param proposals: list of proposals
-        :type proposals: list or boolean
+        :type proposals: list
         :param exclude_user: user to exclude from the calculation
         :type exclude_user: User
         :param generation: question generation.
@@ -3615,6 +3620,12 @@ class Question(db.Model):
         proposals = proposals or self.get_proposals(generation)
         history = self.get_history()
 
+        save_pf = False # snow
+        # Save pareto if calculated against full set of proposals and voters,
+        # and save parameter not set to false
+        if not exclude_user and not proposals and save:
+            save_pf = True
+
         if (len(proposals) == 0):
             return set()
         else:
@@ -3628,7 +3639,7 @@ class Question(db.Model):
 
             for p in proposals:
                 props[p.id] = p.set_of_endorser_ids(generation)
-                
+
                 if (exclude_user is not None):
                     app.logger.debug("props[p.id] = %s\n", props[p.id])
                     props[p.id].discard(exclude_user.id)
@@ -3659,14 +3670,15 @@ class Question(db.Model):
 
                     if (who_dominates == props[proposal1.id]):
                         dominated.add(proposal2)
-                        if (save):
+                        # Save PF in DB
+                        if (save_pf):
                             app.logger.\
                                 debug('SAVE PF: PID %s dominated_by to %s\n',
                                       proposal2.id, proposal1.id)
                             history[proposal2.id].dominated_by = proposal1.id
                     elif (who_dominates == props[proposal2.id]):
                         dominated.add(proposal1)
-                        if (save):
+                        if (save_pf):
                             app.logger.\
                                 debug('SAVE PF: PID %s dominated_by to %s\n',
                                       proposal2.id, proposal1.id)
@@ -3674,11 +3686,16 @@ class Question(db.Model):
                         # Proposal 1 dominated, move to next
                         break
 
+            if (save_pf):
+                db_session.commit()
+
             pareto = set()
             if (len(dominated) > 0):
                 pareto = set(proposals) - dominated
             else:
                 pareto = set(proposals)
+
+            app.logger.debug("PARETO = %s", pareto)
 
             return pareto
 
