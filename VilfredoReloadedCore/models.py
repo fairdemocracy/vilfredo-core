@@ -3726,6 +3726,8 @@ class Question(db.Model):
         :type save: boolean
         :rtype: set of proposal objects
         '''
+        app.logger.debug("calculate_pareto_front_original called")
+        
         generation = generation or self.generation
         proposals = proposals or self.get_proposals(generation)
         history = self.get_history()
