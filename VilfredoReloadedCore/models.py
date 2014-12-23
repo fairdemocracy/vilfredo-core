@@ -3552,7 +3552,7 @@ class Question(db.Model):
                                proposals=None,
                                exclude_user=None,
                                generation=None,
-                               save=False,
+                               save=True,
                                algorithm=None):
         '''
         .. function:: calculate_pareto_front([proposals=None,
@@ -3615,17 +3615,19 @@ class Question(db.Model):
         '''
 
         app.logger.debug("calculate_pareto_front_qualified called...")
-
-        generation = generation or self.generation
-        proposals = proposals or self.get_proposals(generation)
-        history = self.get_history()
-
+        
         save_pf = False # snow
         # Save pareto if calculated against full set of proposals and voters,
         # and save parameter not set to false
         if not exclude_user and not proposals and save:
             save_pf = True
 
+        app.logger.debug("Save PF? - %s", save_pf)
+
+        generation = generation or self.generation
+        proposals = proposals or self.get_proposals(generation)
+        history = self.get_history()
+        
         if (len(proposals) == 0):
             return set()
         else:
@@ -3736,7 +3738,7 @@ class Question(db.Model):
 
             if (exclude_user is not None):
                 app.logger.\
-                    debug("calculate_pareto_front called excluding user %s\n",
+                    debug("calculate_pareto_front_original called excluding user %s\n",
                           exclude_user.id)
 
             for p in proposals:

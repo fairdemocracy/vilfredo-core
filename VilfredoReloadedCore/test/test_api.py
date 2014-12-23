@@ -1182,6 +1182,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         #
         # Get Key Players
         #
+        '''
         rv = self.open_with_json_auth(
             '/api/v1/questions/1/key_players',
             'GET',
@@ -1193,6 +1194,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         # Log data received
         app.logger.debug("Data retrieved from Get Key Players = %s\n",
                          rv.data)
+        '''
 
         #
         # Get Endorser Effects
