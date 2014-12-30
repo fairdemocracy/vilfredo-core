@@ -42,6 +42,29 @@ def send_email(subject, sender_email, recipient_email, text_body):
         app.logger.debug("emails.send_email: EMAIL_OFF is set - no email sent!")
         return 1
 
+def send_email_invite_accepted_email(user, email, question):
+    '''
+    .. function:: send_email_verification(email, token)
+
+    Send an email containing a link to allow someone to reset their password.
+
+    :param user: question participant
+    :type user: User
+    :param question: question
+    :type toquestionken: Question
+    :rtype: long
+    '''
+    body_template = \
+    """
+    The invitation you sent to %s for question "%s" has been accepted.
+    
+    http://%s/question/%s
+    """
+    return send_email("Vilfredo - Invitation Accepted",
+                      app.config['ADMINS'][0],
+                      user.email,
+                      body_template % (email, question.title, app.config['SITE_DOMAIN'], question.id))
+
 def send_moved_on_email(user, question):
     '''
     .. function:: send_email_verification(email, token)
@@ -79,6 +102,8 @@ def send_email_verification(user_id, email, token):
     '''
     body_template = \
     """
+    Welcome to Vilfrdo! Great to have you with us!
+    
     Click on the link below to activate your account.
     
     Activate Account: http://%s
