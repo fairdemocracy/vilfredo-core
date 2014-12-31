@@ -372,6 +372,33 @@ def api_index():
 @app.route('/api/v1/authtoken', methods=['GET'])
 @requires_auth
 def api_get_auth_token():
+    '''
+    .. http:get:: /authtoken/
+
+        An authentication token.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET /authtoken HTTP/1.1
+            Host: vilfredo.org
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+            {
+               "token": "fr56gy6fuj78hg6549judhyey"
+            }
+
+        :statuscode 200: no error
+        :statuscode 400: there's no user
+    '''
     app.logger.debug("api_get_auth_token called...\n")
     user = get_authenticated_user(request)
     if not user:
