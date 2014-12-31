@@ -279,6 +279,12 @@ class RESTAPITestCase(unittest.TestCase):
                                       email='harry@example.com',
                                       password='harry123'))
         self.assertEqual(rv.status_code, 201)
+            
+        rv = self.open_with_json('/api/v1/users',
+                                 'POST',
+                                 dict(username='tim',
+                                      email='tim@example.com',
+                                      password='tim123'))
 
         #
         # Create Question
@@ -361,7 +367,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         #
         rv = self.open_with_json_auth('/api/v1/questions/1/invitations',
                                       'POST',
-                                      dict(invite_user_ids=[2, 3, 4, 5], permissions=7),
+                                      dict(invite_user_ids=[2, 3, 4, 5, 6], permissions=7),
                                       'john',
                                       'john123')
         self.assertEqual(rv.status_code, 201)
