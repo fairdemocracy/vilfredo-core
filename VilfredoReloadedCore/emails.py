@@ -102,7 +102,7 @@ def send_email_verification(user_id, email, token):
     '''
     body_template = \
     """
-    Welcome to Vilfrdo! Great to have you with us!
+    Welcome to Vilfredo! Great to have you with us!
     
     Click on the link below to activate your account.
     
@@ -155,12 +155,9 @@ def send_question_email_invite_email(sender, recipient_email, question, token):
     # print "Sending email:", sender.username, question.title
     body_template = \
     """
-    Vilfredo user %s invites you to participate in the question "%s".
+    %s invites you to participate in the question "%s" on Vilfredo.
     
-    If you are already a member of Vilfredo please sign in then click on the Join Question link below.
-    
-    If you are not yet signed up then please go here http://%s and create an account, then once you have logged in click on the 
-    Join Question link below.
+    If you are already a member of Vilfredo please login then click on the link below. If you are not yet registered then please go to http://%s and register for a free account. Once you have logged in, click on the link below.
     
     Join Question: http://%s
     """
