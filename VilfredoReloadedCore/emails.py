@@ -46,7 +46,7 @@ def send_email_invite_accepted_email(user, email, question):
     '''
     .. function:: send_email_verification(email, token)
 
-    Send an email containing a link to allow someone to reset their password.
+    Send an email to notify someone has accepted an invitation.
 
     :param user: question participant
     :type user: User
@@ -69,7 +69,7 @@ def send_moved_on_email(user, question):
     '''
     .. function:: send_email_verification(email, token)
 
-    Send an email containing a link to allow someone to reset their password.
+    Send an email to notify that a question has moved on to a new stage.
 
     :param user: question participant
     :type user: User
@@ -92,7 +92,7 @@ def send_email_verification(user_id, email, token):
     '''
     .. function:: send_email_verification(email, token)
 
-    Send an email containing a link to allow someone to reset their password.
+    Send an email containing a link to allow someone to activate their account.
 
     :param email: user email address
     :type email: string
@@ -140,7 +140,7 @@ def send_question_email_invite_email(sender, recipient_email, question, token):
     '''
     .. function:: send_question_email_invite_email(sender, recipient_email, question, token)
 
-    Send an email containing a link to allow someone to participate in a question.
+    Send an email containing a link to invite someone to participate in a question.
 
     :param sender: User sending the invitation
     :type email: User
