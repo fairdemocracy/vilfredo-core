@@ -46,7 +46,7 @@ def send_email_invite_accepted_email(user, email, question):
     '''
     .. function:: send_email_verification(email, token)
 
-    Send an email containing a link to allow someone to reset their password.
+    Send an email to notify someone has accepted an invitation.
 
     :param user: question participant
     :type user: User
@@ -69,7 +69,7 @@ def send_moved_on_email(user, question):
     '''
     .. function:: send_email_verification(email, token)
 
-    Send an email containing a link to allow someone to reset their password.
+    Send an email to notify that a question has moved on to a new stage.
 
     :param user: question participant
     :type user: User
@@ -92,7 +92,7 @@ def send_email_verification(user_id, email, token):
     '''
     .. function:: send_email_verification(email, token)
 
-    Send an email containing a link to allow someone to reset their password.
+    Send an email containing a link to allow someone to activate their account.
 
     :param email: user email address
     :type email: string
@@ -102,7 +102,7 @@ def send_email_verification(user_id, email, token):
     '''
     body_template = \
     """
-    Welcome to Vilfrdo! Great to have you with us!
+    Welcome to Vilfredo! Great to have you with us!
     
     Click on the link below to activate your account.
     
@@ -140,7 +140,7 @@ def send_question_email_invite_email(sender, recipient_email, question, token):
     '''
     .. function:: send_question_email_invite_email(sender, recipient_email, question, token)
 
-    Send an email containing a link to allow someone to participate in a question.
+    Send an email containing a link to invite someone to participate in a question.
 
     :param sender: User sending the invitation
     :type email: User
@@ -155,12 +155,9 @@ def send_question_email_invite_email(sender, recipient_email, question, token):
     # print "Sending email:", sender.username, question.title
     body_template = \
     """
-    Vilfredo user %s invites you to participate in the question "%s".
+    %s invites you to participate in the question "%s" on Vilfredo.
     
-    If you are already a member of Vilfredo please sign in then click on the Join Question link below.
-    
-    If you are not yet signed up then please go here http://%s and create an account, then once you have logged in click on the 
-    Join Question link below.
+    If you are already a member of Vilfredo please login then click on the link below. If you are not yet registered then please go to http://%s and register for a free account. Once you have logged in, click on the link below.
     
     Join Question: http://%s
     """
