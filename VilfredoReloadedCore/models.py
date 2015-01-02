@@ -1508,7 +1508,7 @@ class Question(db.Model):
             history = self.get_history(generation=generation)
             for (proposal_id, data) in history.iteritems():
                 if proposal_id in results:
-                results[proposal_id]['dominated_by'] = data.dominated_by
+                    results[proposal_id]['dominated_by'] = data.dominated_by
 
             app.logger.debug("results ==> %s", results)
 
@@ -3585,6 +3585,9 @@ class Question(db.Model):
         '''
         algorithm = algorithm or app.config['ALGORITHM_VERSION']
 
+        app.logger.debug("calculate_pareto_front: ************ Using Algorithm %s ************", algorithm)
+        app.logger.debug("calculate_pareto_front: ************ Save PF %s ************", save)
+
         if algorithm == 2:
             # app.logger.debug("************** USING ALGORITHM 2 ************")
             return self.calculate_pareto_front_qualified(proposals,
@@ -4098,7 +4101,7 @@ class Question(db.Model):
                                      proposal_level_type,
                                      user_level_type)
         '''
-        
+        app.logger.debug("get_complex_voting_graph called.... ********** Using Algorihm 2 ************")
         algorithm = 2
         generation = generation or self.generation
 
@@ -4128,7 +4131,7 @@ class Question(db.Model):
             if not os.path.isfile(filepath + '.dot'):
                 # Create the dot specification of the map
                 app.logger.debug("dot file not found: create")
-                
+                # sick
                 voting_graph = self.create_new_graph(
                     generation=generation)
                 
@@ -4226,7 +4229,7 @@ class Question(db.Model):
                                      proposal_level_type,
                                      user_level_type)
         '''
-        
+        app.logger.debug("get_voting_graph called.... ********** Using Algorihm 1 ************")
         algorithm = 1
 
         filename = make_map_filename_hashed(self,
@@ -4277,12 +4280,13 @@ class Question(db.Model):
                 app.logger.debug("Generating map with proposals...")
                 app.logger.debug("DEBUG_MAP Generating map with proposals %s...", map_proposals)
 
-                voting_graph = self.make_graphviz_map(
+                voting_graph = self.make_graphviz_map( # sick
                     proposals=map_proposals,
                     generation=generation,
                     proposal_level_type=proposal_level_type,
-                    user_level_type=user_level_type)
-                
+                    user_level_type=user_level_type,
+                    algorithm=algorithm)
+
                 # Save the dot specification as a dot file
                 app.logger.debug("Writing dot file %s.dot", filepath)
                 dot_file = open(filepath+".dot", "w")
@@ -4423,18 +4427,19 @@ class Question(db.Model):
 
         return below
 
-    def create_new_graph(self, generation=None): # newgraph jazz
+    def create_new_graph(self, generation=None, algorithm=2): # newgraph jazz sick
+        app.logger.debug("create_new_graph called: Algorithm = %s", algorithm)
         generation = generation or self.generation
         proposals = self.get_proposals_list(generation)
         all_proposals = copy.copy(proposals)
         proposals_by_id = self.get_proposals_list_by_id(generation)
 
-        dom_map = self.calculate_domination_map(generation=generation, algorithm=2)
+        dom_map = self.calculate_domination_map(generation=generation, algorithm=algorithm)
         app.logger.debug('dom_map = %s', dom_map)
         cases = self.find_domination_cases(proposals=proposals, dom_map=dom_map, generation=generation)
         app.logger.debug('cases = %s', cases)
 
-        relations = self.calculate_proposal_relation_ids(generation=generation, algorithm=2)
+        relations = self.calculate_proposal_relation_ids(generation=generation, algorithm=algorithm)
         app.logger.debug("relations ==> %s", relations)
         proposals_below = dict()
         
@@ -5660,7 +5665,7 @@ class Question(db.Model):
 
         return voting_graph
     
-    # oldgraph
+    # newgraph
     def make_graphviz_map(self,
                           proposals=None,
                           generation=None,
@@ -5669,7 +5674,8 @@ class Question(db.Model):
                           user_level_type=GraphLevelType.layers,
                           address_image='',
                           highlight_user1=None,
-                          highlight_proposal1=None):
+                          highlight_proposal1=None,
+                          algorithm=None):
         '''
         .. function:: make_graphviz_map(
             [proposals=None,
@@ -5679,7 +5685,8 @@ class Question(db.Model):
             user_level_type=GraphLevelType.layerss,
             address_image='',
             highlight_user1=None,
-            highlight_proposal1=None])
+            highlight_proposal1=None],
+            algorithm=None)
 
         Generates the string to create a voting graph from Graphviz.
 
@@ -5702,23 +5709,23 @@ class Question(db.Model):
         :rtype: string
         '''
         generation = generation or self.generation
+        algorithm = algorithm or app.config['ALGORITHM_VERSION'] # sick
+        app.logger.debug("make_graphviz_map: *********** Using Algorithm %s **********", algorithm)
 
         # get set of all proposals -- debugging
         proposals = proposals or self.get_proposals(generation)
-        app.logger.debug("DEBUG_MAP create map using proposals %s in generation %s\n",
-                         proposals, generation)
+        # app.logger.debug("DEBUG_MAP create map using proposals %s in generation %s\n",
+        #                  proposals, generation)
 
         proposal_ids = get_ids_from_proposals(proposals)
-        app.logger.debug("DEBUG_MAP: map pids %s", proposal_ids)
-        
-        algorithm = 1
+        # app.logger.debug("DEBUG_MAP: map pids %s", proposal_ids)
 
         # get pareto
+        app.logger.debug("make_graphviz_map: Get Pareto Front")
         pareto = self.calculate_pareto_front(proposals=proposals,
                                              generation=generation,
                                              algorithm=algorithm)
-        app.logger.debug("pareto %s\n",
-                         pareto)
+        # app.logger.debug("pareto %s\n", pareto)
 
         # get set of all endorsers
         # endorsers = self.get_endorsers(generation)

@@ -3874,7 +3874,7 @@ def api_question_graph(question_id):
     # set Algorithm version
     algorithm = int(request.args.get('algorithm', app.config['ALGORITHM_VERSION']))
     
-    app.logger.debug("************** USING ALGORITHM %s ************", algorithm)
+    app.logger.debug("api_question_graph: ************** USING ALGORITHM %s ************", algorithm)
 
     # app.logger.debug('Question has %s endorsememnts', question.has_endorsememnts(generation))
     if not question.has_endorsememnts(generation=generation):

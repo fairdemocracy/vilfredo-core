@@ -279,7 +279,7 @@ class RESTAPITestCase(unittest.TestCase):
                                       email='harry@example.com',
                                       password='harry123'))
         self.assertEqual(rv.status_code, 201)
-            
+
         rv = self.open_with_json('/api/v1/users',
                                  'POST',
                                  dict(username='tim',
@@ -401,7 +401,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         app.logger.debug("Data retrieved from Create Invite = %s\n", rv.data)
         # self.assertEqual(rv.data.invites.rejected, 'bademail.com')
         # self.assertEqual(rv.data.invites.num_invites_sent, '2')
-        if (SEND_EMAILS):
+        if SEND_EMAILS:
             # Email invited users
             with mail.record_messages() as outbox:
                 emails.email_question_invite(john, susan, johns_q)
@@ -1231,7 +1231,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         app.logger.debug("Data retrieved from Get Proposal Relations = %s\n",
                          rv.data)
 
-        if (MAKE_GRAPH):
+        if MAKE_GRAPH:
             #
             # Create Voting Map
             #
@@ -1247,19 +1247,21 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             # self.assertIn('map_Q1_G1_all_1_1.svg', data['url'],
             #              "File URL not returned")
 
-            rv = self.open_with_json_auth(
-                '/api/v1/questions/1/graph?generation=1&map_type=pareto',
-                'GET',
-                dict(),
-                'harry',
-                'harry123')
-            self.assertEqual(rv.status_code, 200)
-            data = json.loads(rv.data)
-            app.logger.debug("Data retrieved from get graph = %s\n", data)
-            # self.assertIn('map_Q1_G1_all_1_1.svg', data['url'],
-            #              "File URL not returned")
+            if app.config['ALGORITHM_VERSION'] == 1:
+
+                rv = self.open_with_json_auth(
+                    '/api/v1/questions/1/graph?generation=1&map_type=pareto',
+                    'GET',
+                    dict(),
+                    'harry',
+                    'harry123')
+                self.assertEqual(rv.status_code, 200)
+                data = json.loads(rv.data)
+                app.logger.debug("Data retrieved from get graph = %s\n", data)
+                # self.assertIn('map_Q1_G1_all_1_1.svg', data['url'],
+                #              "File URL not returned")
             
-            # Stop here while debugging graph
+                # Stop here while debugging graph
 
         
         # gen 2
