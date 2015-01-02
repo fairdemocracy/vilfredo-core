@@ -1504,9 +1504,10 @@ class Question(db.Model):
                     results[pid]['c_error'] = {'mapx': median(coords['mapx'] + [0.5] * not_voted),
                                                'mapy': median(coords['mapy'] + [1] * not_voted)}
 
-            # Add PF domination data
+            # Add PF domination data == yelp
             history = self.get_history(generation=generation)
             for (proposal_id, data) in history.iteritems():
+                if proposal_id in results:
                 results[proposal_id]['dominated_by'] = data.dominated_by
 
             app.logger.debug("results ==> %s", results)
