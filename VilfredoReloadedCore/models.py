@@ -7881,9 +7881,11 @@ class Proposal(db.Model):
         #   ie find intersection with qualified endorsers
         #   (those that understand both proposal A and proposal B) ---- look
         proposal1_qualified = proposal1_voters & qualified_voters
+        # app.logger.debug("proposal1_qualified = %s", proposal1_qualified)
         proposal2_qualified = proposal2_voters & qualified_voters
+        # app.logger.debug("proposal2_qualified = %s", proposal2_qualified)
 
-        # If proposal1 and proposal2 are the same return -1
+        # If proposal1 and proposal2 are the same return -2
         if (proposal1_qualified == proposal2_qualified):
             return -2
         # If proposal1 is empty return proposal2
