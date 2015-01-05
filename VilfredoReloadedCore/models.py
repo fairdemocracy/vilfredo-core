@@ -598,9 +598,15 @@ class User(db.Model, UserMixin):
         :rtype: boolean
         '''
         if (self.id == question.author.id and self.id not in receivers):
-            for receiver in receivers:
-                app.logger.debug('appending invite for user id %s', receiver)
-                self.invites.append(Invite(self, receiver, permissions, question.id))
+            for receiver_id in receivers:
+                receiver = User.query.get(receiver_id)
+                if not receiver:
+                    continue
+                else:
+                    app.logger.debug('appending invite for user id %s', receiver)
+                    self.invites.append(Invite(self, receiver, permissions, question.id))
+                    # send email notification to receiver
+                    emails.send_added_to_question_email(self, receiver, question)
             return True
         return False
 

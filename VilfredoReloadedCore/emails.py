@@ -42,6 +42,29 @@ def send_email(subject, sender_email, recipient_email, text_body):
         app.logger.debug("emails.send_email: EMAIL_OFF is set - no email sent!")
         return 1
 
+def send_added_to_question_email(inviter, receiver, question):
+    '''
+    .. function:: send_email_verification(email, token)
+
+    Send an email to notify someone has accepted an invitation.
+
+    :param user: question participant
+    :type user: User
+    :param question: question
+    :type toquestionken: Question
+    :rtype: long
+    '''
+    body_template = \
+    """
+    User %s has added you to the question %s.
+    
+    http://%s/question/%s
+    """
+    return send_email("Vilfredo - Please Participate",
+                      app.config['ADMINS'][0],
+                      receiver.email,
+                      body_template % (inviter.username, question.title, app.config['SITE_DOMAIN'], question.id))
+
 def send_email_invite_accepted_email(user, email, question):
     '''
     .. function:: send_email_verification(email, token)
