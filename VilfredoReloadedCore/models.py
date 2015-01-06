@@ -3251,9 +3251,9 @@ class Question(db.Model):
     def set_domination_table_entry():
         pass
     
-    def calculate_domination_map_qualified_v2(self, generation=None, proposals=None):  
+    def calculate_domination_map_qualified(self, generation=None, proposals=None):  
         '''
-        .. function:: Turbo version of calculate_domination_map_qualified([generation=None])
+        .. function:: calculate_domination_map_qualified([generation=None, proposals=None])
 
         Calculates the complete map of dominations. For each proposal
         it calculates which dominate and which are dominated.
@@ -3263,6 +3263,8 @@ class Question(db.Model):
         :rtype: dict
         '''
         app.logger.debug("CALCULATE_DOMINATION_MAP_QUALIFIED CALLED...")
+
+        reverse_values = {-2: -2, -1: -1, 0: 0, 1: 2, 2: 1, 3: 4, 4: 3, 5: 6, 6: 5}
 
         generation = generation or self.generation
         app.logger.debug("calculate_domination_map_qualified: called with generation %s", generation)
@@ -3283,7 +3285,8 @@ class Question(db.Model):
         outer_counter = 0
 
         for proposal1 in all_proposals:
-            domination_map[proposal1.id] = dict()
+            if domination_map.get(proposal1.id, None) is None:
+                domination_map[proposal1.id] = dict()
 
             outer_counter = outer_counter + 1
             # app.logger.debug("********************* OUTER PROPOSAL COUNTER = %s ********************* ", outer_counter)
@@ -3294,36 +3297,40 @@ class Question(db.Model):
                 inner_counter = inner_counter + 1
                 # Test for same proposal
                 if (proposal1 == proposal2):
-                    domination_map[proposal1.id][proposal1.id] = -1
+                    domination_map[proposal1.id][proposal2.id] = -1
                     continue
-                # Test if reverse value already set
-                # -- make sure IDs are numerically sorted
-                # elif proposal1.id < proposal2.id:
                 
-                # Reverse values for the domination map
-                reverse_values = {-2: -2, -1: -1, 0: 0, 1: 2, 2: 1, 3: 4, 4: 3, 5: 6, 6: 5}
-                
-                try:
-                    domination_map[proposal1.id][proposal2.id] = reverse_values[domination_map[proposal2.id][proposal1.id]]
+                # Check if the two proposals are equivalent
+                elif votes[proposal1.id]['oppose'] == votes[proposal2.id]['oppose'] and\
+                        votes[proposal1.id]['endorse'] == votes[proposal2.id]['endorse'] and\
+                        votes[proposal1.id]['confused'] == votes[proposal2.id]['confused']:
+                    domination_map[proposal1.id][proposal2.id] = -1
+                    if domination_map.get(proposal2.id, None) is None:
+                        domination_map[proposal2.id] = dict()
+                    domination_map[proposal2.id][proposal1.id] = -1
                     continue
-                except NameError:
-                    app.logger.debug("domination_map entry [%s][%s] was not defined",
-                        proposal2.id,
-                        proposal1.id)
+                    
+                if not domination_map[proposal1.id].get(proposal2.id, None) is None:
+                    '''
+                    app.logger.debug("**** Domination_map entry [%s][%s] already set: skip",
+                        proposal1.id,
+                        proposal2.id)
+                    '''
+                    continue
 
                 qualified_voters = Proposal.\
                     intersection_of_qualfied_endorser_ids(proposal1,
                                                           proposal2,
                                                           generation)
 
-                app.logger.debug("Proposal %s votes == %s", proposal1.id, endorser_ids[proposal1.id])
-                app.logger.debug("Proposal %s votes == %s", proposal2.id, endorser_ids[proposal2.id])
-                
+                # app.logger.debug("Proposal %s votes == %s", proposal1.id, endorser_ids[proposal1.id])
+                # app.logger.debug("Proposal %s votes == %s", proposal2.id, endorser_ids[proposal2.id])
+                '''
                 app.logger.debug("Complex Domination: qualified_voters for %s and %s ==> %s",
                     proposal1.id,
                     proposal2.id,
                     qualified_voters)
-                
+                '''
 
                 who_dominates = Proposal.\
                     who_dominates_who_qualified(endorser_ids[proposal1.id],
@@ -3343,18 +3350,18 @@ class Question(db.Model):
                 '''
 
                 partial_understanding = len(votes[proposal1.id]['confused']) > 0 or len(votes[proposal2.id]['confused']) > 0
-                
-                app.logger.debug("Partial Understanding for relation %s --> %s = %s",
-                    proposal1.id,
-                    proposal2.id,
-                    partial_understanding)
+
+                # app.logger.debug("Partial Understanding for relation %s --> %s = %s",
+                #     proposal1.id,
+                #     proposal2.id,
+                #     partial_understanding)
 
                 if (who_dominates == endorser_ids[proposal1.id]): # newgraph
                     # dominating
                     if partial_understanding:
-                        app.logger.debug("Testing Partials A = PID %s and B = PID %s", proposal1.id, proposal2.id)
-                        app.logger.debug("Test1: A? %s < B- %s", votes[proposal1.id]['confused'], votes[proposal2.id]['oppose'])
-                        app.logger.debug("Test2: B? %s < A+ %s", votes[proposal2.id]['confused'], votes[proposal1.id]['endorse'])
+                        # app.logger.debug("Testing Partials A = PID %s and B = PID %s", proposal1.id, proposal2.id)
+                        # app.logger.debug("Test1: A? %s < B- %s", votes[proposal1.id]['confused'], votes[proposal2.id]['oppose'])
+                        # app.logger.debug("Test2: B? %s < A+ %s", votes[proposal2.id]['confused'], votes[proposal1.id]['endorse'])
 
                         if self.converts_to_full_domination(votes, proposal1, proposal2):
                             app.logger.debug("Partial converts...")
@@ -3381,10 +3388,20 @@ class Question(db.Model):
                 else:
                     domination_map[proposal1.id][proposal2.id] = 0
 
+                # Set second proposal based on first
+                if domination_map.get(proposal2.id, None) is None:
+                    domination_map[proposal2.id] = dict()
+                '''
+                app.logger.debug("**** Setting reverse domination_map entry [%s][%s]!!!!",
+                    proposal2.id,
+                    proposal1.id)
+                '''
+                domination_map[proposal2.id][proposal1.id] = reverse_values[domination_map[proposal1.id][proposal2.id]]
+
         # app.logger.debug("Complex Domination: Domination Map ==> %s", domination_map)
         return domination_map
     
-    def calculate_domination_map_qualified(self, generation=None, proposals=None):  
+    def calculate_domination_map_qualified_v1(self, generation=None, proposals=None):  
         '''
         .. function:: calculate_domination_map_qualified([generation=None])
 
@@ -7816,51 +7833,6 @@ class Proposal(db.Model):
             return Proposal.who_dominates_who(proposal1_voters,
                                               proposal2_voters)
 
-    @staticmethod
-    def who_dominates_who_qualified_2(proposal1_voters, proposal2_voters, qualified_voters): # newgraph
-        '''
-        .. function:: who_dominates_who_qualified(proposal1, proposal2)
-
-        Takes 2 SETS of Qualified ENDORSER IDs representing who endorsed each proposal
-        and calulates which proposal if any domiantes the other.
-        Returns either the dominating set, or an db.Integer value of:
-
-            - 0 if the sets of endorsers are different
-            - -1 if the sets of endorsers are the same
-
-        :param proposal1_voters: set of voters for proposal 1
-        :type proposal1_voters: set of int
-        :param proposal2_voters: set of voters for proposal 2
-        :type proposal2_voters: set of int
-        :rtype: interger or set of int
-        '''
-        # app.logger.debug("who_dominates_who_qualified called with voters %s and %s and qualified %s",
-        #    proposal1_voters, proposal2_voters, qualified_voters)
-        
-        # Remove unqualified voters from each proposal.
-        #   ie find intersection with qualified endorsers
-        #   (those that understand both proposal A and proposal B) ---- look
-        proposal1_qualified = proposal1_voters & qualified_voters
-        proposal2_qualified = proposal2_voters & qualified_voters
-
-        # If proposal1 and proposal2 are the same return -1
-        if (proposal1_qualified == proposal2_qualified):
-            return -2
-        # If proposal1 is empty return proposal2
-        elif (len(proposal1_qualified) == 0):
-            return proposal2_voters
-        # If proposal2 is empty return proposal1
-        elif (len(proposal2_qualified) == 0):
-            return proposal1_voters
-        # Check if proposal1 is a propoer subset of proposal2
-        elif (proposal1_qualified < proposal2_qualified):
-            return proposal2_voters
-        # Check if proposal2 is a proper subset of proposal1
-        elif (proposal2_qualified < proposal1_qualified):
-            return proposal1_voters
-        # proposal1 and proposal2 are different return 0
-        else:
-            return 0
     
     @staticmethod
     def who_dominates_who_qualified(proposal1_voters, proposal2_voters, qualified_voters): # newgraph
@@ -7906,53 +7878,6 @@ class Proposal(db.Model):
         # Check if proposal2 is a proper subset of proposal1
         elif (proposal2_qualified < proposal1_qualified):
             return proposal1_voters
-        # proposal1 and proposal2 are different return 0
-        else:
-            return 0
-    
-    @staticmethod
-    def who_dominates_who_qualified_prev(proposal1_voters, proposal2_voters, qualified_voters):
-        '''
-        .. function:: who_dominates_who_qualified(proposal1, proposal2)
-
-        Takes 2 SETS of Qualified ENDORSER IDs representing who endorsed each proposal
-        and calulates which proposal if any domiantes the other.
-        Returns either the dominating set, or an db.Integer value of:
-
-            - 0 if the sets of endorsers are different
-            - -1 if the sets of endorsers are the same
-
-        :param proposal1_voters: set of voters for proposal 1
-        :type proposal1_voters: set of int
-        :param proposal2_voters: set of voters for proposal 2
-        :type proposal2_voters: set of int
-        :rtype: interger or set of int
-        '''
-        # app.logger.debug("who_dominates_who_qualified called with voters %s and %s and qualified %s",
-        #    proposal1_voters, proposal2_voters, qualified_voters)
-        
-        
-        # Remove unqualified voters from each proposal.
-        #   ie find intersection with qualified endorsers
-        #   (those that understand both proposal A and proposal B) today 2
-        proposal1_qualified = proposal1_voters & qualified_voters
-        proposal2_qualified = proposal2_voters & qualified_voters
-
-        # If proposal1 and proposal2 are not the same return -1
-        if (proposal1_qualified == proposal2_qualified):
-            return -1
-        # If proposal1 is empty return proposal2
-        elif (len(proposal1_qualified) == 0):
-            return proposal2_qualified
-        # If proposal2 is empty return proposal1
-        elif (len(proposal2_qualified) == 0):
-            return proposal1_qualified
-        # Check if proposal1 is a propoer subset of proposal2
-        elif (proposal1_qualified < proposal2_qualified):
-            return proposal2_qualified
-        # Check if proposal2 is a proper subset of proposal1
-        elif (proposal2_qualified < proposal1_qualified):
-            return proposal1_qualified
         # proposal1 and proposal2 are different return 0
         else:
             return 0
