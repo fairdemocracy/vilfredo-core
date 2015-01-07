@@ -629,6 +629,36 @@ def api_update_user(user_id):
 #
 @app.route('/api/v1/request_password_reset', methods=['POST'])
 def api_request_password_reset():
+    '''
+    .. http:post:: /reset_password
+
+        Request password reset.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            POST /users HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 201 OK
+            Content-Type: application/json
+
+            {
+                "message": "Password reset email sent"
+            }
+
+        :json password: new password
+        :json password2: new password confirmation
+        :json token: password reset token
+        :statuscode 201: no error
+        :statuscode 400: bad request
+    '''
     app.logger.debug("api_request_password_reset called.....\n")
 
     if not request.json:
@@ -667,59 +697,44 @@ def api_request_password_reset():
     message = 'Password reset email sent'
     return jsonify(message=message), 201
 
-#
-# Password reset request
-#
-@app.route('/api/v1/submit_password_reset_token', methods=['GET'])
-def api_submit_password_reset_token():
-    app.logger.debug("api_request_password_reset called...\n")
-
-    user_id = 0
-    try:
-        user_id = int(request.args.get('u'))
-    except ValueError:
-        app.logger.debug("No or invalid userid received...\n")
-        message = "No or invalid userid received"
-        return jsonify(message=message), 400
-
-    pwd_reset_token = request.args.get('t', None)
-    if not pwd_reset_token:
-        app.logger.debug("No reset token received...\n")
-        message = "No token received"
-        return jsonify(message=message), 400
-
-    pwd_reset = models.PWDReset.query.filter_by(token=pwd_reset_token, user_id=user_id).one()
-
-    if not pwd_reset:
-        app.logger.debug("Token and user_id not listed...\n")
-        message = "Token and user_id not listed"
-        return jsonify(message=message), 400
-
-    elif models.get_timestamp() > pwd_reset.timeout:
-        app.logger.debug("Token expired...\n")
-        message = "Token expired"
-        return jsonify(message=message), 400
-
-    user = models.User.query.filter_by(id=user_id).one()
-    auth_token = user.get_auth_token()
-    app.logger.debug("token = %s\n", auth_token)
-    return jsonify(token=token), 200
 
 #
-# Set new password and generate new authentication token - wolf
+# Set new password and generate new authentication token
 #
 @app.route('/api/v1/reset_password', methods=['POST'])
 def api_reset_password():
+    '''
+    .. http:post:: /reset_password
+
+        Request password reset.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            POST /users HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 201 OK
+            Content-Type: application/json
+
+            {
+                "message": "Password reset",
+                "token": "gd6ghgjh7d6hehftt76gTR5677eh"
+            }
+
+        :json password: new password
+        :json password2: new password confirmation
+        :json token: password reset token
+        :statuscode 201: no error
+        :statuscode 400: bad request
+    '''
     app.logger.debug("api_reset_password called...\n")
-
-    '''
-    user = get_authenticated_user()
-    if not user:
-        response = {"message": "User not logged in"}
-        return jsonify(response), 400
-
-    app.logger.debug("Authenticated User = %s\n", user.id)
-    '''
     
     if not 'token' in request.json or request.json['token'] == '':
         message = 'You must pass a password reset token'
@@ -793,7 +808,8 @@ def api_create_user():
             Content-Type: application/json
 
             {
-                "url": "/users/1"
+                "url": "/users/1",
+                "email_sent": true
             }
 
         :json username: username
