@@ -46,9 +46,11 @@ def send_added_to_question_email(inviter, receiver, question):
     '''
     .. function:: send_email_verification(email, token)
 
-    Send an email to notify someone has accepted an invitation.
+    Send an email to notify someone that they have been added to a question.
 
-    :param user: question participant
+    :param inviter: participant granting access to a question
+    :type user: User
+    :param receiver: invited participant
     :type user: User
     :param question: question
     :type toquestionken: Question
