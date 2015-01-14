@@ -91,14 +91,14 @@ def activate():
 
     if not token:
         app.logger.debug("Account Activation: Token not in link...\n")
-        resp.set_cookie('vgamessage', 'Sorry that link is invalid! Plase email support or try registring again.')
+        resp.set_cookie('vgamessage', 'Sorry that link is invalid! Please email support or register again.')
         resp.set_cookie('vgastatus', 'error')
         return resp
 
     verify = models.VerifyEmail.query.filter_by(user_id=user_id,token=token).first()
     if not verify:
         app.logger.debug("Account Activation: Token and user_id not listed...\n")
-        resp.set_cookie('vgamessage', 'Sorry we have no record of you registration. Plase email support or try registring again.')
+        resp.set_cookie('vgamessage', 'This activation code was already used, has expired or does not exist.')
         resp.set_cookie('vgastatus', 'error')
         return resp
 
@@ -114,7 +114,7 @@ def activate():
     user =  models.User.query.get(verify.user_id)
     if not user:
         app.logger.debug("Account Activation: Unknown user...\n")
-        resp.set_cookie('vgamessage', 'Sorry we have no record of you registration. Plase email support or try registring again.')
+        resp.set_cookie('vgamessage', 'Sorry we have no record of you registration. Please email support or register again.')
         resp.set_cookie('vgastatus', 'error')
         # Delete validation entry
         db_session.delete(verify)
