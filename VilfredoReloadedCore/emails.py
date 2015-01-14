@@ -67,6 +67,29 @@ def send_added_to_question_email(inviter, receiver, question):
                       receiver.email,
                       body_template % (inviter.username, question.title, app.config['SITE_DOMAIN'], question.id))
 
+def send_user_already_added_email(user, email, question):
+    '''
+    .. function:: send_email_verification(email, token)
+
+    Send an email to notify someone has already accepted an invitation.
+
+    :param user: question participant
+    :type user: User
+    :param question: question
+    :type toquestionken: Question
+    :rtype: long
+    '''
+    body_template = \
+    """
+    The invitation you sent to %s for question "%s" appears to belong to a user who has already accepted an earlier invitation for that question.
+    
+    http://%s/question/%s
+    """
+    return send_email("Vilfredo - Email Invitation Update",
+                      app.config['ADMINS'][0],
+                      user.email,
+                      body_template % (email, question.title, app.config['SITE_DOMAIN'], question.id))
+
 def send_email_invite_accepted_email(user, email, question):
     '''
     .. function:: send_email_verification(email, token)

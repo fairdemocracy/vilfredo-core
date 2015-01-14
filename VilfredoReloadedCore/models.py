@@ -1095,18 +1095,28 @@ class EmailInvite(db.Model):
             app.logger.debug("add_invitation_from_token question not found with ID: %s", email_invitation.question_id)
             return False
 
-        app.logger.debug("Sender found %s", sender.id)
-        # Add invite, mark email_invitation as accepted and open question page
-        invite = Invite(sender, user, email_invitation.permissions, email_invitation.question_id)
-        app.logger.debug("Invite from %s for %s", invite.sender_id, invite.question_id)
-        # return False
-        email_invitation.accepted = 1
-        user.invites_received.append(invite)
-        db_session.commit()
-        # Notify sender
-        emails.send_email_invite_accepted_email(sender, email_invitation.receiver_email, question)
+        # Check if user is already added to the question
+        already_added = db_session.query(Invite)\
+                .filter(Invite.question_id == question.id)\
+                .filter(Invite.receiver_id == user.id)\
+                .all()
 
-        return invite.question_id
+        # Add invite, mark email_invitation as accepted and open question page
+        #
+        # First check that user not already invited
+        if not already_added:
+            invite = Invite(sender, user, email_invitation.permissions, email_invitation.question_id)
+            app.logger.debug("Invite from %s for %s", invite.sender_id, invite.question_id)
+            email_invitation.accepted = 1
+            user.invites_received.append(invite)
+            db_session.commit()
+            # Notify sender
+            emails.send_email_invite_accepted_email(sender, email_invitation.receiver_email, question)
+        # Otherwise noify sender of prior acceptance or earlier invitation
+        else:
+            emails.send_user_already_added_email(sender, email_invitation.receiver_email, question)
+
+        return question.id
 
 
 class Invite(db.Model):
