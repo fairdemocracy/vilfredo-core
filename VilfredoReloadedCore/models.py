@@ -24,7 +24,7 @@
 The database Bases
 '''
 
-from sqlalchemy import and_, or_, not_, event, distinct
+from sqlalchemy import and_, or_, not_, event, distinct, func
 
 from database import db_session, db
 
@@ -1279,6 +1279,7 @@ class Question(db.Model):
             raise
 
         consensus_found = (self.get_inherited_proposal_count() == 1) and (self.get_new_proposal_count() == 0)
+        completed_voter_count = self.get_completed_voter_count(generation=self.generation)
 
         public = {'id': str(self.id),
                 'url': url_for('api_get_questions', question_id=self.id),
@@ -1300,7 +1301,8 @@ class Question(db.Model):
                 'inherited_proposal_count' : str(self.get_inherited_proposal_count()),
                 'author_url': url_for('api_get_users', user_id=self.user_id),
                 'mapx': str(threshold.mapx),
-                'mapy': str(threshold.mapy)}
+                'mapy': str(threshold.mapy),
+                'completed_voter_count': str(completed_voter_count)}
 
         # Add user permissions
         permissions = None
@@ -1557,6 +1559,27 @@ class Question(db.Model):
                 return False
         return True
 
+    def get_completed_voter_count(self, generation=None):
+        '''
+        .. function:: get_voter_count([generation=None])
+
+        Returns the number of people who participated in the voting round
+        during the selected generation of the question.
+
+        :param generation: question generation.
+        :type generation: int
+        :rtype: int
+        '''
+        generation = generation or self.generation
+        num_proposals = self.get_proposal_count(generation)
+
+        return db_session.query(func.count(Endorsement))\
+        .filter(Endorsement.question_id == self.id)\
+        .filter(Endorsement.generation == generation)\
+        .group_by(Endorsement.user_id)\
+        .having(func.count(Endorsement) == num_proposals)\
+        .count()
+    
     def get_voter_count(self, generation=None):
         '''
         .. function:: get_voter_count([generation=None])
