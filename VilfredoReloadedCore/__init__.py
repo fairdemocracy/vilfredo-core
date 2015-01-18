@@ -85,7 +85,7 @@ app = Flask(__name__)
 config_app(app)
 
 import VilfredoReloadedCore.views
-import VilfredoReloadedCore.api
+import VilfredoReloadedCore.api.v1.api
 
 mail = Mail(app)
 

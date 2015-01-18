@@ -33,7 +33,8 @@ except ImportError:
     import unittest
 
 from .. import app
-from .. import api
+# from .. import api
+from VilfredoReloadedCore.api.v1 import api
 from .. database import drop_db, init_db
 import base64
 import json
@@ -138,7 +139,7 @@ class RESTAPITestCase(unittest.TestCase):
             return None
 
     def get_authtoken(self):
-        rv = self.open_with_json_auth('/api/v1/authtoken',
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/authtoken',
                                       'GET',
                                       dict(),
                                       'john',
@@ -153,7 +154,7 @@ class RESTAPITestCase(unittest.TestCase):
             #
             # Create A Question using token to authenticate
             #
-            rv = self.open_with_json_authtoken('/api/v1/questions',
+            rv = self.open_with_json_authtoken(api.REST_URL_PREFIX + '/questions',
                                      'POST',
                                       dict(title='My Token Question',
                                            blurb='My token blurb written while under the influence of an authentication token.',
@@ -170,7 +171,7 @@ class RESTAPITestCase(unittest.TestCase):
         # Get Question
         #
         # question_url = data['url']
-        question_url = '/api/v1/questions/1'
+        question_url = api.REST_URL_PREFIX + '/questions/1'
         rv = self.open_with_json_auth(question_url,
                                       'GET',
                                       dict(),
@@ -186,9 +187,9 @@ class RESTAPITestCase(unittest.TestCase):
         #
         # Create Users
         #
-        # rv = self.app.post('/api/v1/users', data=payload,
+        # rv = self.app.post(api.REST_URL_PREFIX + '/users', data=payload,
         #                    content_type='application/json')
-        rv = self.open_with_json('/api/v1/users',
+        rv = self.open_with_json(api.REST_URL_PREFIX + '/users',
                                  'POST',
                                  dict(username='john',
                                       email='john@example.com',
@@ -199,7 +200,7 @@ class RESTAPITestCase(unittest.TestCase):
         data = json.loads(rv.data)
         app.logger.debug("New user at = %s\n", data['url'])
 
-        rv = self.open_with_json('/api/v1/request_password_reset',
+        rv = self.open_with_json(api.REST_URL_PREFIX + '/request_password_reset',
                                  'POST',
                                  dict(email='john@example.com'))
         # Log data received
@@ -207,7 +208,7 @@ class RESTAPITestCase(unittest.TestCase):
         self.assertEqual(rv.status_code, 201)
 
         # Attempt to create a user with a duplicate username
-        rv = self.open_with_json('/api/v1/users',
+        rv = self.open_with_json(api.REST_URL_PREFIX + '/users',
                                  'POST',
                                  dict(username='john',
                                       email='john@example.com',
@@ -223,7 +224,7 @@ class RESTAPITestCase(unittest.TestCase):
                          rv.data)
 
         # Attempt to create a user with a duplicate email
-        rv = self.open_with_json('/api/v1/users',
+        rv = self.open_with_json(api.REST_URL_PREFIX + '/users',
                                  'POST',
                                  dict(username='keith',
                                       email='john@example.com',
@@ -240,7 +241,7 @@ class RESTAPITestCase(unittest.TestCase):
             rv.data)
 
         # Attempt to create a user with too short a password
-        rv = self.open_with_json('/api/v1/users',
+        rv = self.open_with_json(api.REST_URL_PREFIX + '/users',
                                  'POST',
                                  dict(username='keith',
                                       email='keith@example.com',
@@ -252,35 +253,35 @@ class RESTAPITestCase(unittest.TestCase):
         app.logger.debug("Create user with too short a password: Message: %s",
                          self.get_message(rv))
 
-        rv = self.open_with_json('/api/v1/users',
+        rv = self.open_with_json(api.REST_URL_PREFIX + '/users',
                                  'POST',
                                  dict(username='susan',
                                       email='susan@example.com',
                                       password='susan123'))
         self.assertEqual(rv.status_code, 201)
 
-        rv = self.open_with_json('/api/v1/users',
+        rv = self.open_with_json(api.REST_URL_PREFIX + '/users',
                                  'POST',
                                  dict(username='bill',
                                       email='bill@example.com',
                                       password='bill123'))
         self.assertEqual(rv.status_code, 201)
 
-        rv = self.open_with_json('/api/v1/users',
+        rv = self.open_with_json(api.REST_URL_PREFIX + '/users',
                                  'POST',
                                  dict(username='jack',
                                       email='jack@example.com',
                                       password='jack123'))
         self.assertEqual(rv.status_code, 201)
 
-        rv = self.open_with_json('/api/v1/users',
+        rv = self.open_with_json(api.REST_URL_PREFIX + '/users',
                                  'POST',
                                  dict(username='harry',
                                       email='harry@example.com',
                                       password='harry123'))
         self.assertEqual(rv.status_code, 201)
 
-        rv = self.open_with_json('/api/v1/users',
+        rv = self.open_with_json(api.REST_URL_PREFIX + '/users',
                                  'POST',
                                  dict(username='tim',
                                       email='tim@example.com',
@@ -302,7 +303,7 @@ If this is the case, should the questioner be allowed to change this limit later
 <br>
 Sometimes it is possible to impose intrinsic limits, like the one said above. For example making the edit box smaller. And others are possible as well. If you have an idea about a soft limit that we could install, please share that too."""
 
-        rv = self.open_with_json_auth('/api/v1/questions',
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/questions',
                                       'POST',
                                       dict(title='Wall of Text',
                                            blurb=blurb,
@@ -320,7 +321,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         # Get Question
         #
         question_url = data['question']['url']
-        # question_url = '/api/v1/questions/1'
+        # question_url = api.REST_URL_PREFIX + '/questions/1'
         rv = self.open_with_json_auth(question_url,
                                       'GET',
                                       dict(),
@@ -335,7 +336,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         #
         # Create More Questions
         #
-        rv = self.open_with_json_auth('/api/v1/questions',
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/questions',
                                       'POST',
                                       dict(title='Another Question',
                                            blurb='Blah blah Blah blah Blah',
@@ -344,7 +345,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                       'john123')
         self.assertEqual(rv.status_code, 201)
 
-        rv = self.open_with_json_auth('/api/v1/questions',
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/questions',
                                       'POST',
                                       dict(title='Too Many Chefs',
                                            blurb='How to Spoil the broth?',
@@ -353,7 +354,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                                       'harry123')
         self.assertEqual(rv.status_code, 201)
 
-        rv = self.open_with_json_auth('/api/v1/questions',
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/questions',
                                       'POST',
                                       dict(title='Test Question',
                                            blurb='Should we run tests to make sure the system works?',
@@ -365,7 +366,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         #
         # Create Invites
         #
-        rv = self.open_with_json_auth('/api/v1/questions/1/invitations',
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/questions/1/invitations',
                                       'POST',
                                       dict(invite_user_ids=[2, 3, 4, 5, 6], permissions=7),
                                       'john',
@@ -377,7 +378,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         #
         # Get Invites
         #
-        rv = self.open_with_json_auth('/api/v1/questions/1/invitations',
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/questions/1/invitations',
                                       'GET',
                                       dict(),
                                       'john',
@@ -391,7 +392,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         # Create Email Invites
         #
         user_emails = 'jenny@test.com,bademail.com,procrastinator@test.com'
-        rv = self.open_with_json_auth('/api/v1/questions/1/emailinvitations',
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/questions/1/emailinvitations',
                                       'POST',
                                       dict(user_emails=user_emails, permissions=7),
                                       'john',
@@ -411,7 +412,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         #
         # Create Subscriptions
         #
-        rv = self.open_with_json_auth('/api/v1/users/1/subscriptions',
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/users/1/subscriptions',
                                       'POST',
                                       dict(question_id=1, how='asap'),
                                       'john',
@@ -421,21 +422,21 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         app.logger.debug("Data retrieved from Create Subscription = %s\n",
                          rv.data)
 
-        rv = self.open_with_json_auth('/api/v1/users/1/subscriptions',
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/users/1/subscriptions',
                                       'POST',
                                       dict(question_id=2, how='asap'),
                                       'john',
                                       'john123')
         self.assertEqual(rv.status_code, 201)
 
-        rv = self.open_with_json_auth('/api/v1/users/1/subscriptions',
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/users/1/subscriptions',
                                       'POST',
                                       dict(question_id=3, how='weekly'),
                                       'john',
                                       'john123')
         self.assertEqual(rv.status_code, 201)
 
-        rv = self.open_with_json_auth('/api/v1/users/5/subscriptions',
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/users/5/subscriptions',
                                       'POST',
                                       dict(question_id=3, how='daily'),
                                       'harry',
@@ -445,7 +446,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         #
         # Update Subscriptions
         #
-        rv = self.open_with_json_auth('/api/v1/users/5/subscriptions',
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/users/5/subscriptions',
                                       'PATCH',
                                       dict(question_id=3, how='asap'),
                                       'harry',
@@ -458,7 +459,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         #
         # Get Subscriptions
         #
-        rv = self.open_with_json_auth('/api/v1/users/1/subscriptions',
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/users/1/subscriptions',
                                       'GET',
                                       dict(),
                                       'john',
@@ -471,7 +472,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         #
         # Get question subscribers
         #
-        rv = self.open_with_json_auth('/api/v1/questions/3/subscribers',
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/questions/3/subscribers',
                                       'GET',
                                       dict(),
                                       'john',
@@ -484,7 +485,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         #
         # Delete Subscription
         #
-        rv = self.open_with_json_auth('/api/v1/users/1/subscriptions/3',
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/users/1/subscriptions/3',
                                       'DELETE',
                                       dict(),
                                       'john',
@@ -500,7 +501,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         bills_blurb = '''<p>I have never written anything so comprehensive on a website before.</p><p>It makes me realise how much fun this can be.</p>
         '''
         rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals',
+            api.REST_URL_PREFIX + '/questions/1/proposals',
             'POST',
             dict(title='Bills First Proposal',
                  blurb=bills_blurb),
@@ -513,7 +514,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
 
         bills_other_blurb = '''<p>This is a much better proposal than my first one.</p><p>It makes me realise how personal growth continues even while using the internet.</p>'''
         rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals',
+            api.REST_URL_PREFIX + '/questions/1/proposals',
             'POST',
             dict(title='Bills Second Proposal',
                  blurb=bills_other_blurb,
@@ -523,7 +524,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         self.assertEqual(rv.status_code, 201)
 
         rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals',
+            api.REST_URL_PREFIX + '/questions/1/proposals',
             'POST',
             dict(title='Susans Only Proposal',
                  blurb='My blub is cool',
@@ -533,7 +534,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         self.assertEqual(rv.status_code, 201)
 
         rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals',
+            api.REST_URL_PREFIX + '/questions/1/proposals',
             'POST',
             dict(
                 title='Harrys Cool Proposal',
@@ -564,7 +565,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         # Get Proposals
         #
         rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals',
+            api.REST_URL_PREFIX + '/questions/1/proposals',
             'GET',
             dict(),
             'bill',
@@ -578,7 +579,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         # Author attempts to Delete a Question - Disallowed
         # because it has proposals
         #
-        rv = self.open_with_json_auth('/api/v1/questions/1',
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/questions/1',
                                       'DELETE',
                                       dict(),
                                       'john',
@@ -594,7 +595,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         #
         # Author moves question on to VOTING phase
         #
-        rv = self.open_with_json_auth('/api/v1/questions/1',
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/questions/1',
                                       'PATCH',
                                       dict(move_on=True),
                                       'john',
@@ -609,7 +610,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         # Must be done in the writing phase where the proposal was created.
         #
         rv = self.open_with_json_auth(
-            '/api/v1/questions/3/proposals',
+            api.REST_URL_PREFIX + '/questions/3/proposals',
             'POST',
             dict(
                 title="My less than stirling proposal",
@@ -647,7 +648,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         if USE_VOTEMAP:
             # Propoosal 1
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/1/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/1/endorsements',
                 'POST',
                 dict(
                     # endorsement_type="oppose",
@@ -659,7 +660,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             
             # bills_prop1.endorse(john)
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/1/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/1/endorsements',
                 'POST',
                 dict(
                     # endorsement_type="endorse",
@@ -670,7 +671,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             self.assertEqual(rv.status_code, 201)
 
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/1/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/1/endorsements',
                 'POST',
                 dict(
                     # endorsement_type="confused",
@@ -681,7 +682,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             self.assertEqual(rv.status_code, 201)
             
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/1/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/1/endorsements',
                 'POST',
                 dict(
                     # endorsement_type="confused",
@@ -693,7 +694,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             
             # bills_prop1.endorse(harry)
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/1/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/1/endorsements',
                 'POST',
                 dict(
                     # endorsement_type="endorse",
@@ -705,7 +706,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
 
             # bills_prop2.endorse(bill)
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/2/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/2/endorsements',
                 'POST',
                 dict(
                     # endorsement_type="endorse",
@@ -717,7 +718,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             
             # John doesn't understand proposal 2
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/2/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/2/endorsements',
                 'POST',
                 dict(
                     # endorsement_type="confused",
@@ -730,7 +731,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             self.assertEqual(rv.status_code, 201, rv.status_code)
             
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/2/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/2/endorsements',
                 'POST',
                 dict(
                     # endorsement_type="confused",
@@ -741,7 +742,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             self.assertEqual(rv.status_code, 201)
             
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/2/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/2/endorsements',
                 'POST',
                 dict(
                     # endorsement_type="oppose",
@@ -752,7 +753,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             self.assertEqual(rv.status_code, 201)
             
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/2/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/2/endorsements',
                 'POST',
                 dict(
                     # endorsement_type="oppose",
@@ -764,7 +765,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
 
             # susans_prop1.endorse(susan)
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/3/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/3/endorsements',
                 'POST',
                 dict(
                     # endorsement_type="endorse",
@@ -779,7 +780,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
 
             # susans_prop1.endorse(john)
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/3/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/3/endorsements',
                 'POST',
                 dict(
                     # endorsement_type="endorse",
@@ -790,7 +791,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             self.assertEqual(rv.status_code, 201)
 
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/3/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/3/endorsements',
                 'POST',
                 dict(
                     # endorsement_type="oppose",
@@ -801,7 +802,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             self.assertEqual(rv.status_code, 201)
             
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/3/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/3/endorsements',
                 'POST',
                 dict(
                     # endorsement_type="oppose",
@@ -813,7 +814,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             
             # susans_prop1.endorse(harry)
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/3/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/3/endorsements',
                 'POST',
                 dict(
                     # endorsement_type="endorse",
@@ -824,7 +825,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             self.assertEqual(rv.status_code, 201)
 
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/4/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/4/endorsements',
                 'POST',
                 dict(
                     # endorsement_type="oppose",
@@ -838,7 +839,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
 
             # Add OPPOSED endorsement
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/4/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/4/endorsements',
                 'POST',
                 dict(
                     # endorsement_type="oppose",
@@ -852,7 +853,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
 
             # Add Confused endorsement
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/4/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/4/endorsements',
                 'POST',
                 dict(
                     # endorsement_type="confused",
@@ -866,7 +867,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
 
             # harrys_prop1.endorse(jack)
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/4/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/4/endorsements',
                 'POST',
                 dict(
                     # endorsement_type="endorse",
@@ -878,7 +879,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
 
             # harrys_prop1.endorse(susan)
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/4/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/4/endorsements',
                 'POST',
                 dict(
                     # endorsement_type="endorse",
@@ -893,7 +894,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             #
             if CREATE_CONSENSUS:
                 rv = self.open_with_json_auth(
-                    '/api/v1/questions/1/proposals/3/endorsements',
+                    api.REST_URL_PREFIX + '/questions/1/proposals/3/endorsements',
                     'POST',
                     dict(
                         use_votemap=True,
@@ -903,7 +904,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 self.assertEqual(rv.status_code, 201)
 
                 rv = self.open_with_json_auth(
-                    '/api/v1/questions/1/proposals/3/endorsements',
+                    api.REST_URL_PREFIX + '/questions/1/proposals/3/endorsements',
                     'POST',
                     dict(
                         use_votemap=True,
@@ -917,7 +918,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         else:
             # susans_prop1.endorse(susan)
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/3/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/3/endorsements',
                 'POST',
                 dict(endorsement_type="endorse"),
                 'susan',
@@ -929,7 +930,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
 
             # susans_prop1.endorse(john)
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/3/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/3/endorsements',
                 'POST',
                 dict(endorsement_type="endorse"),
                 'john',
@@ -937,7 +938,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             self.assertEqual(rv.status_code, 201)
 
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/4/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/4/endorsements',
                 'POST',
                 dict(endorsement_type="oppose"),
                 'john',
@@ -948,7 +949,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
 
             # John doesn't understand proposal 2
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/2/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/2/endorsements',
                 'POST',
                 dict(endorsement_type="confused"),
                 'john',
@@ -959,7 +960,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
 
             # Add OPPOSED endorsement
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/4/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/4/endorsements',
                 'POST',
                 dict(endorsement_type="oppose"),
                 'harry',
@@ -970,7 +971,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
 
             # Add Confused endorsement
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/4/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/4/endorsements',
                 'POST',
                 dict(endorsement_type="confused"),
                 'bill',
@@ -981,7 +982,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         
             # bills_prop1.endorse(john)
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/1/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/1/endorsements',
                 'POST',
                 dict(endorsement_type="endorse"),
                 'john',
@@ -990,7 +991,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
 
             # bills_prop2.endorse(bill)
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/2/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/2/endorsements',
                 'POST',
                 dict(endorsement_type="endorse"),
                 'bill',
@@ -999,7 +1000,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
 
             # harrys_prop1.endorse(jack)
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/4/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/4/endorsements',
                 'POST',
                 dict(endorsement_type="endorse"),
                 'jack',
@@ -1008,7 +1009,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
 
             # harrys_prop1.endorse(susan)
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/4/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/4/endorsements',
                 'POST',
                 dict(endorsement_type="endorse"),
                 'susan',
@@ -1017,7 +1018,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
 
             # bills_prop1.endorse(harry)
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/1/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/1/endorsements',
                 'POST',
                 dict(endorsement_type="endorse"),
                 'harry',
@@ -1026,7 +1027,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
 
             # susans_prop1.endorse(harry)
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/3/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/3/endorsements',
                 'POST',
                 dict(endorsement_type="endorse"),
                 'harry',
@@ -1041,7 +1042,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         #
         # Add a comment only
         rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals/4/comments',
+            api.REST_URL_PREFIX + '/questions/1/proposals/4/comments',
             'POST',
             dict(
                 comment_type="against",
@@ -1054,7 +1055,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
 
         # Add a comment only
         rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals/4/comments',
+            api.REST_URL_PREFIX + '/questions/1/proposals/4/comments',
             'POST',
             dict(
                 comment_type="against",
@@ -1067,7 +1068,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
 
         # Add support to comment
         rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals/4/comments/1/support',
+            api.REST_URL_PREFIX + '/questions/1/proposals/4/comments/1/support',
             'POST',
             dict(),
             'harry',
@@ -1078,7 +1079,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
 
         # Add a comment
         rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals/4/comments',
+            api.REST_URL_PREFIX + '/questions/1/proposals/4/comments',
             'POST',
             dict(
                 comment_type="question",
@@ -1091,7 +1092,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
 
         # Add a comment
         rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals/4/comments',
+            api.REST_URL_PREFIX + '/questions/1/proposals/4/comments',
             'POST',
             dict(
                 comment_type="answer",
@@ -1105,7 +1106,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
 
         # Add a comment
         rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals/4/comments',
+            api.REST_URL_PREFIX + '/questions/1/proposals/4/comments',
             'POST',
             dict(
                 comment_type="against",
@@ -1117,7 +1118,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         self.assertEqual(rv.status_code, 201, rv.status_code)
 
         rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals/3/comments',
+            api.REST_URL_PREFIX + '/questions/1/proposals/3/comments',
             'POST',
             dict(
                 comment_type="for",
@@ -1132,7 +1133,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         # Get comments
         #
         rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals/4/comments',
+            api.REST_URL_PREFIX + '/questions/1/proposals/4/comments',
             'GET',
             dict(),
             'john',
@@ -1145,7 +1146,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         # Get Proposals
         #
         rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals',
+            api.REST_URL_PREFIX + '/questions/1/proposals',
             'GET',
             dict(),
             'bill',
@@ -1159,7 +1160,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         # Get Proposal Endorsers
         #
         rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals/3/endorsers',
+            api.REST_URL_PREFIX + '/questions/1/proposals/3/endorsers',
             'GET',
             dict(),
             'harry',
@@ -1174,7 +1175,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         # Get Question Pareto
         #
         rv = self.open_with_json_auth(
-            '/api/v1/questions/1/pareto',
+            api.REST_URL_PREFIX + '/questions/1/pareto',
             'GET',
             dict(),
             'harry',
@@ -1190,7 +1191,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         #
         '''
         rv = self.open_with_json_auth(
-            '/api/v1/questions/1/key_players',
+            api.REST_URL_PREFIX + '/questions/1/key_players',
             'GET',
             dict(),
             'harry',
@@ -1206,7 +1207,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         # Get Endorser Effects
         #
         rv = self.open_with_json_auth(
-            '/api/v1/questions/1/endorser_effects',
+            api.REST_URL_PREFIX + '/questions/1/endorser_effects',
             'GET',
             dict(),
             'harry',
@@ -1221,7 +1222,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         # Get Proposal Relations
         #
         rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposal_relations',
+            api.REST_URL_PREFIX + '/questions/1/proposal_relations',
             'GET',
             dict(),
             'harry',
@@ -1236,7 +1237,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             # Create Voting Map
             #
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/graph?generation=1&map_type=all',
+                api.REST_URL_PREFIX + '/questions/1/graph?generation=1&map_type=all',
                 'GET',
                 dict(),
                 'harry',
@@ -1250,7 +1251,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             if app.config['ALGORITHM_VERSION'] == 1:
 
                 rv = self.open_with_json_auth(
-                    '/api/v1/questions/1/graph?generation=1&map_type=pareto',
+                    api.REST_URL_PREFIX + '/questions/1/graph?generation=1&map_type=pareto',
                     'GET',
                     dict(),
                     'harry',
@@ -1270,7 +1271,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             # Author moves question on to WRITING phase and GENERATION 2
             #
             app.logger.debug("Move question on to next generation")
-            rv = self.open_with_json_auth('/api/v1/questions/1',
+            rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/questions/1',
                                           'PATCH',
                                           dict(move_on=True),
                                           'john',
@@ -1286,7 +1287,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             bills_blurb = '''<p>This is getting interesting. I may stay up all night deliberating.</p>
             '''
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals',
+                api.REST_URL_PREFIX + '/questions/1/proposals',
                 'POST',
                 dict(title='Bills 2nd Gen Proposal',
                      blurb=bills_blurb),
@@ -1299,7 +1300,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
 
             bills_other_blurb = '''<p>Once I've finished writing this I'm going to sell the rights to warner Brother.</p>'''
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals',
+                api.REST_URL_PREFIX + '/questions/1/proposals',
                 'POST',
                 dict(title='Bills Round 2 Proposal for Hollywood',
                      blurb=bills_other_blurb,
@@ -1310,7 +1311,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             
             # Propoosal 1
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/1/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/1/endorsements',
                 'POST',
                 dict(
                     # endorsement_type="oppose",
@@ -1322,7 +1323,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             
             # bills_prop1.endorse(john)
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/1/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/1/endorsements',
                 'POST',
                 dict(
                     # endorsement_type="endorse",
@@ -1333,7 +1334,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             self.assertEqual(rv.status_code, 201)
 
             rv = self.open_with_json_auth(
-                '/api/v1/questions/1/proposals/1/endorsements',
+                api.REST_URL_PREFIX + '/questions/1/proposals/1/endorsements',
                 'POST',
                 dict(
                     # endorsement_type="confused",
@@ -1351,7 +1352,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         '''
         # John ID=1 endorses proposal 2
         rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals/2/endorsements',
+            api.REST_URL_PREFIX + '/questions/1/proposals/2/endorsements',
             'POST',
             dict(ndorsement_type="endorse"),
             'john',
@@ -1363,7 +1364,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         # Updates endorsement to OPPOSE
         app.logger.debug("John updates his endopsement to OPPOSE")
         rv = self.open_with_json_auth(
-            '/api/v1/questions/1/proposals/2/endorsements',
+            api.REST_URL_PREFIX + '/questions/1/proposals/2/endorsements',
             'PATCH',
             dict(endorsement_type='oppose'),
             'john',
@@ -1381,7 +1382,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         #
         # Create Another Question
         #
-        rv = self.open_with_json_auth('/api/v1/questions',
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/questions',
                                       'POST',
                                       dict(title='My boring question',
                                            blurb='My boring blurb',
@@ -1411,20 +1412,20 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                          rv.data)
 
     def get_questions(self):
-        rv = self.app.get('/api/v1/users')
+        rv = self.app.get(api.REST_URL_PREFIX + '/users')
         #  rv = self.open_with_auth(
-        #    '/api/v1/users', 'GET', None, 'grippo', 'test123')
+        #    api.REST_URL_PREFIX + '/users', 'GET', None, 'grippo', 'test123')
         app.logger.debug("Data retrieved = %s\n", rv.data)
         self.assertEqual(rv.status_code, 200)
 
-        rv = self.open_with_auth('/api/v1/users/50', 'GET',
+        rv = self.open_with_auth(api.REST_URL_PREFIX + '/users/50', 'GET',
                                  None, 'grippo', 'test123')
         app.logger.debug("Data retrieved = %s\n", rv.data)
 
         data = json.loads(rv.data)
         self.assertNotIn('email', data['object'])
 
-        rv = self.open_with_auth('/api/v1/users/638', 'GET',
+        rv = self.open_with_auth(api.REST_URL_PREFIX + '/users/638', 'GET',
                                  None, 'grippo', 'test123')
         app.logger.debug("Data retrieved = %s\n", rv.data)
 

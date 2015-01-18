@@ -28,9 +28,9 @@ REST API
 
 from flask import request,\
     url_for, jsonify, make_response, abort
-from . import app, models, emails
-from .auth import login_manager, login_serializer
-from .database import db_session
+from VilfredoReloadedCore import app, models, emails
+from VilfredoReloadedCore.auth import login_manager, login_serializer
+from VilfredoReloadedCore.database import db_session
 from sqlalchemy import and_
 from functools import wraps
 from flask import Response
@@ -39,7 +39,9 @@ import uuid
 
 
 REST_API_VERSION = 'v1'
-REST_URL_PREFIX = '/api/' + REST_API_VERSION
+REST_URL = '/api'
+REST_URL_PREFIX = REST_URL + '/' + REST_API_VERSION
+
 RESULTS_PER_PAGE = 50
 MAX_LEN_EMAIL = 120
 MAX_LEN_USERNAME = 20
@@ -348,21 +350,23 @@ def bad_request(error):
 #
 # Index
 #
-@app.route(REST_URL_PREFIX + '/', methods=['GET', 'POST'])
-@app.route(REST_URL_PREFIX + '/index', methods=['GET', 'POST'])
+@app.route(REST_URL, methods=['GET', 'POST'])
+@app.route(REST_URL + '/', methods=['GET', 'POST'])
+@app.route(REST_URL + '/index', methods=['GET', 'POST'])
 def api_index():
     app.logger.debug("api_index called...\n")
+    '''
+    api_info = {
+        "current_api_url": "https://api.vilrefo.org/v1",
+        "api_v1_url": "https://api.vilrefo.org/v1"
+    }
+    '''
 
-    # Get authenticated user or None
-    current_user = get_authenticated_user(request)
-
-    if current_user:
-        message = "Welcome back " + current_user.username +\
-            " to the Vilfredo REST API"
-    else:
-        message = "Welcome to the the Vilfredo REST API"
-
-    return jsonify(message=message), 200
+    api_info = {
+        "current_api_url": "https://" + app.config['SITE_DOMAIN'] + "/api/v1",
+        "api_v1_url": "https://" + app.config['SITE_DOMAIN'] + "/api/v1"
+    }
+    return jsonify(api_info), 200
 
 
 #
