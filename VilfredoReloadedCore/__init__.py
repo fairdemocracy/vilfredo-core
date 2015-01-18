@@ -45,7 +45,7 @@ Module documentation
 .. automodule:: VilfredoReloadedCore.main
   :members:
 
-.. automodule:: VilfredoReloadedCore.api
+.. automodule:: VilfredoReloadedCore.api.v1.api
   :members:
 """
 
