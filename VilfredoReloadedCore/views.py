@@ -26,7 +26,9 @@ The Views
 
 from flask import session, request, make_response
 
-from . import app, models, api
+from . import app, models
+
+from VilfredoReloadedCore.api.v1 import api
 
 from database import db_session
 
@@ -62,6 +64,7 @@ def add_invitation_from_token(token):
     user = api.load_token(auth)
     if not user:
         return redirect(redirect_url())
+        # return redirect(url_for('index', token=token))
     else:
         question_id = models.EmailInvite.accept(user, token)
         if question_id == False:
