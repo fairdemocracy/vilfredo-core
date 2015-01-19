@@ -1109,12 +1109,15 @@ class EmailInvite(db.Model):
             app.logger.debug("Invite from %s for %s", invite.sender_id, invite.question_id)
             email_invitation.accepted = 1
             user.invites_received.append(invite)
-            db_session.commit()
             # Notify sender
             emails.send_email_invite_accepted_email(sender, email_invitation.receiver_email, question)
         # Otherwise noify sender of prior acceptance or earlier invitation
         else:
             emails.send_user_already_added_email(sender, email_invitation.receiver_email, question)
+
+        # Delete email invite
+        db_session.delete(email_invitation)
+        db_session.commit()
 
         return question.id
 
