@@ -304,7 +304,7 @@ def api_index():
 #
 # Get Auth Token
 #
-@app.route(REST_URL_PREFIX + '/authtoken', methods=['GET'])
+@app.route(REST_URL_PREFIX + '/authtoken', methods=['POST'])
 @requires_auth
 def api_get_auth_token():
     '''
@@ -346,17 +346,28 @@ def api_get_auth_token():
                        user_message = "Before you can log in you must activate your account by clicking on the link we emailed to you when you registered."), 400
 
     token = user.get_auth_token()
-    app.logger.debug("token = %s\n", token)
+    response = {'token': token}
+
+    if request.json and 'eit' in request.json:
+        app.logger.debug('Email Invite Token found...')
+        email_invite_token = request.json['eit']
+        question_id = models.EmailInvite.accept(user, email_invite_token)
+        # Check if token OK
+        if question_id:
+            response['question_url'] = url_for('display_question', question_id=question_id)
+            app.logger.debug('User accepted invite to question %s...', question_id)
+        else:
+            app.logger.debug('User accept invite to question %s failed for some reason...', question_id)
 
     # Test for jsonp request
     if 'callback' in request.args:
-        d = json.dumps(dict(token=token))
+        d = json.dumps(dict(response))
         return 'jsonCallback(' + d + ');', 200
 
     # Return raw json
     # response = {'token': token}
     # return jsonify(objects=response), 200
-    return jsonify(token=token), 200
+    return jsonify(response), 200
 
 #
 # Get Current User details
@@ -819,7 +830,7 @@ def api_create_user():
         message = "Username not available"
         return jsonify(message=message), 400
         # return jsonify(message = "Username not available"), 400
-        # return make_response(jsonify({'error': 'Username not available'}), 400)
+        # return make_response(jsonify({'error': 'Username not available'}), 400) winter
 
     elif models.User.email_available(request.json['email']) is not True:
         message = "Someone has already registered with that email."
@@ -831,9 +842,43 @@ def api_create_user():
     db_session.add(user)
     db_session.commit()
 
+    verify_new_users_email_adress = True
+    response = {}
     email_sent = False
+
+    if 'eit' in request.json:
+        app.logger.debug('Email Invite Token found: %s', request.json['eit'])
+        email_invite_token = request.json['eit']
+        question_id = models.EmailInvite.accept(user, email_invite_token)
+        # Check if token OK
+        if question_id:
+            app.logger.debug('User %s accepted invite to question %s...', user.username, question_id)
+            # No need to verify email address
+            verify_new_users_email_adress = False
+            # Create auth token to log the user in
+            auth_token = user.get_auth_token()
+
+            # Check if question still exists - eg hasn't been deleted
+            question = models.Question.query.get(question_id)
+            if question:
+                app.logger.debug('Quetion Found: send %s a welcome_to_question_email to %s...', user.username, user.email)
+                emails.send_welcome_to_question_email(user, question)
+            else:
+                app.logger.debug('Quetion Not Found: send %s a welcome_to_notfound_question_email to %s...', user.username, user.email)
+                emails.send_welcome_to_notfound_question_email(user, question_id)
+
+            response = {'url': url_for('api_get_users', user_id=user.id), 
+                        'token': auth_token, 'activation_email_sent': False}
+
+            # send question link only if question acually exists
+            if question:
+                response['question_url'] = url_for('display_question', question_id=question_id)
+
+    else:
+        response = {'url': url_for('api_get_users', user_id=user.id), 'activation_email_sent': False}
+    
     # Send verification email unless deactivate
-    if os.environ.get('EMAIL_VALIDATION_OFF', '0') == '0':
+    if verify_new_users_email_adress and os.environ.get('EMAIL_VALIDATION_OFF', '0') == '0':
         email = request.json['email']
         token = uuid.uuid4().get_hex()
         timeout = models.get_timestamp() + EMAIL_VERIFY_LIFETIME
@@ -841,12 +886,9 @@ def api_create_user():
         ret_code = emails.send_email_verification(user.id, email, token)
         app.logger.debug("api_create_user: Ret Code from send_email_verification = %s", ret_code)
         verify_email.email_sent = 1
-        email_sent = True
         db_session.add(verify_email)
         db_session.commit()
-
-    # Send response
-    response = {'url': url_for('api_get_users', user_id=user.id), 'email_sent': email_sent}
+        response['activation_email_sent'] = True
 
     return jsonify(response), 201
 

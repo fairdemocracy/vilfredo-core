@@ -1078,7 +1078,7 @@ class EmailInvite(db.Model):
     def accept(user, token):
         email_invitation = db_session.query(EmailInvite)\
             .filter(and_(EmailInvite.accepted == 0, EmailInvite.token == token))\
-            .one()
+            .first()
         if not email_invitation:
             app.logger.debug("add_invitation_from_token Token not found: %s", token)
             return False
@@ -1110,9 +1110,11 @@ class EmailInvite(db.Model):
             email_invitation.accepted = 1
             user.invites_received.append(invite)
             # Notify sender
+            app.logger.debug('Send sender %s a email_invite_accepted_email to %s...', sender.username, sender.email)
             emails.send_email_invite_accepted_email(sender, email_invitation.receiver_email, question)
         # Otherwise noify sender of prior acceptance or earlier invitation
         else:
+            app.logger.debug('Send sender %s a user_already_added_email to %s...', sender.username, sender.email)
             emails.send_user_already_added_email(sender, email_invitation.receiver_email, question)
 
         # Delete email invite

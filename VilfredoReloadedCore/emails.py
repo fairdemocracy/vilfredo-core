@@ -102,6 +102,7 @@ def send_email_invite_accepted_email(user, email, question):
     :type toquestionken: Question
     :rtype: long
     '''
+    app.logger.debug('send_email_invite_accepted_email called...')
     body_template = \
     """
     The invitation you sent to %s for question "%s" has been accepted.
@@ -112,6 +113,67 @@ def send_email_invite_accepted_email(user, email, question):
                       app.config['ADMINS'][0],
                       user.email,
                       body_template % (email, question.title, app.config['SITE_DOMAIN'], question.id))
+
+def send_welcome_to_notfound_question_email(user, question_id):
+    '''
+    .. function:: send_welcome_email(user, question_id)
+
+    Send an email to welcome the new user who received an email invitation.
+
+    :param user: question participant
+    :type user: User
+    :param question: question
+    :type toquestionken: Question
+    :rtype: long
+    '''
+    app.logger.debug('send_welcome_to_notfound_question_email called...')
+    body_template = \
+    """
+    Hi %s! Welcome to Vilfredo! Thanks for joining us!
+    
+    You had agreed to participate in %s's question "%s" but unfortunately it appears to no longer exist. Sorry about that.
+    
+    You can of course start your own question and invite others to participate.
+    """
+    return send_email("Welcome to Vilfredo!",
+                      app.config['ADMINS'][0],
+                      user.email,
+                      body_template % (user.username,
+                                       question.author.username,
+                                       question.title,
+                                       app.config['SITE_DOMAIN'],
+                                       question.id))
+
+def send_welcome_to_question_email(user, question):
+    '''
+    .. function:: send_welcome_to_question_email(user, question)
+
+    Send an email to welcome the new user who received an email invitation.
+
+    :param user: question participant
+    :type user: User
+    :param question: question
+    :type toquestionken: Question
+    :rtype: long
+    '''
+    app.logger.debug('send_welcome_to_question_email called...')
+    body_template = \
+    """
+    Hi %s! Welcome to Vilfredo! Thanks for joining us!
+
+    You have agreed to participate in %s's question "%s". You can find it at the link below or by logging in and looking under your active questions.
+    
+    http://%s/question/%s
+    """
+    return send_email("Welcom to Vilfredo!",
+                      app.config['ADMINS'][0],
+                      user.email,
+                      body_template % (user.username,
+                                       question.author.username,
+                                       question.title,
+                                       app.config['SITE_DOMAIN'],
+                                       question.id))
+
 
 def send_moved_on_email(user, question):
     '''
@@ -159,7 +221,7 @@ def send_email_verification(user_id, email, token):
     return send_email("Vilfredo - Activate Your Account",
                       app.config['ADMINS'][0],
                       email,
-                      body_template % (app.config['SITE_DOMAIN']+'/activate'+'?u='+str(user_id)+'&t='+str(token)))
+                      body_template % (app.config['SITE_DOMAIN']+'/activate'+'?u='+str(user_id)+'&t='+token))
 
 def send_password_reset_email(email, token):
     '''
@@ -200,19 +262,21 @@ def send_question_email_invite_email(sender, recipient_email, question, token):
     :type token: string
     :rtype: long
     '''
-    # print "Sending email:", sender.username, question.title
+    app.logger.debug('send_question_email_invite_email called...')
     body_template = \
     """
+    Hi!
+    
     %s invites you to participate in the question "%s" on Vilfredo.
     
-    If you are already a member of Vilfredo please login then click on the link below. If you are not yet registered then please go to http://%s and register for a free account. Once you have logged in, click on the link below.
+    If you wish to participate please click on the link below and follow the instructions.
     
-    Join Question: http://%s
+    Click to participate: http://%s
     """
     return send_email("Vilfredo - Invitation to participate",
                       app.config['ADMINS'][0],
                       recipient_email,
-                      body_template % (sender.username, question.title, 
-                                       app.config['SITE_DOMAIN'],
-                                       app.config['SITE_DOMAIN']+'/invitation/'+token))
+                      body_template % (sender.username, 
+                                       question.title, 
+                                       app.config['SITE_DOMAIN']+'/invitation'+'?email='+recipient_email+'&eit='+token))
 

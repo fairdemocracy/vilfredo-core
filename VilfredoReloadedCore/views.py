@@ -58,13 +58,15 @@ def display_question(question_id):
     else:
         return render_template("question.html")
         
-@app.route('/invitation/<token>')
-def add_invitation_from_token(token):
+@app.route('/invitation')
+def add_invitation_from_token():
+    token = request.args.get('eit')
     auth = request.cookies.get('vgaclient')
     user = api.load_token(auth)
     if not user:
-        return redirect(redirect_url())
-        # return redirect(url_for('index', token=token))
+        # return redirect(redirect_url())
+        email = request.args.get('email')
+        return redirect(url_for('index', email=email, eit=token))
     else:
         question_id = models.EmailInvite.accept(user, token)
         if question_id == False:
