@@ -1013,13 +1013,13 @@ class VerifyEmail(db.Model):
     def verify_email(user_id, token):
         app.logger.debug("verify_email called...\n")
 
-        verify = models.VerifyEmail.query.filter_by(user_id=user_id,token=token).first()
+        verify = VerifyEmail.query.filter_by(user_id=user_id,token=token).first()
 
         if not verify:
             app.logger.debug("Token and user_id not listed...\n")
             return False
 
-        elif models.get_timestamp() > verify.timeout:
+        elif get_timestamp() > verify.timeout:
             app.logger.debug("Token expired...\n")
             return False
 
@@ -1223,13 +1223,13 @@ class PWDReset(db.Model):
     def submit_password_reset_token(token):
         app.logger.debug("submit_password_reset_token called...\n")
 
-        pwd_reset = models.PWDReset.query.filter_by(token=token).first()
+        pwd_reset = PWDReset.query.filter_by(token=token).first()
 
         if not pwd_reset:
             app.logger.debug("Token and user_id not listed...\n")
             return False
 
-        elif models.get_timestamp() > pwd_reset.timeout:
+        elif get_timestamp() > pwd_reset.timeout:
             app.logger.debug("Token expired...\n")
             return False
 
@@ -1278,7 +1278,7 @@ class Question(db.Model):
         from sqlalchemy.orm.exc import NoResultFound
         try:
             threshold = self.thresholds\
-                .filter(Threshold.generation == self.generation).one()
+                .filter(Threshold.generation == self.generation).first()
         except NoResultFound, e:
             print "No threshold found for question " + str(self.id) + ' gen ' + str(self.generation)
             raise
@@ -1453,7 +1453,7 @@ class Question(db.Model):
 
         :rtype: Integer
         '''
-        invite = self.invites.filter_by(receiver_id=user.id).one()
+        invite = self.invites.filter_by(receiver_id=user.id).first()
         if invite is None:
             return 0
         else:
@@ -1729,7 +1729,7 @@ class Question(db.Model):
             for proposal in pareto:
                 self.history.append(QuestionHistory(proposal))
             # Set default threshold for voting map
-            self.thresholds.append(models.Threshold(self))
+            self.thresholds.append(Threshold(self))
             db_session.commit()
 
         app.logger.debug('author_move_on question now generation %s', self.generation)
