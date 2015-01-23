@@ -138,6 +138,9 @@ def activate():
 
     return resp
 
+@app.route('/privacy')
+def pivacy():
+    return render_template("privacy.html")
 
 @app.route('/lostpassword')
 def lost_password():
