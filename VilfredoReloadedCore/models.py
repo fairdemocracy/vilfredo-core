@@ -1283,7 +1283,9 @@ class Question(db.Model):
             print "No threshold found for question " + str(self.id) + ' gen ' + str(self.generation)
             raise
 
-        consensus_found = (self.get_inherited_proposal_count() == 1) and (self.get_new_proposal_count() == 0)
+        inherited_proposal_count = self.get_inherited_proposal_count()
+        #consensus_found = (inherited_proposal_count == 1) and (self.get_new_proposal_count() == 0)
+        consensus_found = self.consensus_found(generation=self.generation-1)
         completed_voter_count = self.get_completed_voter_count(generation=self.generation)
 
         public = {'id': str(self.id),
@@ -1303,7 +1305,7 @@ class Question(db.Model):
                 'new_proposal_count': str(self.get_new_proposal_count()),
                 'new_proposer_count': str(self.get_new_proposer_count()),
                 'consensus_found': consensus_found,
-                'inherited_proposal_count' : str(self.get_inherited_proposal_count()),
+                'inherited_proposal_count' : str(inherited_proposal_count),
                 'author_url': url_for('api_get_users', user_id=self.user_id),
                 'mapx': str(threshold.mapx),
                 'mapy': str(threshold.mapy),
@@ -1338,7 +1340,7 @@ class Question(db.Model):
     blurb = db.Column(db.Text, nullable=False)
     generation = db.Column(db.Integer, default=1, nullable=False)
     room = db.Column(db.String(30))
-    phase = db.Column(db.Enum('writing', 'voting', 'archived', 'consensus', name="question_phase_enum"),
+    phase = db.Column(db.Enum('writing', 'voting', 'archived', 'consensus', 'results', name="question_phase_enum"),
                       default='writing')
     # created = db.Column(db.DateTime)
     # last_move_on = db.Column(db.DateTime)
@@ -1393,7 +1395,7 @@ class Question(db.Model):
         self.phase = 'writing'
         self.minimum_time = minimum_time
         self.maximum_time = maximum_time
-
+    
     # sharks
     def get_not_invited(self):
         '''
@@ -1459,7 +1461,7 @@ class Question(db.Model):
         else:
             return invite.permissions
 
-    def get_endorsement_results(self, generation=None): # snow
+    def get_endorsement_results(self, generation=None): # final
         '''
         .. function:: get_endorsement_results([generation=None])
 
@@ -1477,6 +1479,8 @@ class Question(db.Model):
 
         voter_count = self.get_voter_count(generation)
         app.logger.debug("There were %s voters in generation %s", voter_count, generation)
+        
+        proposals = self.get_proposals_list_by_id()
 
         endorsements = db_session.query(Endorsement)\
                 .filter(Endorsement.question_id == self.id)\
@@ -1511,6 +1515,13 @@ class Question(db.Model):
                 results.update( {pid: {'median': {'medx': median(coords['mapx']),
                                                   'medy': median(coords['mapy'])},
                                        'voters': coords['voters']} } )
+
+                # Update DB with proposal medians
+                geomedx = median(coords['mapx'])
+                geomedy = median(coords['mapy'])
+                proposals[pid].geomedx = geomedx
+                proposals[pid].geomedy = geomedy
+
                 '''
                 1L: {'mapx': [0.75, 0.65, 0.631388, 0.497361, 0.428218], 'mapy': [0.46, 0.16, 0.634726, 0.598698, 0.710889]}
                 '''
@@ -1534,6 +1545,9 @@ class Question(db.Model):
                     results[proposal_id]['dominated_by'] = data.dominated_by
 
             app.logger.debug("results ==> %s", results)
+            
+            # Commit medians to DB
+            db_session.commit()
 
             return results
 
@@ -1607,9 +1621,20 @@ class Question(db.Model):
                         .filter(QuestionHistory.question_id == self.id)\
                         .all()
     
+    def get_inherited_proposals(self, generation=None):
+        generation = generation or self.generation
+        if generation == 1:
+            return list()
+        else:
+            return db_session.query(Proposal).join(QuestionHistory)\
+                        .filter(QuestionHistory.question_id == self.id)\
+                        .filter(QuestionHistory.generation == generation)\
+                        .filter(Proposal.generation_created < self.generation)\
+                        .all()
+    
     def get_inherited_proposal_count(self, generation=None):
         generation = generation or self.generation
-        if generation < 2:
+        if generation == 1:
             return 0
         else:
             return db_session.query(Proposal).join(QuestionHistory)\
@@ -1696,13 +1721,12 @@ class Question(db.Model):
 
         app.logger.debug('auto_move_on question now generation %s', self.generation)
         return self.phase
-
+    
     def author_move_on(self, user_id):
         '''
         .. function:: author_move_on(user_id)
 
-        Moves the question to the the next phase if the minimum time has
-        passed. Called by the author.
+        Moves the question to the the next phase. Called by the author.
 
         :param user_id: Author's user ID.
         :type user_id: Integer
@@ -2507,7 +2531,7 @@ class Question(db.Model):
                 '''
                 app.logger.debug("Comparing endorser_ids %s %s and %s %s\n",
                                  proposal1.id, endorser_ids[proposal1.id],
-                                 proposal2.id, endorser_ids[proposal2.id])
+                                 proposal2.id, endorser_ids[proposal2.id]) final
                 app.logger.debug("   ===> WDW Result = %s\n",
                                  who_dominates)
                 '''
@@ -2600,6 +2624,7 @@ class Question(db.Model):
 
             proposal_relations[proposal1.id]['dominating'] = dominating
             proposal_relations[proposal1.id]['dominated'] = dominated
+            proposal_relations[proposal1.id]['pareto'] = len(dominated) == 0
             # Add whether or not the proposal is fully understood
             proposal_relations[proposal1.id]['understood'] = proposal1.is_completely_understood(generation=generation)
 
@@ -3866,6 +3891,46 @@ class Question(db.Model):
 
             return pareto
 
+    def get_endorser_sets(self, generation=None):
+        generation = generation or self.generation
+        if generation == 1:
+            return set(), set()
+
+        inherited = self.get_inherited_proposals(generation=generation)
+        inherited_endorsers = self.get_endorsers_set(generation=generation-1, proposals=inherited)
+        all_endorsers = self.get_endorsers_set(generation=generation-1)
+        return inherited_endorsers, all_endorsers
+    
+    def consensus_found(self, generation=None):
+        generation = generation or self.generation
+
+        if generation == 1:
+            return False
+
+        inherited = self.get_inherited_proposals(generation=generation)
+        inherited_endorsers = self.get_endorsers_set(generation=generation-1, proposals=inherited)
+        all_endorsers = self.get_endorsers_set(generation=generation-1)
+        return inherited_endorsers == all_endorsers
+    
+    def get_endorsers_set(self, generation=None, proposals=None):
+        '''
+        .. function:: get_endorsers([generation=None])
+
+        Returns a set of endorsers for the current generation of
+        the question.
+
+        :param generation: question generation.
+        :type generation: int
+        :rtype: set
+        '''
+        generation = generation or self.generation
+
+        endorsers = set()
+        all_proposals = proposals or self.get_proposals(generation)
+        for proposal in all_proposals:
+            endorsers.update(set(proposal.endorsers(generation)))
+        return endorsers
+    
     def get_endorsers(self, generation=None):
         '''
         .. function:: get_endorsers([generation=None])
@@ -7225,6 +7290,8 @@ class Proposal(db.Model):
                 'question_count': str(self.get_question_count()),
                 'comment_count': str(self.get_comment_count()),
                 'author_id': str(self.author.id),
+                'geomedy': str(self.geomedx),
+                'geomedy': str(self.geomedy),
                 'author_url': url_for('api_get_users', user_id=self.user_id),
                 'question_url': url_for('api_get_questions',
                                         question_id=self.question_id)}
@@ -7672,10 +7739,10 @@ class Proposal(db.Model):
                 Endorsement.generation == generation)
             ).all()
 
-        endorsers = set()
+        voters = set()
         for e in current_endorsements:
-            endorsers.add(e.endorser)
-        return endorsers
+            voters.add(e.endorser)
+        return voters
     
     def endorsers(self, generation=None):
         '''

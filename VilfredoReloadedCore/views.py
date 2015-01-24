@@ -57,6 +57,14 @@ def display_question(question_id):
         return redirect(redirect_url())
     else:
         return render_template("question.html")
+
+@app.route('/question/<int:question_id>/results')
+def display_results(question_id):
+    auth = request.cookies.get('vgaclient')
+    if not auth:
+        return redirect(redirect_url())
+    else:
+        return render_template("results.html")
         
 @app.route('/invitation')
 def add_invitation_from_token():

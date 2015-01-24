@@ -1294,9 +1294,9 @@ def api_question_subscribers(question_id=None):
                    items=(items), page=str(page), pages=str(pages),
                    num_items=str(subscribers.total), objects=results), 200
 
-# Get question proposals (Fetch Proposals)
+# Get proposals (Fetch Proposals)
 #
-# Add options to return only pareto, ingerited or new user proposals
+# Add options to return only pareto, inherited or new user proposals
 #
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/proposals', methods=['GET'])
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/proposals/<int:proposal_id>',
@@ -1445,7 +1445,7 @@ def api_get_question_proposals(question_id=None, proposal_id=None):
         elif inherited_only:
             query = query.filter(models.Proposal.generation_created < question.generation)
 
-        proposals = query.paginate(page, RESULTS_PER_PAGE, False)
+        proposals = query.paginate(page, RESULTS_PER_PAGE, False) # final winners
 
         items = len(proposals.items)
         pages = proposals.pages
@@ -2753,11 +2753,11 @@ def api_edit_question(question_id):
     app.logger.debug("Authenticated User = %s\n", user.id)
 
     if 'question_id' is None:
-        abort(404)
+        return jsonify(message="Question ID not set"), 404
 
     question = models.Question.query.get(int(question_id))
     if question is None:
-        abort(404)
+        return jsonify(message="Question does not exist"), 404
 
     user_id = user.id
 
@@ -2765,24 +2765,21 @@ def api_edit_question(question_id):
     if user_id != question.user_id:
         message = {"message": "You are not authorized to edit this question"}
         return jsonify(message), 403
-
+    
+    # doom
+    if 'move_to_results' in request.json:
+        question.phase = 'results'
+        db_session.commit()
+        return jsonify(message="Qustion now in results phase",
+                       phase=question.phase), 200
+    
     if 'move_on' in request.json:
-        '''
-        if not question.minimum_time_passed():
-            app.logger.debug("Question cannot be moved on " +
-                             "until minimum time has passed")
-            message = {"message": "Question cannot be moved on " +
-                                  "until minimum time has passed"}
-            return jsonify(message), 405
-        '''
-
         phase = question.author_move_on(user_id)
         db_session.commit()
 
         if not phase:
             return 500
         else:
-            # message = {"new_phase": phase}
             return jsonify({"question": question.get_public()}), 200
 
     # Cannot edit a question which has proposals
@@ -3321,7 +3318,7 @@ def api_question_pareto(question_id=None):
     '''
     .. http:post:: /questions/(int:question_id)/pareto
 
-        The pareto front of a question.
+        The pareto front of a question. Order by voting preference.
 
         **Example request**:
 
@@ -3387,7 +3384,9 @@ def api_question_pareto(question_id=None):
         :statuscode 200: no error
         :statuscode 400: bad request
     '''
-    app.logger.debug("api_question_pareto called with %s...\n", question_id)
+    app.logger.debug("api_question_pareto called with %s...\n", question_id) # final winners
+    
+    user = get_authenticated_user(request)
 
     if question_id is None:
         app.logger.debug("ERROR: question_id is None!\n")
@@ -3401,15 +3400,115 @@ def api_question_pareto(question_id=None):
 
     generation = int(request.args.get('generation', question.generation))
     pareto = question.calculate_pareto_front(generation=generation)
+    pareto_list = list(pareto)
+    pareto_list_sorted = sorted(pareto_list, key=lambda x: x.geomedx, reverse=True)
 
     results = []
-    for p in pareto:
-        results.append(p.get_public())
+    for p in pareto_list_sorted:
+        results.append(p.get_public(user))
+
+    app.logger.debug('pareto data ====> %s', results)
 
     return jsonify(question_id=str(question.id),
                    query_generation=str(generation),
                    current_generation=str(question.generation),
-                   num_items=str(len(pareto)), proposals=results), 200
+                   num_items=str(len(pareto)),
+                   proposals=results), 200
+
+
+@app.route(REST_URL_PREFIX + '/questions/<int:question_id>/results', methods=['GET'])
+@requires_auth # added
+def api_question_results(question_id=None):
+    '''
+    .. http:post:: /questions/(int:question_id)/results
+
+        The final results for this question.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            POST /questions/44/results HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+            {
+              "query_generation": "1",
+              "current_generation": "1",
+              "key_players": [
+                {
+                  "3": [
+                    "/api/v1/questions/1/proposals/4",
+                    "/api/v1/questions/1/proposals/3"
+                  ]
+                },
+                {
+                  "4": [
+                    "/api/v1/questions/1/proposals/3"
+                  ]
+                }
+              ],
+              "num_items": "2",
+              "question_id": "1"
+            }
+
+        :param question_id: question id
+        :statuscode 200: no error
+        :statuscode 404: bad request
+    '''
+    app.logger.debug("api_question_results called with questiobn ID %s...\n",
+                     question_id) # final
+    
+    if question_id is None:
+        app.logger.debug("ERROR: question_id is None!\n")
+        jsonify(message="Question ID not set in request"), 404
+
+    question = models.Question.query.get(int(question_id))
+
+    if not question.phase is 'results':
+        app.logger.debug("ERROR: Question must be in results phase before returning the results!\n")
+        jsonify(message="Question not in results phase"), 404
+
+    if question is None:
+        app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
+        jsonify(message="Question not found"), 404
+
+    
+    results = list()
+    all_relations = question.calculate_proposal_relation_ids()
+    endorsement_results = question.get_endorsement_results()
+
+    for (proposal_id, relations) in all_relations.iteritems():
+        if relations['pareto']:
+            proposal = models.Proposal.query.get(proposal_id)
+            relations['dominated'] = list(relations['dominated'])
+            relations['dominating'] = list(relations['dominating'])
+            results.append({'relations': relations, 
+                            'medx': endorsement_results[proposal_id]['median']['medx'],
+                            'medy': endorsement_results[proposal_id]['median']['medy'],
+                            'title': proposal.title,
+                            'author': proposal.author.username})
+                                    
+    '''
+    votes = question.all_votes_by_type()
+    for (proposal_id, all_votes) in votes.iteritems():
+        results[proposal_id] = dict()
+        results[proposal_id]['votes'] = all_votes
+    '''
+    
+    app.logger.debug("final results: %s", results)
+    
+    return jsonify(question_id=str(question.id),
+                   current_generation=str(question.generation),
+                   results=results), 200
+
 
 
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/participation_table', methods=['GET'])
@@ -3949,12 +4048,12 @@ def api_question_graph(question_id):
                    user_level_type=user_level_type), 200
 
 
-@app.route(REST_URL_PREFIX + '/questions/<int:question_id>/results',
+@app.route(REST_URL_PREFIX + '/questions/<int:question_id>/voting_data',
            methods=['GET'])
 @requires_auth # added
-def api_question_results(question_id):
+def api_get_voting_data(question_id):
     '''
-    .. http:post:: questions/(int:question_id)/results
+    .. http:post:: questions/(int:question_id)/voting_data
 
         A map of voting results for a question.
 
@@ -3995,7 +4094,7 @@ def api_question_results(question_id):
 
     generation = int(request.args.get('generation', question.generation))
 
-    results = question.get_endorsement_results(generation)
+    voting_data = question.get_endorsement_results(generation)
 
     # app.logger.debug("results ==> %s", results)
 
@@ -4003,8 +4102,8 @@ def api_question_results(question_id):
         question_id=str(question.id),
         current_generation=str(question.generation),
         requested_generation=str(generation),
-        num_items=str(len(results)),
-        results=results), 200
+        num_items=str(len(voting_data)),
+        voting_data=voting_data), 200
 
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/voting_map',
            methods=['GET'])
