@@ -3440,23 +3440,36 @@ def api_question_results(question_id=None):
             Content-Type: application/json
 
             {
-              "query_generation": "1",
-              "current_generation": "1",
-              "key_players": [
+              "current_generation": "1", 
+              "results": [
                 {
-                  "3": [
-                    "/api/v1/questions/1/proposals/4",
-                    "/api/v1/questions/1/proposals/3"
-                  ]
-                },
+                  "medx": 0.640694,
+                  "medy": 0.395, 
+                  "author": "bill", 
+                  "relations": 
+                  {
+                    "dominated": [], 
+                    "pareto": true, 
+                    "dominating": [2, 4], 
+                    "understood": false
+                  }, 
+                  "title": "Bills First Proposal"
+                }, 
                 {
-                  "4": [
-                    "/api/v1/questions/1/proposals/3"
-                  ]
+                  "medx": 0.625, 
+                  "medy": 0.175, 
+                  "author": "susan", 
+                  "relations": 
+                  {
+                    "dominated": [], 
+                    "pareto": true, 
+                    "dominating": [], 
+                    "understood": true
+                  }, 
+                  "title": "Susans Only Proposal"
                 }
-              ],
-              "num_items": "2",
-              "question_id": "1"
+              ], 
+              "question_id": "44"
             }
 
         :param question_id: question id
