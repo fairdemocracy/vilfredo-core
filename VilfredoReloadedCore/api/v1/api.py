@@ -4055,7 +4055,7 @@ def api_question_graph(question_id):
                    map_type=map_type,
                    graph_generation=str(generation),
                    current_generation=str(question.generation),
-                   url='http://' + app.config['SITE_DOMAIN'] + '/' + app.config['EXTERNAL_MAP_PATH'] +
+                   url=app.config['PROTOCOL'] + app.config['SITE_DOMAIN'] + '/' + app.config['EXTERNAL_MAP_PATH'] +
                        graph_svg,
                    proposal_level_type=proposal_level_type,
                    user_level_type=user_level_type), 200

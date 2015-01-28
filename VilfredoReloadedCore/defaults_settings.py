@@ -22,6 +22,9 @@
 
 # WARNNG: must be changed in production!
 
+# Set proocol http:// or https://
+PROTOCOL = 'http://'
+
 # Set site domain
 SITE_DOMAIN = '0.0.0.0:8080'
 
