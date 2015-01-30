@@ -131,10 +131,25 @@ work_file_dir = app.config['WORK_FILE_DIRECTORY']
 def get_timestamp():
     return int(math.floor(time.time()))
 
-
 def make_new_map_filename_hashed(question,
-                             generation=None,
-                             algorithm=None):
+                                 generation=None,
+                                 algorithm=None):
+    '''
+        .. function:: make_new_map_filename_hashed(
+            question[,
+            generation=None,
+            algorithm=None])
+
+        Create the hash filname for the voting map.
+
+        :param question: question
+        :type question: Qustion
+        :param generation: generation of the voting map
+        :type generation: int
+        :param algorithm: algorithm version number
+        :type algorithm: int
+        :rtype: String
+        '''
     algorithm = algorithm or app.config['ALGORITHM_VERSION']
     generation = generation or question.generation
     import hashlib, json, pickle
@@ -155,6 +170,31 @@ def make_map_filename_hashed(question,
                              proposal_level_type=GraphLevelType.layers,
                              user_level_type=GraphLevelType.layers,
                              algorithm=None):
+    '''
+        .. function:: make_map_filename_hashed(
+            question[,
+            generation,
+            map_type="all",
+            proposal_level_type=GraphLevelType.layers,
+            user_level_type=GraphLevelType.layers,
+            algorithm=None])
+
+        Create the filname for the voting map.
+
+        :param question: question
+        :type question_id: Question
+        :param generation: generation of the voting map
+        :type generation: int
+        :param map_type: map type
+        :type map_type: string
+        :param proposal_level_type: GraphLevelType
+        :type proposal_level_type: GraphLevelType
+        :param user_level_type: GraphLevelType
+        :type user_level_type: GraphLevelType
+        :param algorithm: algorithm version number
+        :type algorithm: int
+        :rtype: String
+        '''
     algorithm = algorithm or app.config['ALGORITHM_VERSION']
     generation = generation or question.generation
     import hashlib, json, pickle
@@ -213,12 +253,6 @@ user_comments = db.Table(
 #
 # Useful Functions
 #
-def get_ids_list_from_objects(objects):
-    ids = []
-    for o in objects:
-        ids.append(o.id)
-    return ids
-
 def get_ids_from_proposals(proposals): # fix?
     ids = set()
     for prop in proposals:
@@ -2400,8 +2434,14 @@ class Question(db.Model):
 
         import os
 
-        filepath = app.config['WORK_FILE_DIRECTORY'] + '/' + 'prop_rel_ids_qid_' + str(self.id) + '__gen_' + str(generation) + '__alg_' + str(algorithm) + '.pkl'
-        
+        filenamehash = make_new_map_filename_hashed(self,
+                                                    generation,
+                                                    algorithm)
+
+        app.logger.debug("calculate_proposal_relation_ids: filenamehash = %s", filenamehash)
+
+        filepath = app.config['WORK_FILE_DIRECTORY'] + '/' + 'prop_rel_ids_' + filenamehash + '.pkl'
+
         app.logger.debug("calculate_proposal_relation_ids: check for cache file %s", filepath)
         
         if app.config['CACHE_COMPLEX_DOM']:
@@ -3269,9 +3309,15 @@ class Question(db.Model):
         generation = generation or self.generation
 
         import os
-
-        filepath = app.config['WORK_FILE_DIRECTORY'] + '/' + 'dom_map_qid_' + str(self.id) + '__gen_' + str(generation) + '__alg_' + str(algorithm) + '.pkl'
         
+        filenamehash = make_new_map_filename_hashed(self,
+                                                    generation,
+                                                    algorithm)
+        
+        app.logger.debug("calculate_domination_map: filenamehash = %s", filenamehash)
+
+        filepath = app.config['WORK_FILE_DIRECTORY'] + '/' + 'dom_map_' + filenamehash + '.pkl'
+                
         app.logger.debug("calculate_domination_map: check for cache file %s", filepath)
 
         if app.config['CACHE_COMPLEX_DOM']:
