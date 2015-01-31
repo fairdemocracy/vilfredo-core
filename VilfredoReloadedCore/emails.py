@@ -163,7 +163,7 @@ def send_welcome_to_question_email(user, question):
 
     You have agreed to participate in %s's question "%s". You can find it at the link below or by logging in and looking under your active questions.
     
-    http://%s/question/%s
+    %s%s/question/%s
     """
     return send_email("Welcom to Vilfredo!",
                       app.config['ADMINS'][0],
@@ -171,6 +171,7 @@ def send_welcome_to_question_email(user, question):
                       body_template % (user.username,
                                        question.author.username,
                                        question.title,
+                                       app.config['PROTOCOL'],
                                        app.config['SITE_DOMAIN'],
                                        question.id))
 
@@ -191,12 +192,16 @@ def send_moved_on_email(user, question):
     """
     The question titled "%s" has now moved on to the %s stage.
     
-    http://%s/question/%s
+    %s%s/question/%s
     """
     return send_email("Vilfredo - Question %s Now %s" % (question.title, question.phase),
                       app.config['ADMINS'][0],
                       user.email,
-                      body_template % (question.title, question.phase, app.config['SITE_DOMAIN'], question.id))
+                      body_template % (question.title,
+                                       question.phase,
+                                       app.config['PROTOCOL'],
+                                       app.config['SITE_DOMAIN'],
+                                       question.id))
 
 def send_email_verification(user_id, email, token):
     '''
@@ -216,12 +221,13 @@ def send_email_verification(user_id, email, token):
     
     Click on the link below to activate your account.
     
-    Activate Account: http://%s
+    Activate Account: %s%s
     """
     return send_email("Vilfredo - Activate Your Account",
                       app.config['ADMINS'][0],
                       email,
-                      body_template % (app.config['SITE_DOMAIN']+'/activate'+'?u='+str(user_id)+'&t='+token))
+                      body_template % (app.config['PROTOCOL'],
+                                       app.config['SITE_DOMAIN']+'/activate'+'?u='+str(user_id)+'&t='+token))
 
 def send_password_reset_email(email, token):
     '''
@@ -239,12 +245,13 @@ def send_password_reset_email(email, token):
     """
     Click on the link below to enter a new password.
     
-    Reset Password: http://%s
+    Reset Password: %s%s
     """
     return send_email("Vilfredo - Password Reset Request",
                       app.config['ADMINS'][0],
                       email,
-                      body_template % (app.config['SITE_DOMAIN']+'/resetpwd/'+token))
+                      body_template % (app.config['PROTOCOL'],
+                                       app.config['SITE_DOMAIN']+'/resetpwd/'+token))
 
 def send_question_email_invite_email(sender, recipient_email, question, token):
     '''
@@ -271,12 +278,13 @@ def send_question_email_invite_email(sender, recipient_email, question, token):
     
     If you wish to participate please click on the link below and follow the instructions.
     
-    Click to participate: http://%s
+    Click to participate: %s%s
     """
     return send_email("Vilfredo - Invitation to participate",
                       app.config['ADMINS'][0],
                       recipient_email,
-                      body_template % (sender.username, 
-                                       question.title, 
+                      body_template % (sender.username,
+                                       question.title,
+                                       app.config['PROTOCOL'],
                                        app.config['SITE_DOMAIN']+'/invitation'+'?email='+recipient_email+'&eit='+token))
 
