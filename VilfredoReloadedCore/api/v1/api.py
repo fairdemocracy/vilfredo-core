@@ -125,17 +125,14 @@ def authenticate():
         'You have to login to make this request', 403,
         {'WWW-Authenticate': 'Basic realm="Login Required"'})
 
-
 def requires_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        # app.logger.debug("Request authorization = %s\n", request.authorization)
+        # app.logger.debug("request.authorization========>>>>: %s", request.authorization)
         auth = request.authorization
         if not auth:
-            #return authenticate()
             return jsonify(message='auth not defined'), 403
         if auth.username == '':
-            #return authenticate()
             return jsonify(message='no username received'), 403
         if auth.password == '':
             # app.logger.debug('requires_auth: Token set')
@@ -326,12 +323,11 @@ def api_get_auth_token():
 
     # Test for jsonp request
     if 'callback' in request.args:
+        app.logger.debug("api_get_auth_token: callback detected. Returning jsonp...")
         d = json.dumps(dict(response))
         return 'jsonCallback(' + d + ');', 200
 
     # Return raw json
-    # response = {'token': token}
-    # return jsonify(objects=response), 200
     return jsonify(response), 200
 
 #
