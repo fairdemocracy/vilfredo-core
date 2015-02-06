@@ -2744,7 +2744,7 @@ def api_edit_proposal(question_id, proposal_id):
     # It is OK to update the proposal
     if proposal.update(user, title, blurb, abstract):
         db_session.commit()
-        result = {"message":
+        message = {"message":
                    "Proposal updated"}
         return jsonify(message), 200
     else:
