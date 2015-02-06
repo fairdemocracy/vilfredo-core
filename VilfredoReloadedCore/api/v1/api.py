@@ -217,7 +217,6 @@ def check_auth(username, password):
     else:
         return user.check_password(password)
 
-
 def get_authenticated_user(request):
     '''
     .. function:: get_authenticated_user(request)
@@ -229,16 +228,19 @@ def get_authenticated_user(request):
     :rtype: User or None
     '''
     app.logger.debug("get_authenticated_user called....")
-    app.logger.debug("auth into ==> %s", request.authorization)
+    app.logger.debug("auth info ==> %s", request.authorization)
     if request.authorization:
         if request.authorization.password == '':
             user = load_token(request.authorization.username)
-        else:
+            return user
+        elif check_auth(request.authorization.username, request.authorization.password):
             user = models.User.query.\
                 filter_by(username=request.authorization.username).one()
         return user
     else:
-        app.logger.debug("get_authenticated_user: no authorization found")
+            return None
+    else:
+        app.logger.debug("get_authenticated_user: no authorization sent")
         return None
 
 
