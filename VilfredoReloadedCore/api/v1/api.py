@@ -196,8 +196,8 @@ def get_authenticated_user(request):
         elif check_auth(request.authorization.username, request.authorization.password):
             user = models.User.query.\
                 filter_by(username=request.authorization.username).one()
-        return user
-    else:
+            return user
+        else:
             return None
     else:
         app.logger.debug("get_authenticated_user: no authorization sent")
@@ -2693,53 +2693,63 @@ def api_edit_proposal(question_id, proposal_id):
 
     user = get_authenticated_user(request)
     if not user:
-        abort(401)
+        response = {"message": "User not found"}
+        return jsonify(response), 401
 
     app.logger.debug("Authenticated User = %s\n", user.id)
 
     if 'question_id' is None or 'proposal_id' is None:
-        abort(404)
+        response = {"message": "Requires Question ID"}
+        return jsonify(response), 400
+    
+    if 'proposal_id' is None:
+        response = {"message": "Requires Proposal ID"}
+        return jsonify(response), 400
 
-    if not 'title' in request.json or request.json['title'] == '' \
-            or len(request.json['blurb']) > MAX_LEN_PROPOSAL_TITLE:
-        abort(400)
+    if not 'title' in request.json or request.json['title'] == ''\
+            or len(request.json['title']) > MAX_LEN_PROPOSAL_TITLE:
+        return jsonify(message="Proposal title must not be empty and must be less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
 
-    elif not 'blurb' in request.json or request.json['blurb'] == '' \
+    elif not 'blurb' in request.json or request.json['blurb'] == ''\
             or len(request.json['blurb']) > MAX_LEN_PROPOSAL_BLURB:
-        abort(400)
+        return jsonify(message="Proposal content must not be empty and must be less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
 
     elif 'abstract' in request.json and \
-            (request.json['abstract'] == ''
-             or len(request.json['abstract']) > MAX_LEN_PROPOSAL_ABSTRACT):
-        abort(400)
+            len(request.json['abstract']) > MAX_LEN_PROPOSAL_ABSTRACT:
+        return jsonify(message="Proposal abstract name must less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
 
     title = request.json.get('title')
     blurb = request.json.get('blurb')
     abstract = request.json.get('abstract', None)
 
+    question = models.Question.query.get(int(question_id))
+    if question is None:
+        response = {"message": "Question not found"}
+        return jsonify(response), 400
+    
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
-        abort(404)
+        response = {"message": "Proposal not found"}
+        return jsonify(response), 400
 
     if user.id != proposal.user_id:
         message = {"message": "You are not authorized to edit this proposal"}
         return jsonify(message), 403
 
-    if proposal.question.phase != 'writing'\
-            or proposal.question.generation != proposal.generation_created:
-        message = {"message": "This proposal may no longer be edited"}
+    num_votes = len(proposal.all_voters(generation=proposal.question.generation))
+    if num_votes > 0:
+        message = {"message": "This proposal has votes and may no longer be edited"}
         return jsonify(message), 403
-
+    
+    # It is OK to update the proposal
     if proposal.update(user, title, blurb, abstract):
         db_session.commit()
-        message = {"message":
+        result = {"message":
                    "Proposal updated"}
         return jsonify(message), 200
     else:
         message = {"message": "There was an error updating this proposal"}
         return jsonify(message), 400
-
-# shark
 
 # Get users not yet invited to participate in a question
 @app.route(REST_URL_PREFIX + '/users/associated_users',

@@ -7322,6 +7322,7 @@ class Proposal(db.Model):
 
         :rtype: dict
         '''
+        num_votes = len(self.all_voters(generation=self.question.generation))
         public = {'id': str(self.id),
                 'uri': url_for('api_get_question_proposals',
                                question_id=self.question.id,
@@ -7335,6 +7336,7 @@ class Proposal(db.Model):
                 'author': self.author.username,
                 'question_count': str(self.get_question_count()),
                 'comment_count': str(self.get_comment_count()),
+                'vote_count': str(num_votes),
                 'author_id': str(self.author.id),
                 'geomedy': str(self.geomedx),
                 'geomedy': str(self.geomedy),
