@@ -1479,7 +1479,7 @@ class Question(db.Model):
 
         return participants
     
-    def get_permissions(self, user): # shark
+    def get_permissions(self, user):
         '''
         .. function:: get_permissions()
 
