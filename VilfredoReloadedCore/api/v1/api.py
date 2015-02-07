@@ -2379,33 +2379,39 @@ def api_delete_proposal(question_id, proposal_id):
 
     user = get_authenticated_user(request)
     if not user:
-        abort(401)
+        return jsonify(message = "User not found"), 401
 
-    app.logger.debug("Authenticated User = %s\n", user.id)
-
-    # shark
     # Check user permission: can vote?
     question = models.Question.query.get(question_id)
     if question is None:
         return jsonify(message = "Question not found"), 404
 
+    '''
     perm = question.get_permissions(user)
     if perm is None or not models.Question.PROPOSE & perm:
         app.logger.debug("ACCESS ERROR: User %s with permission %s tried to delete a proposal on question %s", user.id, perm, question.id)
         return jsonify(message = "Question not found"), 404
+    '''
 
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
-        abort(404)
+        return jsonify(message = "Proposal not found"), 404
 
+    num_votes = len(proposal.all_voters(generation=proposal.question.generation))
+    if num_votes > 0:
+        message = {"message": "This proposal has votes and may no longer be deleted"}
+        return jsonify(message), 403
+    
     if user.id != proposal.user_id:
-        message = {"message": "You are not authorized to delete this proposal"}
+        message = {"message": "Only the author delete this proposal"}
         return jsonify(message), 403
 
+    '''
     if proposal.question.phase != 'writing'\
             or proposal.question.generation != proposal.generation_created:
         message = {"message": "This proposal may no longer be deleted"}
         return jsonify(message), 403
+    '''
 
     user.delete_proposal(proposal)
     db_session.commit()
@@ -2673,8 +2679,7 @@ def api_edit_proposal(question_id, proposal_id):
     # It is OK to update the proposal
     if proposal.update(user, title, blurb, abstract):
         db_session.commit()
-        message = {"message":
-                   "Proposal updated"}
+        message = {"message": "Proposal updated"}
         return jsonify(message), 200
     else:
         message = {"message": "There was an error updating this proposal"}
