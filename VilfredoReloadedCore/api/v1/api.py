@@ -321,13 +321,6 @@ def api_get_auth_token():
         else:
             app.logger.debug('User accept invite to question %s failed for some reason...', question_id)
 
-    # Test for jsonp request
-    if 'callback' in request.args:
-        app.logger.debug("api_get_auth_token: callback detected. Returning jsonp...")
-        d = json.dumps(dict(response))
-        return 'jsonCallback(' + d + ');', 200
-
-    # Return raw json
     return jsonify(response), 200
 
 #
@@ -938,7 +931,7 @@ def api_get_questions(question_id=None):
         app.logger.debug("Qustion data ==> %s", question_data);
 
         # Test for jsonp request
-        if 'callback' in request.args:
+        if False or 'callback' in request.args:
             d = json.dumps(dict(question=question_data))
             return request.args['callback'] + '(' + d + ');', 200
         else:
@@ -953,7 +946,7 @@ def api_get_questions(question_id=None):
             results.append(q.get_public())
 
         # Test for jsonp request
-        if 'callback' in request.args:
+        if False or 'callback' in request.args:
             d = json.dumps(dict(items=str(items),
                            questions=results))
             return request.args['callback'] + '(' + d + ');', 200
@@ -1249,7 +1242,7 @@ def api_get_question_proposals(question_id=None, proposal_id=None):
         result = proposal.get_public()
 
         # Test for jsonp request
-        if 'callback' in request.args:
+        if False or 'callback' in request.args:
             d = json.dumps(dict(proposal=result))
             return request.args['callback'] + '(' + d + ');', 200
         else:
@@ -1301,7 +1294,7 @@ def api_get_question_proposals(question_id=None, proposal_id=None):
             results.append(p.get_public(user))
 
         # Test for jsonp request
-        if 'callback' in request.args:
+        if False or 'callback' in request.args:
             d = json.dumps(dict(total_items=str(total_items), items=str(items),
                            page=str(page), pages=str(pages),
                            proposals=results))
