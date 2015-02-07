@@ -2167,7 +2167,7 @@ def api_update_proposal_endorsement(question_id, proposal_id):
 
         .. sourcecode:: http
 
-            DELETE /questions/45/proposals/47/endorsements HTTP/1.1
+            PATCH /questions/45/proposals/47/endorsements HTTP/1.1
             Host: example.com
             Accept: application/json
 
