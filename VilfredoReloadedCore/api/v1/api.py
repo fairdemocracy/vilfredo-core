@@ -2296,11 +2296,11 @@ def api_create_proposal(question_id):
 
     if not 'title' in request.json or request.json['title'] == ''\
             or len(request.json['title']) > MAX_LEN_PROPOSAL_TITLE:
-        return jsonify(message="Proposal title must not be empty and must be less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
+        return jsonify(message="Proposal title must not be empty and must be less than " + str(MAX_LEN_PROPOSAL_TITLE) + " characters"), 400
 
     elif not 'blurb' in request.json or request.json['blurb'] == ''\
             or len(request.json['blurb']) > MAX_LEN_PROPOSAL_BLURB:
-        return jsonify(message="Proposal content must not be empty and must be less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
+        return jsonify(message="Proposal content must not be empty and must be less than " + str(MAX_LEN_PROPOSAL_BLURB) + " characters"), 400
 
     elif 'abstract' in request.json and \
             len(request.json['abstract']) > MAX_LEN_PROPOSAL_ABSTRACT:
