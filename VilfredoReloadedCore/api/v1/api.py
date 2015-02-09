@@ -50,10 +50,10 @@ MIN_LEN_PASSWORD = 6
 MAX_LEN_ROOM = 20
 MIN_LEN_ROOM = 2
 MAX_LEN_PROPOSAL_TITLE = 120
-MAX_LEN_PROPOSAL_ABSTRACT = 1000
-MAX_LEN_PROPOSAL_BLURB = 1000
+MAX_LEN_PROPOSAL_ABSTRACT = 5000
+MAX_LEN_PROPOSAL_BLURB = 10000
 MAX_LEN_QUESTION_TITLE = 120
-MAX_LEN_QUESTION_BLURB = 2000
+MAX_LEN_QUESTION_BLURB = 10000
 MAX_LEN_PROPOSAL_COMMENT = 300
 MAX_LEN_PROPOSAL_QUESTION = 300
 MAX_LEN_PROPOSAL_QUESTION_ANSWER = 300
@@ -2529,11 +2529,11 @@ def api_create_proposal(question_id):
 
     if not 'title' in request.json or request.json['title'] == ''\
             or len(request.json['title']) > MAX_LEN_PROPOSAL_TITLE:
-        return jsonify(message="Proposal title must not be empty and must be less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
+        return jsonify(message="Proposal title must not be empty and must be less than " + str(MAX_LEN_PROPOSAL_TITLE) + " characters"), 400
 
     elif not 'blurb' in request.json or request.json['blurb'] == ''\
             or len(request.json['blurb']) > MAX_LEN_PROPOSAL_BLURB:
-        return jsonify(message="Proposal content must not be empty and must be less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
+        return jsonify(message="Proposal content must not be empty and must be less than " + str(MAX_LEN_PROPOSAL_BLURB) + " characters"), 400
 
     elif 'abstract' in request.json and \
             len(request.json['abstract']) > MAX_LEN_PROPOSAL_ABSTRACT:
