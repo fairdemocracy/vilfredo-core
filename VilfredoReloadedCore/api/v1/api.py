@@ -125,14 +125,17 @@ def authenticate():
         'You have to login to make this request', 403,
         {'WWW-Authenticate': 'Basic realm="Login Required"'})
 
+
 def requires_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        # app.logger.debug("request.authorization========>>>>: %s", request.authorization)
+        # app.logger.debug("Request authorization = %s\n", request.authorization)
         auth = request.authorization
         if not auth:
+            #return authenticate()
             return jsonify(message='auth not defined'), 403
         if auth.username == '':
+            #return authenticate()
             return jsonify(message='no username received'), 403
         if auth.password == '':
             # app.logger.debug('requires_auth: Token set')
@@ -152,6 +155,43 @@ def requires_auth(f):
             # return authenticate()
             return jsonify(message='username and password not valid'), 403
     return decorated
+
+def requires_auth_off(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.authorization
+        app.logger.debug("Request authorization = %s\n", request.authorization)
+        if not auth:
+            return authenticate()
+        if auth.username == '':
+            return authenticate()
+        if auth.password == '':
+            app.logger.debug('requires_auth: Token set')
+            token_valid = load_token(auth.username)
+            if token_valid:
+                app.logger.debug('requires_auth: Token is valid')
+                return f(*args, **kwargs)
+            else:
+                app.logger.debug('requires_auth: Token is not valid')
+                return authenticate()
+        elif check_auth(auth.username, auth.password):
+            app.logger.debug('requires_auth: username and password valid')
+            return f(*args, **kwargs)
+        else:
+            app.logger.debug('requires_auth: username and password not valid')
+            return authenticate()
+    return decorated
+
+def requires_auth_V1(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.authorization
+        app.logger.debug("Request authorization = %s\n", request.authorization)
+        if not auth or not check_auth(auth.username, auth.password):
+            return authenticate()
+        return f(*args, **kwargs)
+    return decorated
+
 
 def check_auth(username, password):
     '''
@@ -177,6 +217,7 @@ def check_auth(username, password):
     else:
         return user.check_password(password)
 
+
 def get_authenticated_user(request):
     '''
     .. function:: get_authenticated_user(request)
@@ -188,19 +229,16 @@ def get_authenticated_user(request):
     :rtype: User or None
     '''
     app.logger.debug("get_authenticated_user called....")
-    app.logger.debug("auth info ==> %s", request.authorization)
+    app.logger.debug("auth into ==> %s", request.authorization)
     if request.authorization:
         if request.authorization.password == '':
             user = load_token(request.authorization.username)
-            return user
-        elif check_auth(request.authorization.username, request.authorization.password):
+        else:
             user = models.User.query.\
                 filter_by(username=request.authorization.username).one()
-            return user
-        else:
-            return None
+        return user
     else:
-        app.logger.debug("get_authenticated_user: no authorization sent")
+        app.logger.debug("get_authenticated_user: no authorization found")
         return None
 
 
@@ -321,6 +359,14 @@ def api_get_auth_token():
         else:
             app.logger.debug('User accept invite to question %s failed for some reason...', question_id)
 
+    # Test for jsonp request
+    if 'callback' in request.args:
+        d = json.dumps(dict(response))
+        return 'jsonCallback(' + d + ');', 200
+
+    # Return raw json
+    # response = {'token': token}
+    # return jsonify(objects=response), 200
     return jsonify(response), 200
 
 #
@@ -931,7 +977,7 @@ def api_get_questions(question_id=None):
         app.logger.debug("Qustion data ==> %s", question_data);
 
         # Test for jsonp request
-        if False or 'callback' in request.args:
+        if 'callback' in request.args:
             d = json.dumps(dict(question=question_data))
             return request.args['callback'] + '(' + d + ');', 200
         else:
@@ -946,7 +992,7 @@ def api_get_questions(question_id=None):
             results.append(q.get_public())
 
         # Test for jsonp request
-        if False or 'callback' in request.args:
+        if 'callback' in request.args:
             d = json.dumps(dict(items=str(items),
                            questions=results))
             return request.args['callback'] + '(' + d + ');', 200
@@ -954,6 +1000,122 @@ def api_get_questions(question_id=None):
         else:
             return jsonify(items=str(items),
                            questions=results), 200
+
+
+
+#
+# Get Questions
+#
+# @app.route(REST_URL_PREFIX + '/questions', methods=['GET'])
+# @app.route(REST_URL_PREFIX + '/questions/<int:question_id>', methods=['GET'])
+# @requires_auth # added
+def api_get_questions(question_id=None):
+    '''
+    .. http:get:: /questions/(int:question_id)
+
+        A question or list of questions.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET /questions/42 HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+            {
+              "total_items": "3",
+              "items": "2",
+              "objects": [
+                {
+                  "last_move_on": "2013-08-12 09:51:38.632780",
+                  "created": "2013-08-12 09:51:38.632763",
+                  "title": "My question",
+                  "minimum_time": "0",
+                  "maximum_time": "604800",
+                  "id": 1,
+                  "blurb": "My blurb"
+                },
+                {
+                  "last_move_on": "2013-08-12 09:51:38.665584",
+                  "created": "2013-08-12 09:51:38.665570",
+                  "title": "Too Many Chefs",
+                  "minimum_time": "0",
+                  "maximum_time": "604800",
+                  "id": 3,
+                  "blurb": "How can they avoid spoiling the broth?"
+                }
+              ],
+              "page": "1",
+              "pages": "1"
+            }
+
+        :param question_id: question id
+        :type question_id: int
+        :param room: room title
+        :type room: string
+        :query page: page number. default is 1
+        :statuscode 200: no error
+        :statuscode 404: there's no user
+    '''
+    app.logger.debug("api_get_questions called...\n")
+
+    if question_id is not None:
+
+        question = models.Question.query.get(int(question_id))
+        if question is None:
+            return jsonify(message = "Question not found"), 404
+
+        results = question.get_public()
+
+        # Test for jsonp request
+        if 'callback' in request.args:
+            d = json.dumps(dict(question=results))
+            return request.args['callback'] + '(' + d + ');', 200
+
+        return jsonify(question=results), 200
+
+    else:
+        page = int(request.args.get('page', 1))
+
+        room = request.args.get('room', '')
+        app.logger.debug('api_get_questions: fetch questions for room %s', room)
+
+        # Filter questions
+        query = models.Question.query
+        # query = query.filter_by(room=room)
+        query = query.filter(id >= 141)
+        query = query.order_by(models.Question.last_move_on.desc())
+        questions = query.paginate(page,
+                                   RESULTS_PER_PAGE,
+                                   False)
+
+        items = len(questions.items)
+        pages = questions.pages
+        total_items = questions.total
+
+        results = []
+        for q in questions.items:
+            results.append(q.get_public())
+
+        # Test for jsonp request
+        if 'callback' in request.args:
+            d = json.dumps(dict(total_items=str(total_items), items=str(items),
+                           page=str(page), pages=str(pages),
+                           questions=results))
+            return request.args['callback'] + '(' + d + ');', 200
+
+        return jsonify(total_items=total_items, items=str(items),
+                       page=str(page), pages=str(pages),
+                       questions=results), 200
+
 
 #
 # Create Question
@@ -1242,7 +1404,7 @@ def api_get_question_proposals(question_id=None, proposal_id=None):
         result = proposal.get_public()
 
         # Test for jsonp request
-        if False or 'callback' in request.args:
+        if 'callback' in request.args:
             d = json.dumps(dict(proposal=result))
             return request.args['callback'] + '(' + d + ');', 200
         else:
@@ -1294,7 +1456,7 @@ def api_get_question_proposals(question_id=None, proposal_id=None):
             results.append(p.get_public(user))
 
         # Test for jsonp request
-        if False or 'callback' in request.args:
+        if 'callback' in request.args:
             d = json.dumps(dict(total_items=str(total_items), items=str(items),
                            page=str(page), pages=str(pages),
                            proposals=results))
@@ -2160,7 +2322,7 @@ def api_update_proposal_endorsement(question_id, proposal_id):
 
         .. sourcecode:: http
 
-            PATCH /questions/45/proposals/47/endorsements HTTP/1.1
+            DELETE /questions/45/proposals/47/endorsements HTTP/1.1
             Host: example.com
             Accept: application/json
 
@@ -2228,6 +2390,77 @@ def api_update_proposal_endorsement(question_id, proposal_id):
         return jsonify(message="Endorsement updated"), 200
     else:
         return jsonify(message="Failed to update endorsement"), 500
+
+
+# Remove Endorsement - TO REMOVE
+#
+# @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/proposals/' +
+#           '<int:proposal_id>/endorsements',
+#           methods=['DELETE'])
+@requires_auth
+def api_remove_proposal_endorsement(question_id, proposal_id):
+    '''
+    .. http:post:: /questions/(int:question_id)/proposals/(int:proposal_id)/endorsements
+
+        Delete an endorsement.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            DELETE /questions/45/proposals/47/endorsements HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+            {
+              "message": "Endorsement removed"
+            }
+
+        :param question_id: question ID
+        :type question_id: int
+        :param proposal_id: proposal ID
+        :type proposal_id: int
+        :statuscode 200: no error
+        :statuscode 400: bad request
+    '''
+    app.logger.debug("api_remove_proposal_endorsement called...\n")
+
+    user = get_authenticated_user(request)
+    if not user:
+        abort(401)
+
+    app.logger.debug("Authenticated User = %s\n", user.id)
+
+    if question_id is None or proposal_id is None:
+        abort(404)
+
+    question = models.Question.query.get(int(question_id))
+    if question is None:
+        abort(400)
+    elif question.phase != 'voting':
+        message = {"message": "The question is not in the voting phase"}
+        return jsonify(message), 403
+
+    proposal = models.Proposal.query.get(int(proposal_id))
+    if proposal is None:
+        abort(400)
+
+    if not proposal.is_endorsed_by(user):
+        message = {"message": "User has not yet endorsed this proposal"}
+        return jsonify(message), 400
+
+    proposal.remove_endorsement(user)
+    db_session.commit()
+
+    return jsonify(message="Endorsement removed"), 200
+
 
 #
 # Create proposal
@@ -2372,39 +2605,33 @@ def api_delete_proposal(question_id, proposal_id):
 
     user = get_authenticated_user(request)
     if not user:
-        return jsonify(message = "User not found"), 401
+        abort(401)
 
+    app.logger.debug("Authenticated User = %s\n", user.id)
+
+    # shark
     # Check user permission: can vote?
     question = models.Question.query.get(question_id)
     if question is None:
         return jsonify(message = "Question not found"), 404
 
-    '''
     perm = question.get_permissions(user)
     if perm is None or not models.Question.PROPOSE & perm:
         app.logger.debug("ACCESS ERROR: User %s with permission %s tried to delete a proposal on question %s", user.id, perm, question.id)
         return jsonify(message = "Question not found"), 404
-    '''
 
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
-        return jsonify(message = "Proposal not found"), 404
+        abort(404)
 
-    num_votes = len(proposal.all_voters(generation=proposal.question.generation))
-    if num_votes > 0:
-        message = {"message": "This proposal has votes and may no longer be deleted"}
-        return jsonify(message), 403
-    
     if user.id != proposal.user_id:
-        message = {"message": "Only the author delete this proposal"}
+        message = {"message": "You are not authorized to delete this proposal"}
         return jsonify(message), 403
 
-    '''
     if proposal.question.phase != 'writing'\
             or proposal.question.generation != proposal.generation_created:
         message = {"message": "This proposal may no longer be deleted"}
         return jsonify(message), 403
-    '''
 
     user.delete_proposal(proposal)
     db_session.commit()
@@ -2521,8 +2748,7 @@ def api_edit_question(question_id):
 
     user = get_authenticated_user(request)
     if not user:
-        response = {"message": "User not found"}
-        return jsonify(response), 401
+        abort(401)
 
     app.logger.debug("Authenticated User = %s\n", user.id)
 
@@ -2537,7 +2763,7 @@ def api_edit_question(question_id):
 
     # Cannot edit a question if not author
     if user_id != question.user_id:
-        message = {"message": "Only the author can edit this question"}
+        message = {"message": "You are not authorized to edit this question"}
         return jsonify(message), 403
     
     # doom
@@ -2557,20 +2783,18 @@ def api_edit_question(question_id):
             return jsonify({"question": question.get_public()}), 200
 
     # Cannot edit a question which has proposals
-    if question.proposals.count() > 0:
+    if question.propsals.count() > 0:
         message = {"message":
                    "This question has proposals and may no longer be edited"}
         return jsonify(message), 405
 
     if not 'title' in request.json or request.json['title'] == ''\
             or len(request.json['title']) > MAX_LEN_QUESTION_TITLE:
-        message = {"message": "Missing or empty title field"}
-        return jsonify(message), 400
+        abort(400)
 
     elif not 'blurb' in request.json or request.json['blurb'] == ''\
             or len(request.json['blurb']) > MAX_LEN_QUESTION_BLURB:
-        message = {"message": "Missing or empty content field"}
-        return jsonify(message), 400
+        abort(400)
 
     question.title = request.json.get('title')
     question.blurb = request.json.get('blurb')
@@ -2624,62 +2848,53 @@ def api_edit_proposal(question_id, proposal_id):
 
     user = get_authenticated_user(request)
     if not user:
-        response = {"message": "User not found"}
-        return jsonify(response), 401
+        abort(401)
 
     app.logger.debug("Authenticated User = %s\n", user.id)
 
     if 'question_id' is None or 'proposal_id' is None:
-        response = {"message": "Requires Question ID"}
-        return jsonify(response), 400
-    
-    if 'proposal_id' is None:
-        response = {"message": "Requires Proposal ID"}
-        return jsonify(response), 400
+        abort(404)
 
-    if not 'title' in request.json or request.json['title'] == ''\
-            or len(request.json['title']) > MAX_LEN_PROPOSAL_TITLE:
-        return jsonify(message="Proposal title must not be empty and must be less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
+    if not 'title' in request.json or request.json['title'] == '' \
+            or len(request.json['blurb']) > MAX_LEN_PROPOSAL_TITLE:
+        abort(400)
 
-    elif not 'blurb' in request.json or request.json['blurb'] == ''\
+    elif not 'blurb' in request.json or request.json['blurb'] == '' \
             or len(request.json['blurb']) > MAX_LEN_PROPOSAL_BLURB:
-        return jsonify(message="Proposal content must not be empty and must be less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
+        abort(400)
 
     elif 'abstract' in request.json and \
-            len(request.json['abstract']) > MAX_LEN_PROPOSAL_ABSTRACT:
-        return jsonify(message="Proposal abstract name must less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
+            (request.json['abstract'] == ''
+             or len(request.json['abstract']) > MAX_LEN_PROPOSAL_ABSTRACT):
+        abort(400)
 
     title = request.json.get('title')
     blurb = request.json.get('blurb')
     abstract = request.json.get('abstract', None)
 
-    question = models.Question.query.get(int(question_id))
-    if question is None:
-        response = {"message": "Question not found"}
-        return jsonify(response), 400
-    
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
-        response = {"message": "Proposal not found"}
-        return jsonify(response), 400
+        abort(404)
 
     if user.id != proposal.user_id:
         message = {"message": "You are not authorized to edit this proposal"}
         return jsonify(message), 403
 
-    num_votes = len(proposal.all_voters(generation=proposal.question.generation))
-    if num_votes > 0:
-        message = {"message": "This proposal has votes and may no longer be edited"}
+    if proposal.question.phase != 'writing'\
+            or proposal.question.generation != proposal.generation_created:
+        message = {"message": "This proposal may no longer be edited"}
         return jsonify(message), 403
-    
-    # It is OK to update the proposal
+
     if proposal.update(user, title, blurb, abstract):
         db_session.commit()
-        message = {"message": "Proposal updated"}
+        message = {"message":
+                   "Proposal updated"}
         return jsonify(message), 200
     else:
         message = {"message": "There was an error updating this proposal"}
         return jsonify(message), 400
+
+# shark
 
 # Get users not yet invited to participate in a question
 @app.route(REST_URL_PREFIX + '/users/associated_users',
