@@ -2521,7 +2521,8 @@ def api_edit_question(question_id):
 
     user = get_authenticated_user(request)
     if not user:
-        abort(401)
+        response = {"message": "User not found"}
+        return jsonify(response), 401
 
     app.logger.debug("Authenticated User = %s\n", user.id)
 
@@ -2536,7 +2537,7 @@ def api_edit_question(question_id):
 
     # Cannot edit a question if not author
     if user_id != question.user_id:
-        message = {"message": "You are not authorized to edit this question"}
+        message = {"message": "Only the author can edit this question"}
         return jsonify(message), 403
     
     # doom
@@ -2556,18 +2557,20 @@ def api_edit_question(question_id):
             return jsonify({"question": question.get_public()}), 200
 
     # Cannot edit a question which has proposals
-    if question.propsals.count() > 0:
+    if question.proposals.count() > 0:
         message = {"message":
                    "This question has proposals and may no longer be edited"}
         return jsonify(message), 405
 
     if not 'title' in request.json or request.json['title'] == ''\
             or len(request.json['title']) > MAX_LEN_QUESTION_TITLE:
-        abort(400)
+        message = {"message": "Missing or empty title field"}
+        return jsonify(message), 400
 
     elif not 'blurb' in request.json or request.json['blurb'] == ''\
             or len(request.json['blurb']) > MAX_LEN_QUESTION_BLURB:
-        abort(400)
+        message = {"message": "Missing or empty content field"}
+        return jsonify(message), 400
 
     question.title = request.json.get('title')
     question.blurb = request.json.get('blurb')
