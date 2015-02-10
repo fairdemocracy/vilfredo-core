@@ -34,7 +34,7 @@ except ImportError:
 
 from .. import app
 # from .. import api
-from VilfredoReloadedCore.api.v1 import api
+from VilfredoReloadedCore.api.v2 import api
 from .. database import drop_db, init_db
 import base64
 import json

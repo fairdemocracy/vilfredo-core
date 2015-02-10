@@ -38,7 +38,7 @@ import json, os
 import uuid
 
 
-REST_API_VERSION = 'v1'
+REST_API_VERSION = 'v2'
 REST_URL = '/api'
 REST_URL_PREFIX = REST_URL + '/' + REST_API_VERSION
 
