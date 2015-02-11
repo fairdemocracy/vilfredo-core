@@ -28,7 +28,7 @@ from flask import session, request, make_response
 
 from . import app, models
 
-from VilfredoReloadedCore.api.v1 import api
+from VilfredoReloadedCore.api.v2 import api
 
 from database import db_session
 
