@@ -31,12 +31,25 @@ SITE_DOMAIN = '0.0.0.0:8080'
 # DATABASE_URI = 'sqlite:////var/tmp/vr.db'
 development_db = 'sqlite:////var/tmp/vr.db'
 
-ALGORITHM_VERSION = 1
-
 CACHE_COMPLEX_DOM = True
 
 # Set path to log file
 LOG_FILE_PATH = '/var/tmp/vr.log'
+
+# Set path to pickle work files
+WORK_FILE_DIRECTORY = '/var/tmp/work'
+
+# Set max upload file size 
+MAX_CONTENT_LENGTH = 2 * 1024 * 1024
+
+# Set path to uploaded user files
+UPLOADED_FILES_DEST = 'static/usercontent/uploads'
+
+# Set path to uploaded user files
+UPLOADED_AVATAR_DEST = 'static/usercontent/profiles'
+
+# Set permitted extensions for uploaded user files
+ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif']
 
 # name of logger configuration file
 LOG_CONFIG_FILE = 'logging_debug.conf'

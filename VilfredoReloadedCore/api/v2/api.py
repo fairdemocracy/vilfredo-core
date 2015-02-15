@@ -81,6 +81,12 @@ except Exception:
     print 'Failed to create login_serializer'
 '''
 
+# For a given file, return whether it's an allowed type or not
+def allowed_file(filename, permitted=None):
+    permitted = permitted or app.config['ALLOWED_EXTENSIONS']
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1] in permitted
+
 @login_manager.token_loader
 def load_token(token):
     """
@@ -217,9 +223,9 @@ def bad_request(error):
 #
 # Index
 #
-@app.route(REST_URL, methods=['GET', 'POST'])
-@app.route(REST_URL + '/', methods=['GET', 'POST'])
-@app.route(REST_URL + '/index', methods=['GET', 'POST'])
+@app.route(REST_URL, methods=['GET'])
+@app.route(REST_URL + '/', methods=['GET'])
+@app.route(REST_URL + '/index', methods=['GET'])
 def api_index():
     '''
     .. http:get:: /
@@ -558,6 +564,77 @@ def api_update_user(user_id):
     response = {'url': url_for('api_get_users', user_id=user.id)}
 
     return jsonify(object=response), 201
+
+
+#
+# Upload avatar
+#
+@app.route(REST_URL_PREFIX + '/upload_avatar', methods=['POST'])
+@requires_auth
+def api_upload_avatar():
+    '''
+    .. http:post:: /upload_avatar
+
+        Request password reset.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            POST /users HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 201 OK
+            Content-Type: application/json
+
+            {
+                "message": "File saved",
+                "url": "http://0.0.0.0:8080/static/usercontent/profiles/1/831e44b41f77c66d6f97aa8ee4977275.jpg"
+            }
+
+        :json email: registered email address
+        :statuscode 201: no error
+        :statuscode 400: bad request
+        :statuscode 401: bad request
+    '''
+    app.logger.debug("api_upload_avatar called.....\n")
+    
+    # Must be authenticated
+    user = get_authenticated_user(request)
+    if not user:
+        app.logger.debug("api_upload_avatar: user not logged in.....\n")
+        response = {"message": "User not logged in"}
+        return jsonify(response), 400
+
+    # avatars = UploadSet('avatars', IMAGES)
+
+    app.logger.info("requst data %s", request.files)
+    app.logger.info("requst data %s", request.files['avatar'])
+    avatar = request.files['avatar']
+    app.logger.info("avatar file = %s", avatar)
+    app.logger.info("avatar filename = %s", avatar.filename)
+    if not avatar:
+        message = 'Failed to upload file'
+        return jsonify(message=message, error=message), 401
+    
+    if not allowed_file(avatar.filename):
+        message = 'Avatar file must be of type: ' + ', '.join(app.config['ALLOWED_EXTENSIONS'])
+        return jsonify(message=message, error=message), 401
+
+    avatar_saved = user.set_avatar(avatar)
+
+    if avatar_saved == False:
+        message = 'Failed to save file'
+        return jsonify(message=message, error=message), 401
+
+    message = 'Avatar saved'
+    return jsonify(message=message,
+                   url=app.config['PROTOCOL'] + app.config['SITE_DOMAIN'] + '/' + avatar_saved), 201
 
 
 #
@@ -914,6 +991,9 @@ def api_get_questions(question_id=None):
 
     # shark
     user = get_authenticated_user(request)
+    if not user:
+        response = {"message": "User not logged in"}
+        return jsonify(response), 400
 
     if question_id is not None:
 

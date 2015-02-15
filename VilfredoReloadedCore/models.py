@@ -30,7 +30,7 @@ from database import db_session, db
 
 import datetime, math, time
 
-import copy
+import copy, os, glob
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -130,6 +130,21 @@ work_file_dir = app.config['WORK_FILE_DIRECTORY']
 
 def get_timestamp():
     return int(math.floor(time.time()))
+
+def hash_string(str):
+    '''
+        .. function:: hash_string(str)
+
+        Create the md5 hash of a string.
+
+        :param question: str
+        :type question: string
+        :rtype: String
+        '''
+    import hashlib
+    m = hashlib.md5()
+    m.update(str)
+    return m.hexdigest()
 
 def make_new_map_filename_hashed(question,
                                  generation=None,
@@ -310,6 +325,55 @@ class User(db.Model, UserMixin):
 
     __tablename__ = 'user'
 
+    @staticmethod
+    def get_default_avatar():    
+        avatar = ''
+        current_dir = os.path.dirname(os.path.realpath(__file__))
+        app.logger.debug("current_dir => %s", current_dir)
+        test_default_avatar_path = os.path.join(current_dir, app.config['UPLOADED_AVATAR_DEST'], 'default', '*')
+        files = glob.glob(test_default_avatar_path)
+        if len(files) > 0:
+            avatar = os.path.join(app.config['UPLOADED_AVATAR_DEST'], 'default', os.path.basename(files[0]))
+        return avatar
+
+    def set_avatar(self, avatar):
+        current_dir = os.path.dirname(os.path.realpath(__file__))
+        avatar_path = os.path.join(current_dir, app.config['UPLOADED_AVATAR_DEST'], str(self.id))
+        app.logger.info("avatar path = %s", avatar_path)
+        if not os.path.exists(avatar_path):
+            try:
+                os.makedirs(avatar_path)
+            except IOError:
+                app.logger.debug('Failed to create map path %s', avatar_path)
+                return False
+        else:
+            app.logger.info("deleting current file in avatar path = %s", os.path.join(avatar_path, '*'))
+            test_user_avatar_path = os.path.join(current_dir, app.config['UPLOADED_AVATAR_DEST'], str(self.id), '*')
+            files = glob.glob(test_user_avatar_path)
+            os.remove(files[0])
+
+        fix_filename = os.path.splitext(avatar.filename)
+        avatar.filename = hash_string(avatar.filename) + fix_filename[1]
+        app.logger.debug("Saving avatar to %s", os.path.join(avatar_path, avatar.filename))
+        avatar.save(os.path.join(avatar_path, avatar.filename))
+        if not os.path.isfile(os.path.join(avatar_path, avatar.filename)):
+            return False
+        else:
+            return os.path.join(app.config['UPLOADED_AVATAR_DEST'], str(self.id), avatar.filename)
+    
+    def get_avatar(self):
+        current_dir = os.path.dirname(os.path.realpath(__file__))
+        avatar = ''
+        test_user_avatar_path = os.path.join(current_dir, app.config['UPLOADED_AVATAR_DEST'], str(self.id), '*')
+        app.logger.debug("test_user_avatar_path = %s", test_user_avatar_path)
+        files = glob.glob(test_user_avatar_path)
+        app.logger.debug("test_user_avatar_path = %s", files)
+        if len(files) > 0:
+            avatar = os.path.join(app.config['UPLOADED_AVATAR_DEST'], str(self.id), os.path.basename(files[0]))
+        else:
+            avatar = User.get_default_avatar()
+        return avatar
+    
     def get_public(self):
         '''
         .. function:: get_public()
@@ -318,11 +382,13 @@ class User(db.Model, UserMixin):
 
         :rtype: dict
         '''
+        avatar_url = self.get_avatar()
         return {'id': str(self.id),
                 'username': self.username,
                 "registered": str(self.registered),
                 "last_seen": str(self.last_seen),
-                'url': url_for('api_get_users', user_id=self.id)}
+                'url': url_for('api_get_users', user_id=self.id),
+                'avatar_url': app.config['PROTOCOL'] + os.path.join(app.config['SITE_DOMAIN'], avatar_url)}
 
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(20), unique=True, nullable=False)
@@ -2456,8 +2522,6 @@ class Question(db.Model):
         
         app.logger.debug("calculate_proposal_relation_ids called with gen %s", generation)
 
-        import os
-
         filenamehash = make_new_map_filename_hashed(self,
                                                     generation,
                                                     algorithm)
@@ -3332,7 +3396,6 @@ class Question(db.Model):
 
         generation = generation or self.generation
 
-        import os
         
         filenamehash = make_new_map_filename_hashed(self,
                                                     generation,
@@ -4312,7 +4375,7 @@ class Question(db.Model):
         filepath = map_path + filename
         app.logger.debug("Filepath = %s", filepath)
 
-        import os
+
         if not os.path.exists(map_path):
             try:
                 os.makedirs(map_path)
@@ -4441,7 +4504,6 @@ class Question(db.Model):
         filepath = map_path + filename
         app.logger.debug("Filepath = %s", filepath)
 
-        import os
         if not os.path.exists(map_path):
             try:
                 os.makedirs(map_path)
