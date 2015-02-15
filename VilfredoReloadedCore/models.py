@@ -1401,6 +1401,7 @@ class Question(db.Model):
                 "maximum_time": str(self.maximum_time),
                 'phase': self.phase,
                 'author': self.author.username,
+                'avatar_url': app.config['PROTOCOL'] + os.path.join(app.config['SITE_DOMAIN'], self.author.get_avatar()),
                 'author_id': self.author.id,
                 'proposal_count': str(self.get_proposal_count()),
                 'new_proposal_count': str(self.get_new_proposal_count()),
