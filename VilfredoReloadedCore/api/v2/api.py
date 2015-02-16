@@ -3388,10 +3388,126 @@ def api_question_results(question_id=None):
                    results=results), 200
 
 
-
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/participation_table', methods=['GET'])
 @requires_auth # added
 def api_question_participation_table(question_id=None):
+    '''
+    .. http:post:: /questions/(int:question_id)/participation_table
+
+        A list of the Key Players for this round.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            POST /questions/44/key_players HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+            {
+              "query_generation": "1",
+              "current_generation": "1",
+              "key_players": [
+                {
+                  "3": [
+                    "/api/v1/questions/1/proposals/4",
+                    "/api/v1/questions/1/proposals/3"
+                  ]
+                },
+                {
+                  "4": [
+                    "/api/v1/questions/1/proposals/3"
+                  ]
+                }
+              ],
+              "num_items": "2",
+              "question_id": "1"
+            }
+
+        :param question_id: question id
+        :statuscode 200: no error
+        :statuscode 400: bad request
+    '''
+    app.logger.debug("api_question_participation_table called with %s...\n",
+                     question_id)
+
+    if question_id is None:
+        app.logger.debug("ERROR: question_id is None!\n")
+        abort(404)
+
+    question = models.Question.query.get(int(question_id))
+
+    if question is None:
+        app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
+        jsonify(message="Question not found"), 404
+
+    participants = question.get_participants()
+    app.logger.debug("participants==> %s", participants)
+    all_proposals = question.get_all_proposals()
+    
+    authors = dict()
+    for proposal in all_proposals:
+        if proposal.author.id not in authors:
+            authors[proposal.author.id] = 1
+        else:
+            authors[proposal.author.id] = authors[proposal.author.id] + 1
+    
+    '''
+    participants
+    [{'permissions': '7', 'user_id': '1', 'username': u'john'},
+     {'permissions': '7', 'user_id': '2', 'username': u'susan'},
+     {'permissions': '7', 'user_id': '3', 'username': u'bill'},
+     {'permissions': '7', 'user_id': '4', 'username': u'jack'}]
+     
+     all_proposals
+     [<Proposal(9 'Bill's stuff' by bill, Q:'2')>,
+     <Proposal(10 'dfsdfsdfds' by bill, Q:'2')>]
+     
+     authors
+     {1: 1, 2: 0}
+     
+     {"num_proposals": "2", "current_generation": "1", "question_id": "2", "num_items": "1", 
+     "participation_table": [{"username": "bill", "past_generations": 0, "evaluations": 0}]}
+     
+     {"num_proposals": "2", "current_generation": "1", "question_id": "2", "num_items": "1", 
+     "participation_table": [
+        {"username": "bill", "evaluations": 0, "authored": 2}
+        {"username": "john", "evaluations": 0, "authored": 0}
+        {"username": "jack", "evaluations": 0, "authored": 1}
+     ]}
+    '''
+
+    participation_table = []
+    for user in participants:
+        participant = dict()
+        participant['username'] = user.username
+        participant['evaluations'] = user.get_endorsement_count(question)
+        
+        if user.id not in authors:
+            participant['proposals_written'] = 0
+        else:
+            participant['proposals_written'] = authors[user.id]
+        
+        app.logger.debug("participant==>%s", participant)
+        participation_table.append(participant)
+        app.logger.debug("participation_table==>%s", participation_table)
+
+    return jsonify(question_id=str(question.id),
+                   current_generation=str(question.generation),
+                   num_proposals=str(len(all_proposals)),
+                   num_items=str(len(participation_table)),
+                   participation_table=participation_table), 200
+
+# @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/participation_table', methods=['GET'])
+@requires_auth # added
+def api_question_participation_table_v1(question_id=None):
     '''
     .. http:post:: /questions/(int:question_id)/participation_table
 
@@ -3469,7 +3585,7 @@ def api_question_participation_table(question_id=None):
     for user in participants:
         participant = dict()
         participant['username'] = user.username
-        # participant['key_player'] = user in key_players
+        # participant['key_player'] = user in key_players
         participant['past_generations'] = user.generations_participated_count(question)
         participant['evaluations'] = user.get_endorsement_count(question)
         app.logger.debug("participant==>%s", participant)

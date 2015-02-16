@@ -1533,6 +1533,23 @@ class Question(db.Model):
                 users_to_invite.append({'username': user.username, 'user_id': user.id})
             return users_to_invite
     
+    def get_participants(self):
+        '''
+        .. function:: get_participant_permissions()
+
+        Get a question's participants.
+
+        :rtype: list
+        '''
+        participants = list()
+        invitations = self.invites.all()
+        if not invitations is None:
+            for invitation in invitations:
+                user = User.query.get(invitation.receiver.id)
+                if user:
+                    participants.append(user)
+        return participants
+    
     def get_participant_permissions(self):
         '''
         .. function:: get_participant_permissions()
