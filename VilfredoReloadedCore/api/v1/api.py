@@ -969,7 +969,7 @@ def api_get_questions(question_id=None):
 
         # Check user permission
         perm = question.get_permissions(user)
-        if perm is None:
+        if not perm:
             app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
             return jsonify(message = "Question not found"), 404
 
