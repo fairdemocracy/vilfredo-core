@@ -163,7 +163,7 @@ def lost_password():
     return render_template("lostpassword.html")
     
 @app.route('/mysettings')
-def lost_password():
+def mysettings():
     return render_template("mysettings.html")
 
 @app.route('/domination/<int:question_id>/gen/<int:generation>')
