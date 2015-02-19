@@ -1003,7 +1003,7 @@ def api_get_questions(question_id=None):
 
         # Check user permission
         perm = question.get_permissions(user)
-        if perm is None:
+        if not perm:
             app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
             return jsonify(message = "Question not found"), 404
 
@@ -2041,7 +2041,7 @@ def api_add_proposal_endorsement(question_id, proposal_id):
     # shark
     # Check user permission: can vote?
     perm = question.get_permissions(user)
-    if perm is None or not models.Question.VOTE & perm:
+    if not perm or not models.Question.VOTE & perm:
         app.logger.debug("ACCESS ERROR: User %s with permission %s tried to vote on question %s", user.id, perm, question.id)
         return jsonify(message = "Question not found"), 404
 
@@ -2286,7 +2286,7 @@ def api_update_proposal_endorsement(question_id, proposal_id):
     # shark
     # Check user permission: can vote?
     perm = question.get_permissions(user)
-    if perm is None or not models.Question.VOTE & perm:
+    if not perm or not models.Question.VOTE & perm:
         app.logger.debug("ACCESS ERROR: User %s with permission %s tried to vote on question %s", user.id, perm, question.id)
         return jsonify(message = "Question not found"), 404
 
@@ -2366,7 +2366,7 @@ def api_create_proposal(question_id):
     # shark
     # Check user permission: can propose?
     perm = question.get_permissions(user)
-    if perm is None or not models.Question.PROPOSE & perm:
+    if not perm or not models.Question.PROPOSE & perm:
         app.logger.debug("ACCESS ERROR: User %s with permission %s tried to propose on question %s", user.id, perm, question.id)
         return jsonify(message = "Question not found"), 404
 
@@ -2461,7 +2461,7 @@ def api_delete_proposal(question_id, proposal_id):
 
     '''
     perm = question.get_permissions(user)
-    if perm is None or not models.Question.PROPOSE & perm:
+    if not perm or not models.Question.PROPOSE & perm:
         app.logger.debug("ACCESS ERROR: User %s with permission %s tried to delete a proposal on question %s", user.id, perm, question.id)
         return jsonify(message = "Question not found"), 404
     '''
@@ -4086,6 +4086,12 @@ def api_get_voting_data(question_id):
         app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
         abort(404)
 
+    # Check user permission
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access voting_data for question %s", user.id, question.id)
+        return jsonify(message = "Question not found"), 404
+    
     generation = int(request.args.get('generation', question.generation))
 
     voting_data = question.get_endorsement_results(generation)
