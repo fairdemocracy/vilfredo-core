@@ -2268,7 +2268,7 @@ def api_update_proposal_endorsement(question_id, proposal_id):
 
     user = get_authenticated_user(request)
     if not user:
-        abort(401)
+        return jsonify(message = "User not found"), 400
 
     app.logger.debug("Authenticated User = %s\n", user.id)
 
@@ -2352,7 +2352,7 @@ def api_create_proposal(question_id):
 
     user = get_authenticated_user(request)
     if not user:
-        abort(401)
+        return jsonify(message = "User not found"), 400
 
     app.logger.debug("Authenticated User = %s\n", user.id)
 
@@ -4044,7 +4044,7 @@ def api_question_graph(question_id):
 
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/voting_data',
            methods=['GET'])
-@requires_auth # added
+@requires_auth
 def api_get_voting_data(question_id):
     '''
     .. http:post:: questions/(int:question_id)/voting_data
@@ -4087,6 +4087,10 @@ def api_get_voting_data(question_id):
         abort(404)
 
     # Check user permission
+    user = get_authenticated_user(request)
+    if not user:
+        return jsonify(message = "User not found"), 400
+        
     perm = question.get_permissions(user)
     if not perm:
         app.logger.debug("ACCESS ERROR: User %s tried to access voting_data for question %s", user.id, question.id)
