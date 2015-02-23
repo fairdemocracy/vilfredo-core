@@ -80,8 +80,8 @@ def add_invitation_from_token():
     auth = request.cookies.get('vgaclient')
     user = api.load_token(auth)
     if not user:
-        # return redirect(redirect_url())
-        email = request.args.get('email')
+        invite = models.EmailInvite.query.filter_by(token=token).first()
+        email = invite.receiver_email
         return redirect(url_for('index', email=email, eit=token))
     else:
         question_id = models.EmailInvite.accept(user, token)

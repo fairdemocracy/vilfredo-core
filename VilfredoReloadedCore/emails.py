@@ -286,5 +286,5 @@ def send_question_email_invite_email(sender, recipient_email, question, token):
                       body_template % (sender.username,
                                        question.title,
                                        app.config['PROTOCOL'],
-                                       app.config['SITE_DOMAIN']+'/invitation'+'?email='+recipient_email+'&eit='+token))
+                                       app.config['SITE_DOMAIN']+'/invitation'+'?eit='+token))
 
