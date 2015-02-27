@@ -54,9 +54,9 @@ MAX_LEN_PROPOSAL_ABSTRACT = 5000
 MAX_LEN_PROPOSAL_BLURB = 10000
 MAX_LEN_QUESTION_TITLE = 120
 MAX_LEN_QUESTION_BLURB = 10000
-MAX_LEN_PROPOSAL_COMMENT = 300
-MAX_LEN_PROPOSAL_QUESTION = 300
-MAX_LEN_PROPOSAL_QUESTION_ANSWER = 300
+MAX_LEN_PROPOSAL_COMMENT = 1000
+MAX_LEN_PROPOSAL_QUESTION = 1000
+MAX_LEN_PROPOSAL_QUESTION_ANSWER = 1000
 ENDORSEMENT_TYPES = ['endorse', 'oppose', 'confused']
 COMMENT_TYPES = ['for', 'against', 'question', 'answer']
 PWD_RESET_LIFETIME = 3600*24*2
@@ -193,8 +193,6 @@ def get_authenticated_user(request):
     :type request: Object
     :rtype: User or None
     '''
-    app.logger.debug("get_authenticated_user called....")
-    app.logger.debug("auth info ==> %s", request.authorization)
     if request.authorization:
         if request.authorization.password == '':
             user = load_token(request.authorization.username)
