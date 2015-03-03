@@ -85,7 +85,7 @@ except Exception:
 def allowed_file(filename, permitted=None):
     permitted = permitted or app.config['ALLOWED_EXTENSIONS']
     return '.' in filename and \
-           filename.rsplit('.', 1)[1] in permitted
+           filename.rsplit('.', 1)[1].lower() in permitted
 
 @login_manager.token_loader
 def load_token(token):
