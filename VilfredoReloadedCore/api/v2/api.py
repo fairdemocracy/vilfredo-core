@@ -2119,7 +2119,8 @@ def api_add_proposal_endorsement(question_id, proposal_id):
     '''
 
     return jsonify(message="Endorsement added",
-                   endorsement_type=endorsement_type), 201
+                   endorsement_type=endorsement_type,
+                   vote_count=str(proposal.get_vote_count())), 201
 
 
 

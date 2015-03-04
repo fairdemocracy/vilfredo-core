@@ -7426,7 +7426,7 @@ class Proposal(db.Model):
 
         :rtype: dict
         '''
-        num_votes = len(self.all_voters(generation=self.question.generation))
+        num_votes = self.get_vote_count()
         public = {'id': str(self.id),
                 'uri': url_for('api_get_question_proposals',
                                question_id=self.question.id,
@@ -7572,6 +7572,16 @@ class Proposal(db.Model):
             comments = self.comments.filter(Comment.comment_type == 'question').order_by(Comment.id).count()
         return comments
 
+    def get_vote_count(self):
+        '''
+        .. function:: get_vote_count()
+
+        Get the current vote count for the propsal.
+
+        :rtype: integer
+        '''
+        return self.endorsements.filter(Endorsement.generation == self.question.generation).count()
+    
     def get_comment_count(self, generation=None):
         '''
         .. function:: get_comment_count([generation=None])
