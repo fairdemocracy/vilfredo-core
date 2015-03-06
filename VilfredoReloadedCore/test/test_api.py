@@ -378,6 +378,58 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         #
         # Get Invites
         #
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/questions/1/new_invites',
+                                      'GET',
+                                      dict(),
+                                      'john',
+                                      'john123')
+        self.assertEqual(rv.status_code, 200)
+        # Log data received
+        app.logger.debug("Data retrieved from Get New Invites = %s\n", rv.data)
+
+        #
+        # Accept Invites
+        #
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/users/2/new_invites/1/accept',
+                                      'POST',
+                                      dict(),
+                                      'susan',
+                                      'susan123')
+        self.assertEqual(rv.status_code, 200)
+        # Log data received
+        app.logger.debug("Data retrieved from Get Invites = %s\n", rv.data)
+
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/users/3/new_invites/2/accept',
+                                      'POST',
+                                      dict(),
+                                      'bill',
+                                      'bill123')
+        self.assertEqual(rv.status_code, 200)
+
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/users/4/new_invites/3/accept',
+                                      'POST',
+                                      dict(),
+                                      'jack',
+                                      'jack123')
+        self.assertEqual(rv.status_code, 200)
+
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/users/5/new_invites/4/accept',
+                                      'POST',
+                                      dict(),
+                                      'harry',
+                                      'harry123')
+        self.assertEqual(rv.status_code, 200)
+
+        rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/users/6/new_invites/5/accept',
+                                      'POST',
+                                      dict(),
+                                      'tim',
+                                      'tim123')
+        self.assertEqual(rv.status_code, 200)
+        
+        #
+        # Fetch accepted invitations
+        #
         rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/questions/1/invitations',
                                       'GET',
                                       dict(),
@@ -386,8 +438,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         self.assertEqual(rv.status_code, 200)
         # Log data received
         app.logger.debug("Data retrieved from Get Invites = %s\n", rv.data)
-        
-        
+
         #
         # Create Email Invites
         #

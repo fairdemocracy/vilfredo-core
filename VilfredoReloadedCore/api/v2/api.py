@@ -4655,6 +4655,87 @@ def api_question_proposal_relations(question_id=None):
         num_items=str(len(proposal_relations)), proposal_relations=results), 200
 
 
+# Get New Invitations
+@app.route(REST_URL_PREFIX + '/questions/<int:question_id>/new_invites',
+           methods=['GET'])
+@requires_auth
+def api_get_new_invites(question_id):
+    '''
+    .. http:get:: /questions/(int:question_id)/new_invites
+
+        A list of new invitations for a question whih have not yet ben accepted or declined.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET /questions/45/new_invites HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 201 OK
+            Content-Type: application/json
+
+            {
+              "total_items": "4",
+              "items": "2",
+              "objects": [
+                {
+                  "receiver_id": "/api/v1/users/2",
+                  "sender_url": "/api/v1/users/1",
+                  "sender_id": 1,
+                  "id": "1",
+                  "question_id": 1
+                },
+                {
+                  "receiver_id": "/api/v1/users/3",
+                  "sender_url": "/api/v1/users/1",
+                  "sender_id": 1,
+                  "id": "2",
+                  "question_id": 1
+                }
+              ],
+              "page": "1",
+              "pages": "2"
+            }
+
+        :param question_id: question ID
+        :type question_id: int
+        :query page: results page number, default is 1
+        :statuscode 200: no error
+        :statuscode 404: bad request
+    '''
+    app.logger.debug("api_get_new_invites called...\n")
+
+    if question_id is None:
+        return jsonify(message = "Question ID parameter not set"), 404
+
+    question = models.Question.query.get(int(question_id))
+    if question is None:
+        return jsonify(message = "Question not found"), 404
+
+    page = int(request.args.get('page', 1))
+
+    invites = models.UserInvite.query.filter(
+        models.UserInvite.question_id == int(question_id)).\
+        paginate(page, RESULTS_PER_PAGE, False)
+
+    items = len(invites.items)
+    pages = invites.pages
+    total_items = invites.total
+
+    results = []
+    for i in invites.items:
+        results.append(i.get_public())
+
+    return jsonify(total_items=str(total_items), items=str(items),
+                   page=str(page), pages=str(pages),
+                   invitations=results), 200
+
 # Get Invitations
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/invitations',
            methods=['GET'])
@@ -4706,10 +4787,10 @@ def api_get_invitations(question_id):
         :param question_id: question ID
         :type question_id: int
         :query page: results page number, default is 1
-        :statuscode 201: no error
-        :statuscode 400: bad request
+        :statuscode 200: no error
+        :statuscode 404: bad request
     '''
-    app.logger.debug("api_get_invitations called...\n") # arse
+    app.logger.debug("api_get_invitations called...\n")
 
     if question_id is None:
         return jsonify(message = "Question ID parameter not set"), 404
@@ -4889,7 +4970,7 @@ def api_create_invitation(question_id):
     if not user:
         abort(401)
 
-    app.logger.debug("Authenticated User = %s\n", user.id) # arse
+    app.logger.debug("Authenticated User = %s\n", user.id)
 
     if question_id is None:
         return jsonify(message = "Question ID parameter not set"), 404
