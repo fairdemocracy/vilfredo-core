@@ -325,8 +325,96 @@ class User(db.Model, UserMixin):
 
     __tablename__ = 'user'
 
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(20), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True)
+    password = db.Column(db.String(120), nullable=False)
+    registered = db.Column(db.DateTime)
+    last_seen = db.Column(db.DateTime)
+
+    # 1:M
+    questions = db.relationship('Question', backref='author', lazy='dynamic',
+                                cascade="all, delete-orphan")
+
+    proposals = db.relationship('Proposal', backref='author', lazy='dynamic',
+                                cascade="all, delete-orphan")
+
+    endorsements = db.relationship('Endorsement',
+                                   primaryjoin="User.id==Endorsement.user_id",
+                                   backref='endorser', lazy='dynamic',
+                                   cascade="all, delete-orphan")
+
+    # updates 1:M
+    subscribed_questions = db.relationship("Update", backref='subscriber',
+                                           lazy='dynamic',
+                                           cascade="all, delete-orphan")
+
+    # invites M:M
+    invites = db.relationship("Invite",
+                              primaryjoin="User.id==Invite.sender_id",
+                              backref="sender", lazy='dynamic',
+                              cascade="all, delete-orphan")
+
+    invites_received = db.relationship("Invite",
+                              primaryjoin="User.id==Invite.receiver_id",
+                              backref="owner", lazy='dynamic',
+                              cascade="all, delete-orphan")
+
+    # invites M:M
+    invites_sent = db.relationship("UserInvite",
+                              primaryjoin="User.id==UserInvite.sender_id",
+                              backref="sender", lazy='dynamic',
+                              cascade="all, delete-orphan")
+
+    new_invites = db.relationship("UserInvite",
+                              primaryjoin="User.id==UserInvite.receiver_id",
+                              backref="invited", lazy='dynamic',
+                              cascade="all, delete-orphan")
+
+    comments = db.relationship(
+        'Comment',
+        secondary=user_comments,
+        primaryjoin="user_comments.c.user_id == User.id",
+        backref=db.backref('supporters', lazy='dynamic'),
+        lazy='dynamic')
+
+    def get_public(self):
+        '''
+        .. function:: get_public()
+
+        Return public propoerties as string values for REST responses.
+
+        :rtype: dict
+        '''
+        avatar_url = self.get_avatar()
+        return {'id': str(self.id),
+                'username': self.username,
+                "registered": str(self.registered),
+                "last_seen": str(self.last_seen),
+                'url': url_for('api_get_users', user_id=self.id),
+                'avatar_url': app.config['PROTOCOL'] + os.path.join(app.config['SITE_DOMAIN'], avatar_url)}
+
+    def get_auth_token(self):
+        """
+        Encode a secure token for cookie
+        """
+        data = [str(self.id), self.password]
+        from .auth import login_serializer
+        return login_serializer.dumps(data)
+    
     @staticmethod
-    def get_default_avatar():    
+    def get(userid):
+        return User.query.filter_by(id=userid).first()
+
+    def __init__(self, username, email, password):
+        self.username = username
+        self.email = email
+        self.set_password(password)
+        self.registered = datetime.datetime.utcnow()
+        self.last_seen = datetime.datetime.utcnow()
+    
+    @staticmethod
+    def get_default_avatar():
         avatar = ''
         current_dir = os.path.dirname(os.path.realpath(__file__))
         app.logger.debug("current_dir => %s", current_dir)
@@ -373,83 +461,6 @@ class User(db.Model, UserMixin):
         else:
             avatar = User.get_default_avatar()
         return avatar
-    
-    def get_public(self):
-        '''
-        .. function:: get_public()
-
-        Return public propoerties as string values for REST responses.
-
-        :rtype: dict
-        '''
-        avatar_url = self.get_avatar()
-        return {'id': str(self.id),
-                'username': self.username,
-                "registered": str(self.registered),
-                "last_seen": str(self.last_seen),
-                'url': url_for('api_get_users', user_id=self.id),
-                'avatar_url': app.config['PROTOCOL'] + os.path.join(app.config['SITE_DOMAIN'], avatar_url)}
-
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(20), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True)
-    password = db.Column(db.String(120), nullable=False)
-    registered = db.Column(db.DateTime)
-    last_seen = db.Column(db.DateTime)
-
-    # 1:M
-    questions = db.relationship('Question', backref='author', lazy='dynamic',
-                                cascade="all, delete-orphan")
-
-    proposals = db.relationship('Proposal', backref='author', lazy='dynamic',
-                                cascade="all, delete-orphan")
-
-    endorsements = db.relationship('Endorsement',
-                                   primaryjoin="User.id==Endorsement.user_id",
-                                   backref='endorser', lazy='dynamic',
-                                   cascade="all, delete-orphan")
-
-    # updates 1:M
-    subscribed_questions = db.relationship("Update", backref='subscriber',
-                                           lazy='dynamic',
-                                           cascade="all, delete-orphan")
-
-    # invites M:M
-    invites = db.relationship("Invite",
-                              primaryjoin="User.id==Invite.sender_id",
-                              backref="sender", lazy='dynamic',
-                              cascade="all, delete-orphan")
-
-    invites_received = db.relationship("Invite",
-                              primaryjoin="User.id==Invite.receiver_id",
-                              backref="owner", lazy='dynamic',
-                              cascade="all, delete-orphan")
-
-    comments = db.relationship(
-        'Comment',
-        secondary=user_comments,
-        primaryjoin="user_comments.c.user_id == User.id",
-        backref=db.backref('supporters', lazy='dynamic'),
-        lazy='dynamic')
-
-    def get_auth_token(self):
-        """
-        Encode a secure token for cookie
-        """
-        data = [str(self.id), self.password]
-        from .auth import login_serializer
-        return login_serializer.dumps(data)
-
-    @staticmethod
-    def get(userid):
-        return User.query.filter_by(id=userid).first()
-
-    def __init__(self, username, email, password):
-        self.username = username
-        self.email = email
-        self.set_password(password)
-        self.registered = datetime.datetime.utcnow()
-        self.last_seen = datetime.datetime.utcnow()
 
     def support_comment(self, comment):
         '''
@@ -463,7 +474,7 @@ class User(db.Model, UserMixin):
         '''
         self.comments.append(comment)
 
-    def get_uninvited_associated_users(self, question):
+    def get_uninvited_associated_users(self, question): # arse
         '''
         .. function:: get_uninvited_associated_users()
 
@@ -472,10 +483,15 @@ class User(db.Model, UserMixin):
 
         :rtype: list
         '''
-        invited_uids = list()
+        invited_uids = set()
         current_invites = question.invites.all()
         for invite in current_invites:
-            invited_uids.append(invite.receiver_id)
+            invited_uids.add(invite.receiver_id)
+        new_invites = question.invites_sent.all()
+        for invite in new_invites:
+            invited_uids.add(invite.receiver_id)
+        
+        invited_uids = list(invited_uids)
         
         questions_participated = db_session.query(Invite.question_id)\
             .filter(Invite.receiver_id == self.id)\
@@ -495,7 +511,7 @@ class User(db.Model, UserMixin):
         uids = set()
         for user in associates:
             uids.add(user[0])
-        
+                
         uids = list(uids)
         users = db_session.query(User)\
             .filter(User.id.in_(uids))\
@@ -704,7 +720,7 @@ class User(db.Model, UserMixin):
                     continue
                 else:
                     app.logger.debug('appending invite for user id %s', receiver)
-                    self.invites.append(Invite(self, receiver, permissions, question.id))
+                    self.invites_sent.append(UserInvite(self, receiver, permissions, question.id))
                     # send email notification to receiver
                     emails.send_added_to_question_email(self, receiver, question)
             return True
@@ -1224,6 +1240,52 @@ class EmailInvite(db.Model):
         return question.id
 
 
+class UserInvite(db.Model):
+    '''
+    Stores users invitaions to participate in questions
+    '''
+    __tablename__ = 'user_invite'
+
+    def get_public(self):
+        '''
+        .. function:: get_public()
+
+        Return public propoerties as string values for REST responses.
+
+        :rtype: dict
+        '''
+        return {'id': self.id,
+                'sender_id': self.sender_id,
+                'sender_username': self.sender.username,
+                'receiver_id': self.receiver_id,
+                'question_id': self.question_id,
+                'question_title': self.question.title,
+                'permissions': self.permissions,
+                'sender_url': url_for('api_get_users',
+                                      user_id=self.sender_id)}
+
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    receiver_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    question_id = db.Column(db.Integer, db.ForeignKey('question.id'))
+    permissions = db.Column(db.Integer, default=1)
+
+    receiver = db.relationship("User",
+                               primaryjoin="UserInvite.receiver_id==User.id",
+                               backref="new_invitations",
+                               lazy='static', single_parent=True)
+
+
+    def __init__(self, sender, receiver, permissions, question_id):
+        self.sender_id = sender.id
+        self.question_id = question_id
+        self.permissions = permissions
+
+        if isinstance(receiver, (int, long)):
+            self.receiver_id = receiver
+        else:
+            self.receiver_id = receiver.id
+
 class Invite(db.Model):
     '''
     Stores users invitaions to participate in questions
@@ -1467,6 +1529,9 @@ class Question(db.Model):
                               cascade="all, delete-orphan")
     email_invites = db.relationship('EmailInvite', lazy='dynamic', backref='question',
                               primaryjoin="EmailInvite.question_id == Question.id",
+                              cascade="all, delete-orphan")
+    invites_sent = db.relationship('UserInvite', lazy='dynamic', backref='question',
+                              primaryjoin="UserInvite.question_id == Question.id",
                               cascade="all, delete-orphan")
 
     def __init__(self, author, title, blurb,

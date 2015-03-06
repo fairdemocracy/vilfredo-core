@@ -2850,6 +2850,213 @@ def api_associated_users():
                    not_invited=not_invited), 200
 
 
+# Get new invitations
+@app.route(REST_URL_PREFIX + '/users/<int:user_id>/new_invites/<int:invite_id>/decline', methods=['POST'])
+@requires_auth
+def api_decline_new_invite(user_id, invite_id):
+    '''
+    .. http:get:: /users/(int:user_id)/new_invites
+
+        A list of new invitations to participate in questions.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET /questions/42/not_invited HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+            {
+              "invites": [
+                {
+                  "id": 1, 
+                  "permissions": 7, 
+                  "question_id": 6, 
+                  "question_title": "Is This the Question of Life", 
+                  "receiver_id": 2, 
+                  "sender_id": 1, 
+                  "sender_url": "/api/v2/users/1", 
+                  "sender_username": "john"
+                }
+              ], 
+              "num_items": "1"
+            }
+
+        :param user_id: user id
+        :type user_id: int
+        :param invit_id: invitation id
+        :type user_id: int
+        :statuscode 200: no error
+        :statuscode 400: bad request
+    '''
+    app.logger.debug("api_not_invited called...\n")
+
+    user = get_authenticated_user(request)
+    if not user:
+        return jsonify(message = "User not logged in"), 404
+
+    if user_id is None:
+        return jsonify(message = "user_id not set"), 404
+    
+    if invite_id is None:
+        return jsonify(message = "invite_id not set"), 404
+
+    new_invitation = models.UserInvite.query.filter_by(id=invite_id).first()
+    
+    if not new_invitation:
+        return jsonify(message = "Invitation not found"), 404
+        
+    user.new_invites.remove(new_invitation)
+    db_session.commit()
+
+    return jsonify(message = "Invitation declined"), 200
+
+# Get new invitations
+@app.route(REST_URL_PREFIX + '/users/<int:user_id>/new_invites/<int:invite_id>/accept', methods=['POST'])
+@requires_auth
+def api_accept_new_invite(user_id, invite_id):
+    '''
+    .. http:get:: /users/(int:user_id)/new_invites
+
+        A list of new invitations to participate in questions.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET /questions/42/not_invited HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+            {
+              "invites": [
+                {
+                  "id": 1, 
+                  "permissions": 7, 
+                  "question_id": 6, 
+                  "question_title": "Is This the Question of Life", 
+                  "receiver_id": 2, 
+                  "sender_id": 1, 
+                  "sender_url": "/api/v2/users/1", 
+                  "sender_username": "john"
+                }
+              ], 
+              "num_items": "1"
+            }
+
+        :param user_id: user id
+        :type user_id: int
+        :param invit_id: invitation id
+        :type user_id: int
+        :statuscode 200: no error
+        :statuscode 400: bad request
+    '''
+    app.logger.debug("api_accept_new_invite called...\n")
+
+    user = get_authenticated_user(request)
+    if not user:
+        return jsonify(message = "User not logged in"), 404
+
+    if user_id is None:
+        return jsonify(message = "user_id not set"), 404
+
+    if invite_id is None:
+        return jsonify(message = "invite_id not set"), 404
+
+    new_invitation = models.UserInvite.query.filter_by(id=invite_id).first()
+
+    if not new_invitation:
+        return jsonify(message = "Invitation not found"), 404
+
+    sender = models.User.query.get(new_invitation.sender_id)
+    if not sender:
+        return jsonify(message = "Sender not found"), 404
+
+    user.invites_received.append(models.Invite(sender, user, new_invitation.permissions, new_invitation.question_id))
+    user.new_invites.remove(new_invitation)
+    db_session.commit()
+    
+    return jsonify(message = "Invitation accepted"), 200
+
+# Get new invitations
+@app.route(REST_URL_PREFIX + '/users/<int:user_id>/new_invites', methods=['GET'])
+@requires_auth
+def api_new_invites(user_id):
+    '''
+    .. http:get:: /users/(int:user_id)/new_invites
+
+        A list of new invitations to participate in questions.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET /questions/42/not_invited HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+            {
+              "invites": [
+                {
+                  "id": 1, 
+                  "permissions": 7, 
+                  "question_id": 6, 
+                  "question_title": "Is This the Question of Life", 
+                  "receiver_id": 2, 
+                  "sender_id": 1, 
+                  "sender_url": "/api/v2/users/1", 
+                  "sender_username": "john"
+                }
+              ], 
+              "num_items": "1"
+            }
+
+        :param user_id: user id
+        :type user_id: int
+        :statuscode 200: no error
+        :statuscode 400: bad request
+    '''
+    app.logger.debug("api_not_invited called...\n")
+
+    user = get_authenticated_user(request)
+    if not user:
+        return jsonify(message = "User not logged in"), 404
+
+    if user_id is None:
+        return jsonify(message = "user_id not set"), 404
+
+    new_invitations = user.new_invites.all()
+
+    invites = []
+    for invite in new_invitations:
+        invites.append(invite.get_public())
+
+    return jsonify(num_items=str(len(invites)),
+                   invites=invites), 200
+
+
 # Get users not yet invited to participate in a question
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/not_invited',
            methods=['GET'])
@@ -2914,7 +3121,7 @@ def api_not_invited(question_id):
 
     user = get_authenticated_user(request)
     if not user:
-        abort(401)
+        return jsonify(message = "User not found"), 400
 
     if question_id is None:
         app.logger.debug("ERROR: question_id is None!\n")
@@ -4502,14 +4709,14 @@ def api_get_invitations(question_id):
         :statuscode 201: no error
         :statuscode 400: bad request
     '''
-    app.logger.debug("api_get_invitations called...\n")
+    app.logger.debug("api_get_invitations called...\n") # arse
 
     if question_id is None:
-        abort(404)
+        return jsonify(message = "Question ID parameter not set"), 404
 
     question = models.Question.query.get(int(question_id))
     if question is None:
-        abort(400)
+        return jsonify(message = "Question not found"), 404
 
     page = int(request.args.get('page', 1))
 
@@ -4682,16 +4889,20 @@ def api_create_invitation(question_id):
     if not user:
         abort(401)
 
-    app.logger.debug("Authenticated User = %s\n", user.id)
+    app.logger.debug("Authenticated User = %s\n", user.id) # arse
 
     if question_id is None:
-        abort(404)
+        return jsonify(message = "Question ID parameter not set"), 404
+
+    question = models.Question.query.get(int(question_id))
+    if question is None:
+        return jsonify(message = "Question not found"), 404
 
     if not request.json:
         abort(400)
 
     if not 'invite_user_ids' in request.json:
-        abort(400)
+        return jsonify(message = "invite_user_ids parameter not set"), 400
 
     invite_user_ids = request.json['invite_user_ids']
 
@@ -4706,10 +4917,6 @@ def api_create_invitation(question_id):
             abort(400)
 
     app.logger.debug("invite_user_ids = %s\n", invite_user_ids)
-
-    question = models.Question.query.get(int(question_id))
-    if question is None:
-        abort(400)
 
     app.logger.debug("calling invite_all with users %s\n", invite_user_ids)
     if user.invite_all(invite_user_ids, permissions, question):
