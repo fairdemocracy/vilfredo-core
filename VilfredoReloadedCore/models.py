@@ -440,8 +440,10 @@ class User(db.Model, UserMixin):
             files = glob.glob(test_user_avatar_path)
             os.remove(files[0])
 
-        fix_filename = os.path.splitext(avatar.filename)
-        avatar.filename = hash_string(avatar.filename) + fix_filename[1]
+        from werkzeug import secure_filename
+        filename = secure_filename(avatar.filename)
+        fix_filename = os.path.splitext(filename)
+        avatar.filename = hash_string(filename) + fix_filename[1]
         app.logger.debug("Saving avatar to %s", os.path.join(avatar_path, avatar.filename))
         avatar.save(os.path.join(avatar_path, avatar.filename))
         if not os.path.isfile(os.path.join(avatar_path, avatar.filename)):
