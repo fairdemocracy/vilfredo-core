@@ -3,7 +3,7 @@
 #
 # This file is part of VilfredoReloadedCore.
 #
-# Copyright © 2009-2013 Pietro Speroni di Fenizio / Derek Paterson.
+# Copyright © 2009-2015 Pietro Speroni di Fenizio / Derek Paterson.
 #
 # VilfredoReloadedCore is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -839,7 +839,7 @@ def api_create_user():
     # Check if token required for registration
     if app.config['REGISTER_INVITATION_ONLY']:
         if 'eit' not in request.json or not models.EmailInvite.check_token(request.json['eit']):
-            message = "Sorry, currently registration on this site is by invitation only!<br><br>If you wish to test Vilfredo you can register at the test site here <a href='http://test.vilfredo.org'>Vilfredo Test</a>"
+            message = "Sorry, currently registration on this site is by invitation only!<br><br>If you wish to test Vilfredo you can register at the <a href='http://demo.vilfredo.org' title='Vilfredo Demo site'>Vilfredo Demo site</a>."
             return jsonify(message=message), 400
 
     if not 'username' in request.json or request.json['username'] == '' \
