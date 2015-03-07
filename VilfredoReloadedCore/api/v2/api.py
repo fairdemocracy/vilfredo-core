@@ -836,7 +836,13 @@ def api_create_user():
         message = "Non json request received"
         return jsonify(message=message), 400
 
-    elif not 'username' in request.json or request.json['username'] == '' \
+    # Check if token required for registration
+    if app.config['REGISTER_INVITATION_ONLY']:
+        if 'eit' not in request.json or not models.EmailInvite.check_token(request.json['eit']):
+            message = "Sorry, currently registration on this site is by invitation only!<br><br>If you wish to test Vilfredo you can register at the test site here <a href='http://test.vilfredo.org'>Vilfredo Test</a>"
+            return jsonify(message=message), 400
+
+    if not 'username' in request.json or request.json['username'] == '' \
             or len(request.json['username']) > MAX_LEN_USERNAME:
         message = "Username must be less than %s characters" % MAX_LEN_USERNAME
         return jsonify(message=message), 400

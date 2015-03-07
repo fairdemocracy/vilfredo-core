@@ -1193,6 +1193,17 @@ class EmailInvite(db.Model):
         self.token = token
 
     @staticmethod
+    def check_token(token):
+        email_invitation = db_session.query(EmailInvite)\
+            .filter(and_(EmailInvite.accepted == 0, EmailInvite.token == token))\
+            .first()
+        if not email_invitation:
+            app.logger.debug("add_invitation_from_token Token not found: %s", token)
+            return False
+        else:
+            return True
+    
+    @staticmethod
     def accept(user, token):
         email_invitation = db_session.query(EmailInvite)\
             .filter(and_(EmailInvite.accepted == 0, EmailInvite.token == token))\

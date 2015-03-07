@@ -42,6 +42,9 @@ WORK_FILE_DIRECTORY = '/var/tmp/work'
 # Set max upload file size 
 MAX_CONTENT_LENGTH = 2 * 1024 * 1024
 
+# If True people can only register if invited by email
+REGISTER_INVITATION_ONLY = False
+
 # Set path to uploaded user files
 UPLOADED_FILES_DEST = 'static/usercontent/uploads'
 
