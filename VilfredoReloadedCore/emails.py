@@ -60,12 +60,16 @@ def send_added_to_question_email(inviter, receiver, question):
     """
     User %s has added you to the question %s.
     
-    http://%s/question/%s
+    %s%s/question/%s
     """
     return send_email("Vilfredo - Please Participate",
                       app.config['ADMINS'][0],
                       receiver.email,
-                      body_template % (inviter.username, question.title, app.config['SITE_DOMAIN'], question.id))
+                      body_template % (inviter.username,
+                                       question.title,
+                                       app.config['PROTOCOL'],
+                                       app.config['SITE_DOMAIN'],
+                                       question.id))
 
 def send_user_already_added_email(user, email, question):
     '''
@@ -83,12 +87,16 @@ def send_user_already_added_email(user, email, question):
     """
     The invitation you sent to %s for question "%s" appears to belong to a user who has already accepted an earlier invitation for that question.
     
-    http://%s/question/%s
+    %s%s/question/%s
     """
     return send_email("Vilfredo - Email Invitation Update",
                       app.config['ADMINS'][0],
                       user.email,
-                      body_template % (email, question.title, app.config['SITE_DOMAIN'], question.id))
+                      body_template % (email, 
+                                       question.title, 
+                                       app.config['PROTOCOL'],
+                                       app.config['SITE_DOMAIN'], 
+                                       question.id))
 
 def send_email_invite_accepted_email(user, email, question):
     '''
@@ -107,12 +115,16 @@ def send_email_invite_accepted_email(user, email, question):
     """
     The invitation you sent to %s for question "%s" has been accepted.
     
-    http://%s/question/%s
+    %s%s/question/%s
     """
     return send_email("Vilfredo - Invitation Accepted",
                       app.config['ADMINS'][0],
                       user.email,
-                      body_template % (email, question.title, app.config['SITE_DOMAIN'], question.id))
+                      body_template % (email, 
+                                       question.title,
+                                       app.config['PROTOCOL'],
+                                       app.config['SITE_DOMAIN'], 
+                                       question.id))
 
 def send_welcome_to_notfound_question_email(user, question_id):
     '''
