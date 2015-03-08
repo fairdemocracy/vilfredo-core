@@ -58,9 +58,9 @@ def send_added_to_question_email(inviter, receiver, question):
     '''
     body_template = \
     """
-    User %s has invited you to the question %s.
+    User %s has invited you to participate in the question %s.
     
-    %s%s/question/%s
+    %s%s/question
     """
     return send_email("Vilfredo - Please Participate",
                       app.config['ADMINS'][0],
@@ -68,8 +68,7 @@ def send_added_to_question_email(inviter, receiver, question):
                       body_template % (inviter.username,
                                        question.title,
                                        app.config['PROTOCOL'],
-                                       app.config['SITE_DOMAIN'],
-                                       question.id))
+                                       app.config['SITE_DOMAIN']))
 
 def send_user_already_added_email(user, email, question):
     '''
