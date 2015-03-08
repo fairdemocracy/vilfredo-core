@@ -60,7 +60,7 @@ def send_added_to_question_email(inviter, receiver, question):
     """
     User %s has invited you to participate in the question %s.
     
-    %s%s/question
+    %s%s
     """
     return send_email("Vilfredo - Please Participate",
                       app.config['ADMINS'][0],
