@@ -58,7 +58,7 @@ def send_added_to_question_email(inviter, receiver, question):
     '''
     body_template = \
     """
-    User %s has added you to the question %s.
+    User %s has invited you to the question %s.
     
     %s%s/question/%s
     """
