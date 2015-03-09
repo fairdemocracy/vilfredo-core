@@ -471,11 +471,11 @@ def api_get_users(user_id=None):
 
 
 # Update User Details
-@app.route(REST_URL_PREFIX + '/users/<int:user_id>', methods=['PATCH'])
+@app.route(REST_URL_PREFIX + '/users/<int:user_id>', methods=['POST'])
 @requires_auth
 def api_update_user(user_id):
     '''
-    .. http:patch:: /users/(int:user_id)
+    .. http:post:: /users/(int:user_id)
 
         Update a user's details'.
 
@@ -483,7 +483,7 @@ def api_update_user(user_id):
 
         .. sourcecode:: http
 
-            PATCH /users/42 HTTP/1.1
+            POST /users/42 HTTP/1.1
             Host: example.com
             Accept: application/json
 
@@ -1671,11 +1671,11 @@ def api_get_proposal_comments(question_id, proposal_id, comment_id=None):
 @app.route(
     REST_URL_PREFIX + '/questions/<int:question_id>/proposals/' +
     '<int:proposal_id>/comments/<int:comment_id>',
-    methods=['PATCH'])
+    methods=['POST'])
 @requires_auth
 def api_update_proposal_comment(question_id, proposal_id, comment_id):
     '''
-    .. http:patch:: /questions/(int:question_id)/proposals/(int:proposal_id)/comments/(int:comment_id)
+    .. http:post:: /questions/(int:question_id)/proposals/(int:proposal_id)/comments/(int:comment_id)
 
         Update a comment.
 
@@ -1683,7 +1683,7 @@ def api_update_proposal_comment(question_id, proposal_id, comment_id):
 
         .. sourcecode:: http
 
-            PATCH /questions/45/proposals/47/comments/77 HTTP/1.1
+            POST /questions/45/proposals/47/comments/77 HTTP/1.1
             Host: example.com
             Accept: application/json
 
@@ -2234,7 +2234,7 @@ def api_add_proposal_endorsement_v1(question_id, proposal_id):
 #
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/proposals/' +
            '<int:proposal_id>/endorsements',
-           methods=['PATCH'])
+           methods=['POST'])
 @requires_auth
 def api_update_proposal_endorsement(question_id, proposal_id):
     '''
@@ -2246,7 +2246,7 @@ def api_update_proposal_endorsement(question_id, proposal_id):
 
         .. sourcecode:: http
 
-            PATCH /questions/45/proposals/47/endorsements HTTP/1.1
+            POST /questions/45/proposals/47/endorsements HTTP/1.1
             Host: example.com
             Accept: application/json
 
@@ -2566,7 +2566,7 @@ def api_delete_question(question_id):
 
 # Edit Question
 #
-@app.route(REST_URL_PREFIX + '/questions/<int:question_id>', methods=['PATCH'])
+@app.route(REST_URL_PREFIX + '/questions/<int:question_id>', methods=['POST'])
 @requires_auth
 def api_edit_question(question_id):
     '''
@@ -2669,11 +2669,11 @@ def api_edit_question(question_id):
 # Edit proposal
 #
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/proposals/<int:proposal_id>',
-           methods=['PATCH'])
+           methods=['POST'])
 @requires_auth
 def api_edit_proposal(question_id, proposal_id):
     '''
-    .. http:patch:: questions/int:question_id/proposals/int:proposal_id
+    .. http:post:: questions/int:question_id/proposals/int:proposal_id
 
         Edit proposal.
 
@@ -2681,7 +2681,7 @@ def api_edit_proposal(question_id, proposal_id):
 
         .. sourcecode:: http
 
-            PATCH questions/22/proposals/14 HTTP/1.1
+            POST questions/22/proposals/14 HTTP/1.1
             Host: example.com
             Accept: application/json
 
@@ -5194,11 +5194,11 @@ def api_add_user_subscriptions(user_id):
 # Update subscription
 #
 @app.route(REST_URL_PREFIX + '/users/<int:user_id>/subscriptions',
-           methods=['PATCH'])
+           methods=['POST'])
 @requires_auth
 def api_update_user_subscriptions(user_id):
     '''
-    .. http:patch:: /users/(int:user_id)/subscriptions
+    .. http:post:: /users/(int:user_id)/subscriptions
 
         Update a user's question subscription'.
 
@@ -5206,7 +5206,7 @@ def api_update_user_subscriptions(user_id):
 
         .. sourcecode:: http
 
-            PATCH users/56/subscriptions HTTP/1.1
+            POST users/56/subscriptions HTTP/1.1
             Host: example.com
             Accept: application/json
 
