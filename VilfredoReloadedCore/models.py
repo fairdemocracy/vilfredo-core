@@ -1836,6 +1836,12 @@ class Question(db.Model):
                         .filter(Endorsement.generation == generation)\
                         .count()
 
+    def get_current_proposals(self):
+        return db_session.query(Proposal).join(QuestionHistory)\
+                        .filter(QuestionHistory.question_id == self.id)\
+                        .filter(QuestionHistory.generation == self.generation)\
+                        .all()
+    
     def get_all_proposals(self):
         return db_session.query(Proposal).join(QuestionHistory)\
                         .filter(QuestionHistory.question_id == self.id)\

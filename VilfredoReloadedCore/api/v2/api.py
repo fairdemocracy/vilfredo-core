@@ -1363,6 +1363,7 @@ def api_get_question_proposals(question_id=None, proposal_id=None):
         if user and user_only:
             app.logger.debug("api_get_question_proposals: user_only True, add user filter")
             query = query.filter(models.Proposal.user_id == user.id)
+            query = query.filter(models.Proposal.generation_created == question.generation)
 
         elif inherited_only:
             query = query.filter(models.Proposal.generation_created < question.generation)
@@ -3662,7 +3663,8 @@ def api_question_participation_table(question_id=None):
 
     participants = question.get_participants()
     app.logger.debug("participants==> %s", participants)
-    all_proposals = question.get_all_proposals()
+    all_proposals = question.get_current_proposals()
+    # current_proposals = question.get_current_proposals()
     
     authors = dict()
     for proposal in all_proposals:
