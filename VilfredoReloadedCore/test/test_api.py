@@ -1436,8 +1436,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/questions',
                                       'POST',
                                       dict(title='My boring question',
-                                           blurb='My boring blurb',
-                                           room='test'),
+                                           blurb='My boring blurb'),
                                       'john',
                                       'john123')
         self.assertEqual(rv.status_code, 201)
