@@ -1818,7 +1818,7 @@ class Question(db.Model):
         .group_by(Endorsement.user_id)\
         .having(func.count(Endorsement) == num_proposals)\
         .count()
-    
+
     def get_voter_count(self, generation=None):
         '''
         .. function:: get_voter_count([generation=None])
@@ -4787,7 +4787,7 @@ class Question(db.Model):
 
         return below
 
-    def create_new_graph(self, generation=None, algorithm=2): # newgraph jazz sick
+    def create_new_graph(self, generation=None, algorithm=2): # LIVE
         app.logger.debug("create_new_graph called: Algorithm = %s", algorithm)
         generation = generation or self.generation
         proposals = self.get_proposals_list(generation)
