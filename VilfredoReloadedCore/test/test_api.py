@@ -550,7 +550,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         #
         # Create Proposals
         #
-        bills_blurb = '''<p>I have never written anything so comprehensive on a website before.</p><p>It makes me realise how much fun this can be.</p>
+        bills_blurb = '''I have never written anything so comprehensive on a website before.\n\nIIt makes me realise how much fun this can be.
         '''
         rv = self.open_with_json_auth(
             api.REST_URL_PREFIX + '/questions/1/proposals',
@@ -564,7 +564,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         app.logger.debug("Data retrieved from Create Proposal = %s\n",
                          rv.data)
 
-        bills_other_blurb = '''<p>This is a much better proposal than my first one.</p><p>It makes me realise how personal growth continues even while using the internet.</p>'''
+        bills_other_blurb = '''This is a much better proposal than my first one.\n\nIIt makes me realise how personal growth continues even while using the internet.'''
         rv = self.open_with_json_auth(
             api.REST_URL_PREFIX + '/questions/1/proposals',
             'POST',
@@ -1336,7 +1336,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             #
             # Create Proposals
             #
-            bills_blurb = '''<p>This is getting interesting. I may stay up all night deliberating.</p>
+            bills_blurb = '''This is getting interesting. I may stay up all night deliberating.
             '''
             rv = self.open_with_json_auth(
                 api.REST_URL_PREFIX + '/questions/1/proposals',
@@ -1350,7 +1350,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             app.logger.debug("Data retrieved from Create Proposal = %s\n",
                              rv.data)
 
-            bills_other_blurb = '''<p>Once I've finished writing this I'm going to sell the rights to warner Brother.</p>'''
+            bills_other_blurb = '''Once I've finished writing this I'm going to sell the rights to warner Brother.'''
             rv = self.open_with_json_auth(
                 api.REST_URL_PREFIX + '/questions/1/proposals',
                 'POST',
