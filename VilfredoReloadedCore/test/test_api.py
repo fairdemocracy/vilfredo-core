@@ -459,7 +459,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 emails.email_question_invite(john, susan, johns_q)
                 emails.email_question_invite(john, bill, johns_q)
                 self.assertEqual(len(outbox), 2)
-        
+        '''
         #
         # Create Subscriptions
         #
@@ -546,6 +546,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         app.logger.debug("Data retrieved from Delete Subscription = %s\n",
                          rv.data)
 
+        '''
         #
         # Create Proposals
         #

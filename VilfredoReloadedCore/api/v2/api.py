@@ -5156,30 +5156,36 @@ def api_add_user_subscriptions(user_id):
 
     user = get_authenticated_user(request)
     if not user:
-        abort(401)
+        message = 'User not logged in'
+        return jsonify(message=message), 401
 
     app.logger.debug("Authenticated User = %s\n", user.id)
 
     if not request.json:
-        abort(400)
+        message = 'No json object found'
+        return jsonify(message=message), 400
 
     if not 'how' in request.json\
             or not request.json['how'] in ['daily', 'weekly', 'asap']:
-        abort(400)
+        message = 'how not set'
+        return jsonify(message=message), 400
 
     if not 'question_id' in request.json:
-        abort(400)
+        message = 'question_id not set'
+        return jsonify(message=message), 400
 
     question_id = int(request.json['question_id'])
     how = request.json['how']
 
     if user.subscribed_questions.filter(
             models.Update.question_id == question_id).count() == 1:
-        abort(400)
+        message = 'User already subscribed'
+        return jsonify(message=message), 400
 
     question = models.Question.query.get(question_id)
     if question is None:
-        abort(400)
+        message = 'question not found'
+        return jsonify(message=message), 400
 
     user.subscribe_to(question, how)
     db_session.add(user)
