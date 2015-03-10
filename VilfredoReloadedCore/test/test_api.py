@@ -498,7 +498,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         # Update Subscriptions
         #
         rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/users/5/subscriptions',
-                                      'PATCH',
+                                      'POST',
                                       dict(question_id=3, how='asap'),
                                       'harry',
                                       'harry123')
@@ -601,7 +601,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         # Harry edits his proposal
         rv = self.open_with_json_auth(
             new_proposal_uri,
-            'PATCH',
+            'POST',
             dict(
                 title='Harrys Cooler Proposal',
                 blurb='Harry edits like a champ'),
@@ -647,7 +647,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         # Author moves question on to VOTING phase
         #
         rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/questions/1',
-                                      'PATCH',
+                                      'POST',
                                       dict(move_on=True),
                                       'john',
                                       'john123')
@@ -1323,7 +1323,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
             #
             app.logger.debug("Move question on to next generation")
             rv = self.open_with_json_auth(api.REST_URL_PREFIX + '/questions/1',
-                                          'PATCH',
+                                          'POST',
                                           dict(move_on=True),
                                           'john',
                                           'john123')
@@ -1416,7 +1416,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         app.logger.debug("John updates his endopsement to OPPOSE")
         rv = self.open_with_json_auth(
             api.REST_URL_PREFIX + '/questions/1/proposals/2/endorsements',
-            'PATCH',
+            'POST',
             dict(endorsement_type='oppose'),
             'john',
             'john123')
