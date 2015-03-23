@@ -1273,6 +1273,7 @@ class UserInvite(db.Model):
                 'receiver_id': self.receiver_id,
                 'question_id': self.question_id,
                 'question_title': self.question.title,
+                'question_blurb': self.question.blurb,
                 'permissions': self.permissions,
                 'sender_url': url_for('api_get_users',
                                       user_id=self.sender_id)}
