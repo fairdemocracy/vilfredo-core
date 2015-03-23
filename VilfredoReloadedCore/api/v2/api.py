@@ -1345,15 +1345,15 @@ def api_get_question_proposals(question_id=None, proposal_id=None):
         # Return empty list if user_only requested and user not authenticated
         if user_only and not user:
             app.logger.debug("api_get_question_proposals: user_only True but no current user, return empty list")
-            return jsonify(total_items=str(0), items=str(0),
-                          page=str(1), pages=str(1),
+            return jsonify(total_items=0, items=0,
+                          page=1, pages=1,
                           proposals=[]), 200
 
         inherited_only = request.args.get('inherited_only', False)
         # Return empty list if inherited_only requested and in first generation
         if inherited_only and question.generation == 1:
-            return jsonify(total_items=str(0), items=str(0),
-                          page=str(1), pages=str(1),
+            return jsonify(total_items=0, items=0,
+                          page=1, pages=1,
                           proposals=[]), 200
 
         query = models.Proposal.query.join(models.QuestionHistory).\
@@ -1368,7 +1368,7 @@ def api_get_question_proposals(question_id=None, proposal_id=None):
         elif inherited_only:
             query = query.filter(models.Proposal.generation_created < question.generation)
 
-        proposals = query.paginate(page, RESULTS_PER_PAGE, False) # final winners
+        proposals = query.paginate(page, RESULTS_PER_PAGE, False)
 
         items = len(proposals.items)
         pages = proposals.pages
@@ -1386,8 +1386,8 @@ def api_get_question_proposals(question_id=None, proposal_id=None):
             return request.args['callback'] + '(' + d + ');', 200
         else:
             # Return json
-            return jsonify(total_items=str(total_items), items=str(items),
-                          page=str(page), pages=str(pages),
+            return jsonify(total_items=total_items, items=items,
+                          page=page, pages=pages,
                           proposals=results), 200
 
 
@@ -4317,10 +4317,10 @@ def api_get_voting_data(question_id):
     # app.logger.debug("results ==> %s", results)
 
     return jsonify(
-        question_id=str(question.id),
-        current_generation=str(question.generation),
-        requested_generation=str(generation),
-        num_items=str(len(voting_data)),
+        question_id=question.id,
+        current_generation=question.generation,
+        requested_generation=generation,
+        num_items=len(voting_data),
         voting_data=voting_data), 200
 
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/voting_map',

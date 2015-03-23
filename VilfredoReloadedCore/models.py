@@ -1465,12 +1465,11 @@ class Question(db.Model):
         completed_voter_count = self.get_completed_voter_count(generation=self.generation)
         voters_voting_count = self.get_voters_voting_count()
 
-        public = {'id': str(self.id),
+        public = {'id': self.id,
                 'url': url_for('api_get_questions', question_id=self.id),
                 'title': self.title,
                 'blurb': self.blurb,
-                'room': self.room,
-                'generation': str(self.generation),
+                'generation': self.generation,
                 'created': str(self.created),
                 "last_move_on": str(self.last_move_on),
                 "minimum_time": str(self.minimum_time),
@@ -1479,17 +1478,17 @@ class Question(db.Model):
                 'author': self.author.username,
                 'avatar_url': app.config['PROTOCOL'] + os.path.join(app.config['SITE_DOMAIN'], self.author.get_avatar()),
                 'author_id': self.author.id,
-                'proposal_count': str(self.get_proposal_count()),
-                'new_proposal_count': str(self.get_new_proposal_count()),
-                'new_proposer_count': str(self.get_new_proposer_count()),
-                'participant_count': str(self.invites.count()),
+                'proposal_count': self.get_proposal_count(),
+                'new_proposal_count': self.get_new_proposal_count(),
+                'new_proposer_count': self.get_new_proposer_count(),
+                'participant_count': self.invites.count(),
                 'consensus_found': consensus_found,
-                'inherited_proposal_count' : str(inherited_proposal_count),
+                'inherited_proposal_count' : inherited_proposal_count,
                 'author_url': url_for('api_get_users', user_id=self.user_id),
-                'mapx': str(threshold.mapx),
-                'mapy': str(threshold.mapy),
-                'completed_voter_count': str(completed_voter_count),
-                'voters_voting_count': str(voters_voting_count)}
+                'mapx': threshold.mapx,
+                'mapy': threshold.mapy,
+                'completed_voter_count': completed_voter_count,
+                'voters_voting_count': voters_voting_count}
 
         # Add user permissions
         permissions = None
