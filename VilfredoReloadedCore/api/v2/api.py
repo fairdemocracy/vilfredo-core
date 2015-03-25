@@ -388,7 +388,7 @@ def api_get_users(user_id=None):
     '''
     .. http:get:: /users/(int:user_id)
 
-        A user or list of users.
+        A user or list of associated users.
 
         **Example request**:
 
@@ -441,22 +441,31 @@ def api_get_users(user_id=None):
     current_user = get_authenticated_user(request)
 
     if user_id is not None:
-        user = models.User.query.get(int(user_id))
-        if user is None:
-            abort(404)
-
-        results = user.get_public()
+        # user = models.User.query.get(int(user_id))
+        # if user is None:
+        #     abort(404)
 
         if current_user and current_user.id == user.id:
-            results['email'] = user.email
+            results = current_user.get_public()
+            results['email'] = current_user.email
+            return jsonify(user=results), 200
+        else:
+            user = current_user.get_associated_user(userid)
+            if user is None:
+                response = {"message": "User not found"}
+                return jsonify(response), 400
 
-        return jsonify(user=results), 200
+            results = user.get_public()
+            return jsonify(user=results), 200
 
     else:
         page = int(request.args.get('page', 1))
-        users = models.User.query.paginate(page,
-                                           RESULTS_PER_PAGE,
-                                           False)
+
+        # users = models.User.query.paginate(page,
+        #                                   RESULTS_PER_PAGE,
+        #                                  False)
+        users = user.get_associated_users(page)
+
         items = len(users.items)
         pages = users.pages
         total_items = users.total
@@ -993,7 +1002,6 @@ def api_get_questions(question_id=None):
     '''
     app.logger.debug("api_get_questions called...\n")
 
-    # shark
     user = get_authenticated_user(request)
     if not user:
         response = {"message": "User not logged in"}
@@ -1135,86 +1143,7 @@ def api_create_question():
     return jsonify(question=question.get_public()), 201
 
 
-@app.route(REST_URL_PREFIX + '/questions/<int:question_id>/subscribers', methods=['GET'])
-@requires_auth # added
-def api_question_subscribers(question_id=None):
-    '''
-    .. http:get:: /questions/(int:question_id)/subscribers
 
-        A list of question subscribers.
-
-        **Example request**:
-
-        .. sourcecode:: http
-
-            GET questions/3/subscribers HTTP/1.1
-            Host: example.com
-            Accept: application/json
-
-        **Example response**:
-
-        .. sourcecode:: http
-
-            Status Code: 200 OK
-            Content-Type: application/json
-
-            {
-              "objects": [
-                {
-                  "url": "/users/1/subscriptions/3",
-                  "how": "weekly",
-                  "last_update": "None",
-                  "question_id": "3"
-                },
-                {
-                  "url": "/users/5/subscriptions/3",
-                  "how": "daily",
-                  "last_update": "None",
-                  "question_id": "3"
-                }
-              ],
-              "num_items": "2",
-              "items": 2,
-              "question_id": "3",
-              "page": "1",
-              "pages": "1"
-            }
-
-        :param question_id: question id
-        :type question_id: int
-        :query page: page number, default is 1
-        :statuscode 200: no error
-        :statuscode 400: bad request
-    '''
-    app.logger.debug("api_question_subscribers called with %s...\n",
-                     question_id)
-
-    if question_id is None:
-        app.logger.debug("ERROR: question_id is None!\n")
-        abort(404)
-
-    question = models.Question.query.get(int(question_id))
-
-    if question is None:
-        app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
-        abort(404)
-
-    page = int(request.args.get('page', 1))
-    # subscribers = question.subscriber_update.\
-        # paginate(page, RESULTS_PER_PAGE, False)
-    subscribers = models.Update.query.filter_by(question_id=question.id).\
-        paginate(page, RESULTS_PER_PAGE, False)
-
-    items = len(subscribers.items)
-    pages = subscribers.pages
-
-    results = []
-    for s in subscribers.items:
-        results.append(s.get_public())
-
-    return jsonify(question_id=str(question.id),
-                   items=(items), page=str(page), pages=str(pages),
-                   num_items=str(subscribers.total), objects=results), 200
 
 # Get proposals (Fetch Proposals)
 #
@@ -1223,12 +1152,12 @@ def api_question_subscribers(question_id=None):
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/proposals', methods=['GET'])
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/proposals/<int:proposal_id>',
            methods=['GET'])
-@requires_auth # added
+@requires_auth
 def api_get_question_proposals(question_id=None, proposal_id=None):
     '''
     .. http:get:: /questions/(int:question_id)/proposals/(int:proposal_id)
 
-        A proposal or list of proposals.
+        A proposal or list of proposals for a qustion.
 
         **Example request**:
 
@@ -1317,6 +1246,12 @@ def api_get_question_proposals(question_id=None, proposal_id=None):
         app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
         return jsonify(message="Question not found"), 404
 
+    # Check if user has permission to view the question
+        perm = question.get_permissions(user)
+        if not perm:
+            app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+            return jsonify(message = "Question not found"), 404
+
     if not proposal_id is None:
         proposal_id = int(proposal_id)
         proposal = question.proposals.filter_by(id=proposal_id).one()
@@ -1368,7 +1303,7 @@ def api_get_question_proposals(question_id=None, proposal_id=None):
         elif inherited_only:
             query = query.filter(models.Proposal.generation_created < question.generation)
 
-        proposals = query.paginate(page, RESULTS_PER_PAGE, False)
+        proposals = query.paginate(page, RESULTS_PER_PAGE, False) 
 
         items = len(proposals.items)
         pages = proposals.pages
@@ -1437,7 +1372,7 @@ def api_support_proposal_comment(question_id, proposal_id, comment_id):
 
     user = get_authenticated_user(request)
     if not user:
-        abort(401)
+        return jsonify({"message": "User not found"}), 401
 
     app.logger.debug("Authenticated User = %s\n", user.id)
 
@@ -1447,6 +1382,12 @@ def api_support_proposal_comment(question_id, proposal_id, comment_id):
     question = models.Question.query.get(int(question_id))
     if question is None:
         return jsonify(message = "Question not found"), 404
+
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
 
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
@@ -1523,6 +1464,12 @@ def api_unsupport_proposal_comment(question_id, proposal_id, comment_id):
     question = models.Question.query.get(int(question_id))
     if question is None:
         return jsonify(message = "Question not found"), 404
+    
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
 
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
@@ -1630,6 +1577,12 @@ def api_get_proposal_comments(question_id, proposal_id, comment_id=None):
     if question is None:
         message = {"message": "Question not found"}
         return jsonify(message), 404
+    
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
 
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
@@ -1713,20 +1666,26 @@ def api_update_proposal_comment(question_id, proposal_id, comment_id):
 
     user = get_authenticated_user(request)
     if not user:
-        abort(401)
+        return jsonify({"message": "User not found"}), 401
 
     app.logger.debug("Authenticated User = %s\n", user.id)
 
     if question_id is None or proposal_id is None:
-        abort(404)
+        return jsonify({"message": "Missing parameters"}), 404
 
     question = models.Question.query.get(int(question_id))
     if question is None:
-        abort(400)
+        return jsonify({"message": "Question not found"}), 400
+    
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
 
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
-        abort(400)
+        return jsonify({"message": "Proposal not found"}), 400
 
     comment = models.Comment.query.get(int(comment_id))
     if comment is None:
@@ -1835,6 +1794,12 @@ def api_add_proposal_comment(question_id, proposal_id):
     if question is None:
         message = {"message": "Question not found"}
         return jsonify(message), 400
+    
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
 
     # Consider allowing comments during writing
     elif question.phase != 'voting':
@@ -1959,6 +1924,12 @@ def api_delete_proposal_comment(question_id, proposal_id, comment_id):
     question = models.Question.query.get(int(question_id))
     if question is None:
         return jsonify(message = "Question not found"), 404
+    
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
 
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
@@ -1982,7 +1953,7 @@ def api_delete_proposal_comment(question_id, proposal_id, comment_id):
     return jsonify(message="Comment deleted"), 201
 
 
-# Create Endorsement
+# Create Endorsement - or vote on a proposal
 #
 @app.route(
     REST_URL_PREFIX + '/questions/<int:question_id>/proposals/' +
@@ -2039,11 +2010,10 @@ def api_add_proposal_endorsement(question_id, proposal_id):
     if question is None:
         abort(400)
 
-    elif question.phase != 'voting':
+    if question.phase != 'voting':
         message = {"message": "The question is not in the voting phase"}
         return jsonify(message), 403
 
-    # shark
     # Check user permission: can vote?
     perm = question.get_permissions(user)
     if not perm or not models.Question.VOTE & perm:
@@ -2128,106 +2098,6 @@ def api_add_proposal_endorsement(question_id, proposal_id):
     return jsonify(message="Endorsement added",
                    endorsement_type=endorsement_type,
                    vote_count=str(proposal.get_vote_count())), 201
-
-
-
-# Create Endorsement
-#
-@requires_auth
-def api_add_proposal_endorsement_v1(question_id, proposal_id):
-    '''
-    .. http:post:: /questions/(int:question_id)/proposals/(int:proposal_id)/endorsements
-
-        Endorse a proposal.
-
-        **Example request**:
-
-        .. sourcecode:: http
-
-            POST /questions/45/proposals/47/endorsements HTTP/1.1
-            Host: example.com
-            Accept: application/json
-
-        **Example response**:
-
-        .. sourcecode:: http
-
-            Status Code: 200 OK
-            Content-Type: application/json
-
-            {
-                 "message": "Endorsement added"
-            }
-
-        :param question_id: question ID
-        :type question_id: int
-        :param proposal_id: proposal ID
-        :type proposal_id: int
-        :json endorsement_type: one of endorse, oppose or confused
-        :json comments: ids of supported comments
-        :json new_comment: text for new comment
-        :statuscode 200: no error
-        :statuscode 400: bad request
-    '''
-    app.logger.debug("api_add_proposal_endorsement called...\n")
-
-    user = get_authenticated_user(request)
-    if not user:
-        abort(401)
-
-    app.logger.debug("Authenticated User = %s\n", user.id)
-
-    if question_id is None or proposal_id is None:
-        abort(404)
-
-    question = models.Question.query.get(int(question_id))
-    if question is None:
-        abort(400)
-
-    elif question.phase != 'voting':
-        message = {"message": "The question is not in the voting phase"}
-        return jsonify(message), 403
-
-    proposal = models.Proposal.query.get(int(proposal_id))
-    if proposal is None:
-        abort(400)
-
-    # if proposal.is_endorsed_by(user):
-    #    message = {"message": "User has already endorsed this proposal"}
-    #    return jsonify(message), 400
-
-    app.logger.debug("request.json = %s\n", request.json)
-
-    endorsement_type = 'endorse'
-    if 'endorsement_type' in request.json:
-        if not request.json['endorsement_type'] in ENDORSEMENT_TYPES:
-            message = {"message": "endorsement_type must be one of endorse, oppose or confused"}
-            return jsonify(message), 400
-        else:
-            app.logger.debug("Endrsing type json parameter == %s", request.json['endorsement_type'])
-            endorsement_type = request.json['endorsement_type']
-
-    # add voting map coordinates if any
-    coords = request.json.get('coords', {'mapx': None, 'mapy': None})
-
-    app.logger.debug("endorsement_type = %s\n", endorsement_type)
-    app.logger.debug("vote coords = %s\n", coords)
-
-    # Add user endorsement
-    proposal.endorse(user, endorsement_type, coords=coords)
-    db_session.commit()
-
-    '''
-    # Update graphs
-    question.get_voting_graph(
-        generation=generation,
-        map_type='all')
-    question.get_voting_graph(
-        generation=generation,
-        map_type='all')
-    '''
-
-    return jsonify(message="Endorsement added"), 201
 
 
 # Update Endorsement
@@ -2475,14 +2345,14 @@ def api_delete_proposal(question_id, proposal_id):
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
         return jsonify(message = "Proposal not found"), 404
+    
+    if user.id != proposal.user_id:
+        message = {"message": "Only the author delete this proposal"}
+        return jsonify(message), 403
 
     num_votes = len(proposal.all_voters(generation=proposal.question.generation))
     if num_votes > 0:
         message = {"message": "This proposal has votes and may no longer be deleted"}
-        return jsonify(message), 403
-    
-    if user.id != proposal.user_id:
-        message = {"message": "Only the author delete this proposal"}
         return jsonify(message), 403
 
     '''
@@ -2722,23 +2592,7 @@ def api_edit_proposal(question_id, proposal_id):
     if 'proposal_id' is None:
         response = {"message": "Requires Proposal ID"}
         return jsonify(response), 400
-
-    if not 'title' in request.json or request.json['title'] == ''\
-            or len(request.json['title']) > MAX_LEN_PROPOSAL_TITLE:
-        return jsonify(message="Proposal title must not be empty and must be less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
-
-    elif not 'blurb' in request.json or request.json['blurb'] == ''\
-            or len(request.json['blurb']) > MAX_LEN_PROPOSAL_BLURB:
-        return jsonify(message="Proposal content must not be empty and must be less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
-
-    elif 'abstract' in request.json and \
-            len(request.json['abstract']) > MAX_LEN_PROPOSAL_ABSTRACT:
-        return jsonify(message="Proposal abstract name must less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
-
-    title = request.json.get('title')
-    blurb = request.json.get('blurb')
-    abstract = request.json.get('abstract', None)
-
+    
     question = models.Question.query.get(int(question_id))
     if question is None:
         response = {"message": "Question not found"}
@@ -2757,6 +2611,22 @@ def api_edit_proposal(question_id, proposal_id):
     if num_votes > 0:
         message = {"message": "This proposal has votes and may no longer be edited"}
         return jsonify(message), 403
+
+    if not 'title' in request.json or request.json['title'] == ''\
+            or len(request.json['title']) > MAX_LEN_PROPOSAL_TITLE:
+        return jsonify(message="Proposal title must not be empty and must be less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
+
+    elif not 'blurb' in request.json or request.json['blurb'] == ''\
+            or len(request.json['blurb']) > MAX_LEN_PROPOSAL_BLURB:
+        return jsonify(message="Proposal content must not be empty and must be less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
+
+    elif 'abstract' in request.json and \
+            len(request.json['abstract']) > MAX_LEN_PROPOSAL_ABSTRACT:
+        return jsonify(message="Proposal abstract name must less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
+
+    title = request.json.get('title')
+    blurb = request.json.get('blurb')
+    abstract = request.json.get('abstract', None)
     
     # It is OK to update the proposal
     if proposal.update(user, title, blurb, abstract):
@@ -2831,7 +2701,7 @@ def api_associated_users():
 
     user = get_authenticated_user(request)
     if not user:
-        abort(401)
+        return jsonify(message = "User not logged in"), 404
 
     question_id = request.args.get('ignore_question', None)
 
@@ -2850,6 +2720,12 @@ def api_associated_users():
                   question_id
         return jsonify(message=message), 400
 
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
+
     not_invited = user.get_uninvited_associated_users(question=question)
 
     return jsonify(question_id=str(question.id),
@@ -2857,14 +2733,14 @@ def api_associated_users():
                    not_invited=not_invited), 200
 
 
-# Get new invitations
+# Decline a new invitation
 @app.route(REST_URL_PREFIX + '/users/<int:user_id>/new_invites/<int:invite_id>/decline', methods=['POST'])
 @requires_auth
 def api_decline_new_invite(user_id, invite_id):
     '''
     .. http:get:: /users/(int:user_id)/new_invites
 
-        A list of new invitations to participate in questions.
+        Decline an invitation to participate in a question.
 
         **Example request**:
 
@@ -2926,14 +2802,14 @@ def api_decline_new_invite(user_id, invite_id):
 
     return jsonify(message = "Invitation declined"), 200
 
-# Get new invitations
+# Accept new invitation
 @app.route(REST_URL_PREFIX + '/users/<int:user_id>/new_invites/<int:invite_id>/accept', methods=['POST'])
 @requires_auth
 def api_accept_new_invite(user_id, invite_id):
     '''
     .. http:get:: /users/(int:user_id)/new_invites
 
-        A list of new invitations to participate in questions.
+        Accept an invitation to participate in a question.
 
         **Example request**:
 
@@ -3136,7 +3012,13 @@ def api_not_invited(question_id):
 
     question = models.Question.query.get(int(question_id))
     if question is None:
-        abort(404)
+        return jsonify(message = "Question not found"), 404
+
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
 
     not_invited = user.get_uninvited_associated_users(question)
 
@@ -3144,81 +3026,6 @@ def api_not_invited(question_id):
                    num_items=str(len(not_invited)),
                    not_invited=not_invited), 200
 
-# Get users not yet invited to participate in a question
-# @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/not_invited',
-#           methods=['GET'])
-@requires_auth # added
-def api_not_invited_1(question_id):
-    '''
-    .. http:get:: /questions/(int:question_id)/not_invited
-
-        A list of users not yet invited to participate in a question.
-
-        **Example request**:
-
-        .. sourcecode:: http
-
-            GET /questions/42/not_invited HTTP/1.1
-            Host: example.com
-            Accept: application/json
-
-        **Example response**:
-
-        .. sourcecode:: http
-
-            Status Code: 200 OK
-            Content-Type: application/json
-
-            {
-              "query_generation": "1",
-              "current_generation": "1",
-              "endorsers": [
-                {
-                  "username": "john",
-                  "url": "/users/1",
-                  "registered": "2013-08-15 18:10:23.877239",
-                  "id": "1",
-                  "last_seen": "2013-08-15 18:10:23.877268"
-                },
-                {
-                  "username": "susan",
-                  "url": "/users/2",
-                  "registered": "2013-08-15 18:10:23.938536",
-                  "id": "2",
-                  "last_seen": "2013-08-15 18:10:23.938550"
-                },
-                {
-                  "username": "harry",
-                  "url": "/users/5",
-                  "registered": "2013-08-15 18:10:23.981326",
-                  "id": "5",
-                  "last_seen": "2013-08-15 18:10:23.981341"
-                }
-              ],
-              "num_items": "3",
-              "question_id": "1"
-            }
-
-        :param question_id: question id
-        :type question_id: int
-        :statuscode 200: no error
-        :statuscode 400: bad request
-    '''
-    app.logger.debug("api_not_invited called...\n")
-
-    if question_id is None:
-        app.logger.debug("ERROR: question_id is None!\n")
-        abort(404)
-
-    question = models.Question.query.get(int(question_id))
-    if question is None:
-        abort(404)
-
-    not_invited = question.get_not_invited()
-
-    return jsonify(question_id=str(question.id),
-                   num_items=str(len(not_invited)),
-                   not_invited=not_invited), 200
 
 # Get Question Participants
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/permissions',
@@ -3281,14 +3088,24 @@ def api_get_question_participants(question_id):
         :statuscode 400: bad request
     '''
     app.logger.debug("api_get_question_participants called...\n")
+    
+    user = get_authenticated_user(request)
+    if not user:
+        return jsonify(message = "User not logged in"), 404
 
     if question_id is None:
         app.logger.debug("ERROR: question_id is None!\n")
-        abort(404)
+        return jsonify({"message": "question_id not set"}), 404
 
     question = models.Question.query.get(int(question_id))
     if question is None:
-        abort(404)
+        return jsonify({"message": "Question not found"}), 401
+    
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
 
     permissions = question.get_participant_permissions()
 
@@ -3362,17 +3179,28 @@ def api_get_question_proposal_endorsers(question_id, proposal_id):
     '''
     app.logger.debug("api_get_question_proposal_endorsers called...\n")
 
+    # Check user is logged in
+    user = get_authenticated_user(request)
+    if user is None:
+        return jsonify(message = "User not logged in"), 404
+    
     if question_id is None or proposal_id is None:
         app.logger.debug("ERROR: question_id or proposal_id is None!\n")
-        abort(404)
+        return jsonify({"message": "Parameter qustion_id not set"}), 401
 
     question = models.Question.query.get(int(question_id))
     if question is None:
-        abort(404)
+        return jsonify({"message": "Question not found"}), 401
+        
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
 
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
-        abort(404)
+        return jsonify({"message": "Proposal not found"}), 401
 
     generation = int(request.args.get('generation', question.generation))
     endorsers = proposal.endorsers(generation=generation)
@@ -3474,7 +3302,14 @@ def api_question_pareto(question_id=None):
 
     if question is None:
         app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
-        abort(404)
+        return jsonify({"message": "Question not found"}), 404
+
+
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
 
     generation = int(request.args.get('generation', question.generation))
     pareto = question.calculate_pareto_front(generation=generation)
@@ -3557,21 +3392,29 @@ def api_question_results(question_id=None):
     app.logger.debug("api_question_results called with questiobn ID %s...\n",
                      question_id) # final
     
+    user = get_authenticated_user(request)
+    if user is None:
+        return jsonify(message = "User not logged in"), 404
+    
     if question_id is None:
         app.logger.debug("ERROR: question_id is None!\n")
         jsonify(message="Question ID not set in request"), 404
 
     question = models.Question.query.get(int(question_id))
+    if question is None:
+        app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
+        jsonify(message="Question not found"), 404
+
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
 
     if not question.phase is 'results':
         app.logger.debug("ERROR: Question must be in results phase before returning the results!\n")
         jsonify(message="Question not in results phase"), 404
 
-    if question is None:
-        app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
-        jsonify(message="Question not found"), 404
-
-    
     results = list()
     all_relations = question.calculate_proposal_relation_ids()
     endorsement_results = question.get_endorsement_results()
@@ -3651,21 +3494,34 @@ def api_question_participation_table(question_id=None):
     app.logger.debug("api_question_participation_table called with %s...\n",
                      question_id)
 
+    user = get_authenticated_user(request)
+    if user is None:
+        return jsonify(message = "User not logged in"), 404
+    
     if question_id is None:
         app.logger.debug("ERROR: question_id is None!\n")
-        abort(404)
+        return jsonify({"message": "Parameter question_id not set"}), 404
 
     question = models.Question.query.get(int(question_id))
 
     if question is None:
         app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
         jsonify(message="Question not found"), 404
+    
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
+    
+    # Check user is question author
+    if question.user_id != user.id:
+        return jsonify({"message": "Only the question author can make this request"}), 401
 
     participants = question.get_participants()
     app.logger.debug("participants==> %s", participants)
     all_proposals = question.get_current_proposals()
-    # current_proposals = question.get_current_proposals()
-    
+
     authors = dict()
     for proposal in all_proposals:
         if proposal.author.id not in authors:
@@ -3709,99 +3565,6 @@ def api_question_participation_table(question_id=None):
         else:
             participant['proposals_written'] = authors[user.id]
         
-        app.logger.debug("participant==>%s", participant)
-        participation_table.append(participant)
-        app.logger.debug("participation_table==>%s", participation_table)
-
-    return jsonify(question_id=str(question.id),
-                   current_generation=str(question.generation),
-                   num_proposals=str(len(all_proposals)),
-                   num_items=str(len(participation_table)),
-                   participation_table=participation_table), 200
-
-# @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/participation_table', methods=['GET'])
-@requires_auth # added
-def api_question_participation_table_v1(question_id=None):
-    '''
-    .. http:post:: /questions/(int:question_id)/participation_table
-
-        A list of the Key Players for this round.
-
-        **Example request**:
-
-        .. sourcecode:: http
-
-            POST /questions/44/key_players HTTP/1.1
-            Host: example.com
-            Accept: application/json
-
-        **Example response**:
-
-        .. sourcecode:: http
-
-            Status Code: 200 OK
-            Content-Type: application/json
-
-            {
-              "query_generation": "1",
-              "current_generation": "1",
-              "key_players": [
-                {
-                  "3": [
-                    "/api/v1/questions/1/proposals/4",
-                    "/api/v1/questions/1/proposals/3"
-                  ]
-                },
-                {
-                  "4": [
-                    "/api/v1/questions/1/proposals/3"
-                  ]
-                }
-              ],
-              "num_items": "2",
-              "question_id": "1"
-            }
-
-        :param question_id: question id
-        :statuscode 200: no error
-        :statuscode 400: bad request
-    '''
-    app.logger.debug("api_question_participation_table called with %s...\n",
-                     question_id)
-
-    if question_id is None:
-        app.logger.debug("ERROR: question_id is None!\n")
-        abort(404)
-
-    question = models.Question.query.get(int(question_id))
-
-    if question is None:
-        app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
-        jsonify(message="Question not found"), 404
-
-    participants = set()
-
-    # key_players = question.calculate_key_players()
-    all_proposals = question.get_all_proposals()
-
-    all_voters = set()
-    all_authors = set()
-    for proposal in all_proposals:
-        all_authors.add(proposal.author)
-        all_voters.update(proposal.all_voters())
-
-    participants.update(all_authors)
-    participants.update(all_voters)
-
-    app.logger.debug("participants==> %s", participants)
-
-    participation_table = []
-    for user in participants:
-        participant = dict()
-        participant['username'] = user.username
-        # participant['key_player'] = user in key_players
-        participant['past_generations'] = user.generations_participated_count(question)
-        participant['evaluations'] = user.get_endorsement_count(question)
         app.logger.debug("participant==>%s", participant)
         participation_table.append(participant)
         app.logger.debug("participation_table==>%s", participation_table)
@@ -3866,15 +3629,24 @@ def api_question_key_players(question_id=None):
     app.logger.debug("api_question_key_players called with %s...\n",
                      question_id)
 
+    user = get_authenticated_user(request)
+    if user is None:
+        return jsonify(message = "User not logged in"), 404
+
     if question_id is None:
-        app.logger.debug("ERROR: question_id is None!\n")
-        abort(404)
+        return jsonify({"message": "Parameter question_id not set"}), 404
 
     question = models.Question.query.get(int(question_id))
 
     if question is None:
         app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
         jsonify(message="Question not found"), 404
+    
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
 
     generation = int(request.args.get('generation', question.generation))
     key_players = question.calculate_key_players(generation=generation)
@@ -3892,91 +3664,6 @@ def api_question_key_players(question_id=None):
                 # proposals[endorse_type] = list()
             proposals[endorse_type].append(proposal.id)
         kp = {'user': endorser.get_public(), 'add_vote': proposals}
-        results.append(kp)
-
-    return jsonify(question_id=str(question.id),
-                   query_generation=str(generation),
-                   current_generation=str(question.generation),
-                   num_items=str(len(key_players)), key_players=results), 200
-
-
-#@app.route(REST_URL_PREFIX + '/questions/<int:question_id>/key_players', methods=['GET'])
-def api_question_key_players_v1(question_id=None):
-    '''
-    .. http:post:: /questions/(int:question_id)/key_players
-
-        A list of the Key Players for this round.
-
-        **Example request**:
-
-        .. sourcecode:: http
-
-            POST /questions/44/key_players HTTP/1.1
-            Host: example.com
-            Accept: application/json
-
-        **Example response**:
-
-        .. sourcecode:: http
-
-            Status Code: 200 OK
-            Content-Type: application/json
-
-            {
-              "query_generation": "1",
-              "current_generation": "1",
-              "key_players": [
-                {
-                  "3": [
-                    "/api/v1/questions/1/proposals/4",
-                    "/api/v1/questions/1/proposals/3"
-                  ]
-                },
-                {
-                  "4": [
-                    "/api/v1/questions/1/proposals/3"
-                  ]
-                }
-              ],
-              "num_items": "2",
-              "question_id": "1"
-            }
-
-        :param question_id: question id
-        :json username: username
-        :json email: email address
-        :json password: password
-        :statuscode 200: no error
-        :statuscode 400: bad request
-    '''
-    app.logger.debug("api_question_key_players called with %s...\n",
-                     question_id)
-
-    if question_id is None:
-        app.logger.debug("ERROR: question_id is None!\n")
-        abort(404)
-
-    question = models.Question.query.get(int(question_id))
-
-    if question is None:
-        app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
-        jsonify(message="Question not found"), 404
-
-    generation = int(request.args.get('generation', question.generation))
-    key_players = question.calculate_key_players(generation=generation)
-
-    app.logger.debug("calculate_key_players returned: %s", key_players)
-    # {3: set([<Proposal('3', Q:'1')>, <Proposal('4', Q:'1')>]), 4: set([<Proposal('3', Q:'1')>])}
-
-    results = []
-    for (endorser, vote_for) in key_players.iteritems():
-        proposals = []
-        for proposal in vote_for:
-            # proposals.append(url_for('api_get_question_proposals',
-            #                         question_id=question.id,
-            #                         proposal_id=proposal.id))
-            proposals.append(proposal.id)
-        kp = {endorser: proposals}
         results.append(kp)
 
     return jsonify(question_id=str(question.id),
@@ -4095,15 +3782,25 @@ def api_question_endorser_effects(question_id=None):
     app.logger.debug("api_question_endorser_effects called with %s...\n",
                      question_id)
 
+    user = get_authenticated_user(request)
+    if user is None:
+        return jsonify(message = "User not logged in"), 404
+    
     if question_id is None:
         app.logger.debug("ERROR: question_id is None!\n")
-        abort(404)
+        return jsonify({"message": "Parameter question_id not set"}), 404
 
     question = models.Question.query.get(int(question_id))
 
     if question is None:
         app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
-        abort(404)
+        return jsonify({"message": "Question not found"}), 401
+    
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
 
     generation = int(request.args.get('generation', question.generation))
     endorser_effects = question.\
@@ -4192,16 +3889,25 @@ def api_question_graph(question_id):
         :statuscode 400: bad request
     '''
     app.logger.debug("api_question_graph called...\n")
+    
+    user = get_authenticated_user(request)
+    if user is None:
+        return jsonify(message = "User not logged in"), 404
 
     if question_id is None:
-        app.logger.debug("ERROR: question_id is None!\n")
-        abort(404)
+        return jsonify({"message": "Parameter question_id not set"}), 404
 
     question = models.Question.query.get(int(question_id))
 
     if question is None:
         app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
-        abort(404)
+        return jsonify({"message": "Question not found"}), 401
+    
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
 
     generation = int(request.args.get('generation', question.generation))
 
@@ -4290,20 +3996,17 @@ def api_get_voting_data(question_id):
     app.logger.debug("api_question_results called with %s...\n",
                      question_id)
 
+    user = get_authenticated_user(request)
+    if user is None:
+        return jsonify(message = "User not logged in"), 404
+
     if question_id is None:
-        app.logger.debug("ERROR: question_id is None!\n")
-        abort(404)
+        return jsonify({"message": "Parameter question_id not set"}), 404
 
     question = models.Question.query.get(int(question_id))
 
     if question is None:
-        app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
-        abort(404)
-
-    # Check user permission
-    user = get_authenticated_user(request)
-    if not user:
-        return jsonify(message = "User not found"), 400
+        return jsonify({"message": "Question not found"}), 401
         
     perm = question.get_permissions(user)
     if not perm:
@@ -4359,16 +4062,26 @@ def api_question_voting_map(question_id):
     '''
     app.logger.debug("api_question_voting_map called with %s...\n",
                      question_id)
+    
+    user = get_authenticated_user(request)
+    if user is None:
+        return jsonify(message = "User not logged in"), 404
 
     if question_id is None:
         app.logger.debug("ERROR: question_id is None!\n")
-        abort(404)
+        return jsonify({"message": "Parameter question_id not set"}), 404
 
     question = models.Question.query.get(int(question_id))
 
     if question is None:
         app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
-        abort(404)
+        return jsonify({"message": "Question not found"}), 401
+    
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
 
     generation = int(request.args.get('generation', question.generation))
 
@@ -4418,16 +4131,26 @@ def api_question_levels_map(question_id=None):
     '''
     app.logger.debug("api_question_levels_map called with %s...\n",
                      question_id)
+    
+    # Check user is logged in
+    user = get_authenticated_user(request)
+    if user is None:
+        return jsonify(message = "User not logged in"), 404
 
     if question_id is None:
-        app.logger.debug("ERROR: question_id is None!\n")
-        abort(404)
+        return jsonify({"message": "Parameter question_id not set"}), 404
 
     question = models.Question.query.get(int(question_id))
 
     if question is None:
         app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
-        abort(404)
+        return jsonify({"message": "Question not found"}), 401
+    
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
 
     generation = int(request.args.get('generation', question.generation))
     # set Algorithm version
@@ -4485,15 +4208,25 @@ def api_question_domination_map(question_id=None):
     app.logger.debug("api_question_domination_map called with %s...\n",
                      question_id)
 
+    # Check user is logged in
+    user = get_authenticated_user(request)
+    if user is None:
+        return jsonify(message = "User not logged in"), 404
+    
     if question_id is None:
-        app.logger.debug("ERROR: question_id is None!\n")
-        abort(404)
+        return jsonify({"message": "Parameter question_id not set"}), 404
 
     question = models.Question.query.get(int(question_id))
 
     if question is None:
         app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
-        abort(404)
+        return jsonify({"message": "Question not found"}), 401
+    
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
 
     generation = int(request.args.get('generation', question.generation))
     # set Algorithm version
@@ -4629,15 +4362,25 @@ def api_question_proposal_relations(question_id=None):
     app.logger.debug("api_question_proposal_relations called with %s...\n",
                      question_id)
 
+    # Check user is logged in
+    user = get_authenticated_user(request)
+    if user is None:
+        return jsonify(message = "User not logged in"), 404
+    
     if question_id is None:
-        app.logger.debug("ERROR: question_id is None!\n")
-        abort(404)
+        return jsonify({"message": "Parameter question_id not set"}), 404
 
     question = models.Question.query.get(int(question_id))
 
     if question is None:
         app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
-        abort(404)
+        return jsonify({"message": "Question not found"}), 401
+    
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
 
     generation = int(request.args.get('generation', question.generation))
     proposal_relations =\
@@ -4719,12 +4462,25 @@ def api_get_new_invites(question_id):
     '''
     app.logger.debug("api_get_new_invites called...\n")
 
+    # Check user is logged in
+    user = get_authenticated_user(request)
+    if user is None:
+        return jsonify(message = "User not logged in"), 404
+    
     if question_id is None:
-        return jsonify(message = "Question ID parameter not set"), 404
+        return jsonify({"message": "Parameter question_id not set"}), 404
 
     question = models.Question.query.get(int(question_id))
+
     if question is None:
-        return jsonify(message = "Question not found"), 404
+        app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
+        return jsonify({"message": "Question not found"}), 401
+    
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
 
     page = int(request.args.get('page', 1))
 
@@ -4800,12 +4556,25 @@ def api_get_invitations(question_id):
     '''
     app.logger.debug("api_get_invitations called...\n")
 
+    # Check user is logged in
+    user = get_authenticated_user(request)
+    if user is None:
+        return jsonify(message = "User not logged in"), 404
+    
     if question_id is None:
-        return jsonify(message = "Question ID parameter not set"), 404
+        return jsonify({"message": "Parameter question_id not set"}), 404
 
     question = models.Question.query.get(int(question_id))
+
     if question is None:
-        return jsonify(message = "Question not found"), 404
+        app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
+        return jsonify({"message": "Question not found"}), 401
+    
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
 
     page = int(request.args.get('page', 1))
 
@@ -4863,22 +4632,31 @@ def api_create_email_invitation(question_id):
     '''
     app.logger.debug("api_create_email_invitation called...\n")
 
+    # Check user is logged in
     user = get_authenticated_user(request)
-    if not user:
-        abort(401)
-
+    if user is None:
+        return jsonify(message = "User not logged in"), 404
+    
     if question_id is None:
-        abort(404)
+        return jsonify({"message": "Parameter question_id not set"}), 404
 
     question = models.Question.query.get(int(question_id))
+
     if question is None:
-        abort(400)
+        app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
+        return jsonify({"message": "Question not found"}), 401
+    
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
 
     if not request.json:
-        abort(400)
+        return jsonify({"message": "JSON object not set in request"}), 400
 
     if not 'user_emails' in request.json:
-        abort(400)
+        return jsonify({"message": "Parameter user_emails not set"}), 404
 
     permissions = int(request.json.get('permissions', models.Question.READ))
     user_emails = request.json['user_emails']
@@ -4974,24 +4752,31 @@ def api_create_invitation(question_id):
     '''
     app.logger.debug("api_create_invitation called...\n")
 
+    # Check user is logged in
     user = get_authenticated_user(request)
-    if not user:
-        abort(401)
-
-    app.logger.debug("Authenticated User = %s\n", user.id)
-
+    if user is None:
+        return jsonify(message = "User not logged in"), 404
+    
     if question_id is None:
-        return jsonify(message = "Question ID parameter not set"), 404
+        return jsonify({"message": "Parameter question_id not set"}), 404
 
     question = models.Question.query.get(int(question_id))
+
     if question is None:
-        return jsonify(message = "Question not found"), 404
+        app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
+        return jsonify({"message": "Question not found"}), 401
+    
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
 
     if not request.json:
-        abort(400)
+        return jsonify({"message": "JSON object not set in request"}), 400
 
     if not 'invite_user_ids' in request.json:
-        return jsonify(message = "invite_user_ids parameter not set"), 400
+        return jsonify(message = "Parameter invite_user_ids not set"), 400
 
     invite_user_ids = request.json['invite_user_ids']
 
@@ -5013,7 +4798,7 @@ def api_create_invitation(question_id):
         db_session.commit()
         return jsonify(message="Invites created"), 201
     else:
-        abort(500)
+        return jsonify(message="Unable to create invites"), 500
 
 
 # Get subscriptions
@@ -5073,19 +4858,28 @@ def api_get_user_subscriptions(user_id, question_id=None):
         :statuscode 400: bad request
     '''
     app.logger.debug("api_get_user_subscriptions called...\n")
+    
+    # Check user is logged in
+    user = get_authenticated_user(request)
+    if user is None:
+        return jsonify(message = "User not logged in"), 404
 
     if user_id is None:
-        abort(404)
-
-    user = models.User.query.get(int(user_id))
+        return jsonify({"message": "Parameter user_id not set"}), 404
+        
+    if user_id != user.id:
+        return jsonify({"message": "User can only view his own subscriotions"}), 404
 
     if question_id is not None:
+        question = models.Question.query.get(int(question_id))
+        if question is None:
+            return jsonify({"message": "Question not found"}), 401
 
         subscribed_question = user.subscribed_questions.\
             filter(models.Update.question_id == int(question_id)).one()
 
         if subscribed_question is None:
-            abort(404)
+            return jsonify({"message": "Question subscription not found"}), 401
 
         app.logger.debug("Subscribed question ID %s\n",
                          subscribed_question.question_id)
@@ -5154,12 +4948,10 @@ def api_add_user_subscriptions(user_id):
     '''
     app.logger.debug("api_add_user_subscriptions called...\n")
 
+    # Check user is logged in
     user = get_authenticated_user(request)
-    if not user:
-        message = 'User not logged in'
-        return jsonify(message=message), 401
-
-    app.logger.debug("Authenticated User = %s\n", user.id)
+    if user is None:
+        return jsonify(message = "User not logged in"), 404
 
     if not request.json:
         message = 'No json object found'
@@ -5167,24 +4959,23 @@ def api_add_user_subscriptions(user_id):
 
     if not 'how' in request.json\
             or not request.json['how'] in ['daily', 'weekly', 'asap']:
-        message = 'how not set'
+        message = 'Parameter how not set'
         return jsonify(message=message), 400
 
     if not 'question_id' in request.json:
-        message = 'question_id not set'
+        message = 'Parameter question_id not set'
         return jsonify(message=message), 400
 
     question_id = int(request.json['question_id'])
+    question = models.Question.query.get(int(question_id))
+    if question is None:
+        return jsonify({"message": "Question not found"}), 401
+
     how = request.json['how']
 
     if user.subscribed_questions.filter(
             models.Update.question_id == question_id).count() == 1:
         message = 'User already subscribed'
-        return jsonify(message=message), 400
-
-    question = models.Question.query.get(question_id)
-    if question is None:
-        message = 'question not found'
         return jsonify(message=message), 400
 
     user.subscribe_to(question, how)
@@ -5243,20 +5034,19 @@ def api_update_user_subscriptions(user_id):
     '''
     app.logger.debug("api_update_user_subscriptions called...\n")
 
+    # Check user is logged in
     user = get_authenticated_user(request)
-    if not user:
-        abort(401)
-
-    app.logger.debug("Authenticated User = %s\n", user.id)
+    if user is None:
+        return jsonify(message = "User not logged in"), 404
 
     if not request.json:
-        abort(400)
+        return jsonify({"message": "JSON object not set in request"}), 400
 
     if user_id is None:
-        abort(400)
+        return jsonify(message = "Parameter user_id not set"), 400
 
     if user.id != user_id:
-        abort(401)
+        return jsonify(message = "Only user can update his subscriptions"), 400
 
     if not 'question_id' in request.json:
         msg_txt = "You must supply the parameter 'question_id' " +\
@@ -5266,6 +5056,9 @@ def api_update_user_subscriptions(user_id):
         return jsonify(message), 400
 
     question_id = int(request.json['question_id'])
+    question = models.Question.query.get(int(question_id))
+    if question is None:
+        return jsonify({"message": "Question not found"}), 401
 
     if not 'how' in request.json \
             or not request.json['how'] in ['daily', 'weekly', 'asap']:
@@ -5332,21 +5125,31 @@ def api_delete_user_subscriptions(user_id, question_id):
     '''
     app.logger.debug("api_delete_user_subscriptions called...\n")
 
+    # Check user is logged in
     user = get_authenticated_user(request)
-
     if user is None:
-        abort(404)
+        return jsonify(message = "User not logged in"), 404
+
+    if not request.json:
+        return jsonify({"message": "JSON object not set in request"}), 400
 
     if user_id is None:
-        abort(400)
+        return jsonify(message = "Parameter user_id not set"), 400
 
     if user.id != user_id:
-        abort(401)
+        return jsonify(message = "Only user can update his subscriptions"), 400
+    
+    if not 'question_id' in request.json:
+        msg_txt = "You must supply the parameter 'question_id' " +\
+                  "set to the id of the question" +\
+                  "you wish to subscribe to"
+        message = {"message": msg_txt}
+        return jsonify(message), 400
 
-    if question_id is None:
-        abort(404)
-
-    app.logger.debug("Authenticated User = %s\n", user.id)
+    question_id = int(request.json['question_id'])
+    question = models.Question.query.get(int(question_id))
+    if question is None:
+        return jsonify({"message": "Question not found"}), 401
 
     subscription = user.subscribed_questions.filter(and_(
         models.Update.question_id == int(question_id),

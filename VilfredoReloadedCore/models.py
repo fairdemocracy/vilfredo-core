@@ -525,7 +525,74 @@ class User(db.Model, UserMixin):
         
         return uninvited_associates
 
-    def get_associated_users(self, ignore_question_id=None):
+    def get_associated_user(self, userid):
+        '''
+        .. function:: get_associated_user()
+
+        Get user if associated with this user.
+
+        :rtype: User or None
+        '''
+
+        questions_participated = db_session.query(Invite.question_id)\
+            .filter(Invite.receiver_id == self.id)\
+            .all()
+
+        qids = set()
+        for item in questions_participated:
+            qids.add(item[0])
+        qids = list(qids)
+
+        associates = db_session.query(Invite.receiver_id)\
+            .filter(Invite.question_id.in_(qids))\
+            .filter(Invite.receiver_id != self.id)\
+            .all()
+
+        uids = set()
+        for user in associates:
+            uids.add(user[0])
+
+        uids = list(uids)
+        
+        if userid in uids:
+            return User.query.get(userid)
+        else:
+            return None
+
+    def get_associated_users(self, page=None):
+        '''
+        .. function:: get_associated_users()
+
+        Get all users associated with this user.
+
+        :rtype: flask.ext.sqlalchemy.Pagination
+        '''
+        page = page or 1
+
+        questions_participated = db_session.query(Invite.question_id)\
+            .filter(Invite.receiver_id == self.id)\
+            .all()
+
+        qids = set()
+        for item in questions_participated:
+            qids.add(item[0])
+        qids = list(qids)
+
+        associates = db_session.query(Invite.receiver_id)\
+            .filter(Invite.question_id.in_(qids))\
+            .filter(Invite.receiver_id != self.id)\
+            .all()
+
+        uids = set()
+        for user in associates:
+            uids.add(user[0])
+
+        uids = list(uids)
+
+        query = User.query.filter((User.id.in_(uids)))
+        return query.paginate(page, app.config['RESULTS_PER_PAGE'], False)
+
+    def get_associated_users_v1(self):
         '''
         .. function:: get_associated_users()
 
@@ -539,8 +606,7 @@ class User(db.Model, UserMixin):
         filter(Invite.question_id != ignore_question_id).\
         all()
         '''
-        invitations_query = self.invites_received
-        
+
         #if ignore_question_id:
         #invitations_query.filter(Invite.question_id != ignore_question_id)
         
@@ -549,19 +615,16 @@ class User(db.Model, UserMixin):
         # current_participants = 
         
         invitations = db_session.query(Invite).\
-            filter(Invite.question_id != ignore_question_id).\
-            filter(Invite.sender_id != self.id).\
+            filter(or_(Invite.sender_id == self.id,
+                       Invite.receiver_id == self.id)).\
             all()
-        
-        
-        #return invitations
 
         qids = set()
         for invite in invitations:
             qids.add(invite.question_id)
 
         #return qids
-        
+
         associate_invites = db_session.query(Invite).\
                 filter(Invite.question_id.in_(qids)).\
                 filter(Invite.receiver_id != self.id).\
