@@ -1776,7 +1776,8 @@ class Question(db.Model):
             for (pid, coords) in endorsement_data.iteritems():
                 results.update( {pid: {'median': {'medx': median(coords['mapx']),
                                                   'medy': median(coords['mapy'])},
-                                       'voters': coords['voters']} } )
+                                       'voters': coords['voters'],
+                                       'voter_count' : len(coords['voters'])} } )
 
                 # Update DB with proposal medians
                 geomedx = median(coords['mapx'])
