@@ -1237,8 +1237,7 @@ def api_get_question_proposals(question_id=None, proposal_id=None):
     # user = None
 
     if question_id is None:
-        app.logger.debug("ERROR: question_id is None!\n")
-        return jsonify(message="question_id not set"), 404
+        return jsonify({"message": "Parameter question_id not set"}), 404
 
     question = models.Question.query.get(int(question_id))
 
@@ -3007,8 +3006,7 @@ def api_not_invited(question_id):
         return jsonify(message = "User not logged in"), 404
 
     if question_id is None:
-        app.logger.debug("ERROR: question_id is None!\n")
-        abort(404)
+        return jsonify({"message": "Parameter question_id not set"}), 404
 
     question = models.Question.query.get(int(question_id))
     if question is None:
@@ -3094,8 +3092,8 @@ def api_get_question_participants(question_id):
         return jsonify(message = "User not logged in"), 404
 
     if question_id is None:
-        app.logger.debug("ERROR: question_id is None!\n")
-        return jsonify({"message": "question_id not set"}), 404
+        
+        return jsonify({"message": "Parameter question_id not set"}), 404
 
     question = models.Question.query.get(int(question_id))
     if question is None:
@@ -3295,8 +3293,8 @@ def api_question_pareto(question_id=None):
     user = get_authenticated_user(request)
 
     if question_id is None:
-        app.logger.debug("ERROR: question_id is None!\n")
-        abort(404)
+        
+        return jsonify({"message": "Parameter question_id not set"}), 404
 
     question = models.Question.query.get(int(question_id))
 
@@ -3397,7 +3395,7 @@ def api_question_results(question_id=None):
         return jsonify(message = "User not logged in"), 404
     
     if question_id is None:
-        app.logger.debug("ERROR: question_id is None!\n")
+        
         jsonify(message="Question ID not set in request"), 404
 
     question = models.Question.query.get(int(question_id))
@@ -3499,7 +3497,7 @@ def api_question_participation_table(question_id=None):
         return jsonify(message = "User not logged in"), 404
     
     if question_id is None:
-        app.logger.debug("ERROR: question_id is None!\n")
+        
         return jsonify({"message": "Parameter question_id not set"}), 404
 
     question = models.Question.query.get(int(question_id))
@@ -3787,7 +3785,7 @@ def api_question_endorser_effects(question_id=None):
         return jsonify(message = "User not logged in"), 404
     
     if question_id is None:
-        app.logger.debug("ERROR: question_id is None!\n")
+        
         return jsonify({"message": "Parameter question_id not set"}), 404
 
     question = models.Question.query.get(int(question_id))
@@ -4068,7 +4066,7 @@ def api_question_voting_map(question_id):
         return jsonify(message = "User not logged in"), 404
 
     if question_id is None:
-        app.logger.debug("ERROR: question_id is None!\n")
+        
         return jsonify({"message": "Parameter question_id not set"}), 404
 
     question = models.Question.query.get(int(question_id))
