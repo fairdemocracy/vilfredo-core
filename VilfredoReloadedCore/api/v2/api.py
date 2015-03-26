@@ -303,7 +303,7 @@ def api_get_auth_token():
     app.logger.debug("api_get_auth_token called...\n")
     user = get_authenticated_user(request)
     if not user:
-        return jsonify(message = "User not found"), 400
+        return jsonify(message = "User not logged in"), 404
 
     # Check if user needs to verify his email address
     verify_email = models.VerifyEmail.query.filter_by(user_id=user.id).first()
@@ -2144,7 +2144,7 @@ def api_update_proposal_endorsement(question_id, proposal_id):
 
     user = get_authenticated_user(request)
     if not user:
-        return jsonify(message = "User not found"), 400
+        return jsonify(message = "User not logged in"), 404
 
     app.logger.debug("Authenticated User = %s\n", user.id)
 
@@ -2228,7 +2228,7 @@ def api_create_proposal(question_id):
 
     user = get_authenticated_user(request)
     if not user:
-        return jsonify(message = "User not found"), 400
+        return jsonify(message = "User not logged in"), 404
 
     app.logger.debug("Authenticated User = %s\n", user.id)
 
@@ -3004,7 +3004,7 @@ def api_not_invited(question_id):
 
     user = get_authenticated_user(request)
     if not user:
-        return jsonify(message = "User not found"), 400
+        return jsonify(message = "User not logged in"), 404
 
     if question_id is None:
         app.logger.debug("ERROR: question_id is None!\n")
