@@ -157,6 +157,10 @@ def activate():
 @app.route('/privacy')
 def pivacy():
     return render_template("privacy.html")
+    
+@app.route('/newquestion')
+def new_question():
+    return render_template("newquestion.html")
 
 @app.route('/lostpassword')
 def lost_password():
