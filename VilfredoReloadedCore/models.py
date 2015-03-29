@@ -1801,11 +1801,11 @@ class Question(db.Model):
                     results[pid]['c_error'] = {'mapx': median(coords['mapx'] + [0.5] * not_voted),
                                                'mapy': median(coords['mapy'] + [1] * not_voted)}
 
-            # Add PF domination data == yelp
-            history = self.get_history(generation=generation)
-            for (proposal_id, data) in history.iteritems():
+            # Add PF data
+            relations = self.calculate_proposal_relation_ids(generation=generation)
+            for (proposal_id, data) in relations.iteritems():
                 if proposal_id in results:
-                    results[proposal_id]['dominated_by'] = data.dominated_by
+                    results[proposal_id]['dominated_by'] = int(not data['pareto'])
 
             app.logger.debug("results ==> %s", results)
             
@@ -2861,6 +2861,7 @@ class Question(db.Model):
 
         return proposal_relations
     
+    # bang
     def calculate_proposal_relation_ids_qualified(self, generation=None, proposals=None):
         '''
         .. function:: calculate_proposal_relations([generation=None])
@@ -2910,7 +2911,7 @@ class Question(db.Model):
                 app.logger.debug("   ===> WDW Result = %s\n",
                                  who_dominates)
                 '''
-
+                # bang 
                 if (who_dominates == endorser_ids[proposal1.id]):
                     dominating.add(proposal2.id)
                 elif (who_dominates == endorser_ids[proposal2.id]):
@@ -3613,6 +3614,7 @@ class Question(db.Model):
     def set_domination_table_entry():
         pass
     
+    # bang
     def calculate_domination_map_qualified(self, generation=None, proposals=None):  
         '''
         .. function:: calculate_domination_map_qualified([generation=None, proposals=None])
@@ -3985,7 +3987,7 @@ class Question(db.Model):
                                                          exclude_user,
                                                          generation,
                                                          save)
-
+    # bang
     def calculate_pareto_front_qualified(self,
                                proposals=None,
                                exclude_user=None,
@@ -4013,7 +4015,7 @@ class Question(db.Model):
 
         app.logger.debug("calculate_pareto_front_qualified called...")
         
-        save_pf = False # snow
+        save_pf = False
         # Save pareto if calculated against full set of proposals and voters,
         # and save parameter not set to false
         if not exclude_user and not proposals and save:
@@ -4506,6 +4508,7 @@ class Question(db.Model):
             keys.append(k)
         return inv
 
+    # bang
     def get_complex_voting_graph(self, generation=None):
         '''
         .. function:: get_complex_voting_graph(generation, map_type)
@@ -4594,41 +4597,6 @@ class Question(db.Model):
 
         # Return voting graph file path
         return filename + ".svg"
-    
-    def get_voting_graph_off(self,
-                         generation=None,
-                         map_type='all',
-                         proposal_level_type=GraphLevelType.layers,
-                         user_level_type=GraphLevelType.layers,
-                         algorithm=None): # oldgraph
-        '''
-        .. function:: get_voting_graph(generation, map_type)
-
-        Generates the svg map file from the dot string and returns the map URL.
-
-        :param generation: the question generation
-        :type generation: Integer
-        :param map_type: map type
-        :type map_type: string
-        :rtype: string or Boolean
-        '''
-        algorithm = algorithm or app.config['ALGORITHM_VERSION']
-
-        if algorithm == 1:
-            # Generate old voting graph
-            return self.get_old_voting_graph(
-                generation=generation,
-                map_type=map_type,
-                proposal_level_type=proposal_level_type,
-                user_level_type=user_level_type,
-                algorithm=algorithm)
-        elif algorithm == 2:
-            # Generate new voting graph based on Complex Algorithm
-            return self.get_new_voting_graph(
-                generation=generation,
-                algorithm=algorithm)
-        else:
-            return False
 
     def get_voting_graph(self,
                          generation=None,
@@ -4851,7 +4819,7 @@ class Question(db.Model):
 
         return below
 
-    def create_new_graph(self, generation=None, algorithm=2): # LIVE
+    def create_new_graph(self, generation=None, algorithm=2): # LIVE bang
         app.logger.debug("create_new_graph called: Algorithm = %s", algorithm)
         generation = generation or self.generation
         proposals = self.get_proposals_list(generation)
