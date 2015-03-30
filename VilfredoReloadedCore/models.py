@@ -1538,6 +1538,7 @@ class Question(db.Model):
                 "minimum_time": str(self.minimum_time),
                 "maximum_time": str(self.maximum_time),
                 'phase': self.phase,
+                'type': self.question_type.name,
                 'author': self.author.username,
                 'avatar_url': app.config['PROTOCOL'] + os.path.join(app.config['SITE_DOMAIN'], self.author.get_avatar()),
                 'author_id': self.author.id,
@@ -1584,6 +1585,9 @@ class Question(db.Model):
     room = db.Column(db.String(30))
     phase = db.Column(db.Enum('writing', 'voting', 'archived', 'consensus', 'results', name="question_phase_enum"),
                       default='writing')
+    
+    question_type_id = db.Column(db.Integer, db.ForeignKey('question_types.id', name='fk_quesion_question_types'), default=1, nullable=False) 
+    
     # created = db.Column(db.DateTime)
     # last_move_on = db.Column(db.DateTime)
     created = db.Column(db.Integer)
@@ -1609,7 +1613,9 @@ class Question(db.Model):
     invites_sent = db.relationship('UserInvite', lazy='dynamic', backref='question',
                               primaryjoin="UserInvite.question_id == Question.id",
                               cascade="all, delete-orphan")
-
+    
+    question_type = db.relationship('QuestionTypes', lazy='join')
+    
     def __init__(self, author, title, blurb,
                  minimum_time=86400, maximum_time=604800, room=None):
         '''
@@ -1640,6 +1646,7 @@ class Question(db.Model):
         self.phase = 'writing'
         self.minimum_time = minimum_time
         self.maximum_time = maximum_time
+        self.question_type_id = 1
     
     # sharks
     def get_not_invited(self):
@@ -7487,6 +7494,20 @@ class Comment(db.Model):
             return existing_comment
         else:
             return False
+
+
+class QuestionTypes(db.Model):
+    '''
+    Reference table of question types.
+    '''
+
+    __tablename__ = 'question_types'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(25), nullable=False)
+    
+    def __init__(self, name):
+        self.name = name
 
 
 class QuestionHistory(db.Model):

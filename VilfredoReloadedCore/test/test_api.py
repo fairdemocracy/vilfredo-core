@@ -35,7 +35,8 @@ except ImportError:
 from .. import app
 # from .. import api
 from VilfredoReloadedCore.api.v2 import api
-from .. database import drop_db, init_db
+from VilfredoReloadedCore import models
+from .. database import drop_db, init_db, db_session
 import base64
 import json
 import os
@@ -76,6 +77,10 @@ class RESTAPITestCase(unittest.TestCase):
             init_db()
             app.config['TESTING'] = True
             self.app = app.test_client()
+            # Populate QuestionTypes
+            db_session.add_all([models.QuestionTypes('standard'),
+                                models.QuestionTypes('image')])
+            db_session.commit()
 
     def tearDown(self):
         # For SQLite development DB only
