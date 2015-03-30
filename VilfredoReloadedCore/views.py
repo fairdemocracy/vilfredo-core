@@ -160,7 +160,11 @@ def pivacy():
     
 @app.route('/newquestion')
 def new_question():
-    return render_template("newquestion.html")
+    auth = request.cookies.get('vgaclient')
+    if not auth:
+        return redirect(redirect_url())
+    else:
+        return render_template("newquestion.html")
 
 @app.route('/lostpassword')
 def lost_password():
@@ -168,9 +172,17 @@ def lost_password():
     
 @app.route('/mysettings')
 def mysettings():
-    return render_template("mysettings.html")
+    auth = request.cookies.get('vgaclient')
+    if not auth:
+        return redirect(redirect_url())
+    else:
+        return render_template("mysettings.html")
 
 @app.route('/domination/<int:question_id>/gen/<int:generation>')
 def display_domination(question_id, generation):
-    return render_template("domination.html")
+    auth = request.cookies.get('vgaclient')
+    if not auth:
+        return redirect(redirect_url())
+    else:
+        return render_template("domination.html")
 
