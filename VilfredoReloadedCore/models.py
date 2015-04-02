@@ -258,6 +258,82 @@ def make_map_filename(question_id,
            "_" + str(user_level_type)
 
 
+def check_user_file_exists(user, filename):
+    current_dir = os.path.dirname(os.path.realpath(__file__))
+    image_path = os.path.join(current_dir, app.config['UPLOADED_FILES_DEST'], str(user.id), filename)
+    return os.path.exists(image_path)
+
+def create_image_filename(image_filename, filename_append_list=[]):
+    from werkzeug import secure_filename
+    new_filename = secure_filename(image_filename)
+    fix_filename = os.path.splitext(new_filename)
+
+    # Optionally append strings, question id etc
+    for append in filename_append_list:
+        new_filename += '_' + append
+
+    app.logger.debug("new_filename + appendics = %s", new_filename)
+    new_filename = hash_string(new_filename) + fix_filename[1]
+    return new_filename
+
+def save_image(user, image, use_filename):
+    current_dir = os.path.dirname(os.path.realpath(__file__))
+    image_path = os.path.join(current_dir, app.config['UPLOADED_FILES_DEST'], str(user.id))
+    app.logger.info("image path = %s", image_path)
+    if not os.path.exists(image_path):
+        try:
+            os.makedirs(image_path)
+        except IOError:
+            app.logger.debug('save_image: Failed to create image path %s', image_path)
+            return False
+
+    if os.path.isfile(os.path.join(image_path, use_filename)):
+        app.logger.debug("A file of that name already exists: %s", os.path.join(image_path, use_filename))
+        return False
+    
+    app.logger.debug("Saving image to %s", os.path.join(image_path, use_filename))
+    image.save(os.path.join(image_path, use_filename))
+    if not os.path.isfile(os.path.join(image_path, use_filename)):
+        return False
+    else:
+        return use_filename
+
+def save_image_v1(user, image, filename_append_list=[]):
+    current_dir = os.path.dirname(os.path.realpath(__file__))
+    image_path = os.path.join(current_dir, app.config['UPLOADED_FILES_DEST'], str(user.id))
+    app.logger.info("image path = %s", image_path)
+    if not os.path.exists(image_path):
+        try:
+            os.makedirs(image_path)
+        except IOError:
+            app.logger.debug('save_image: Failed to create image path %s', image_path)
+            return False
+
+    '''
+    from werkzeug import secure_filename
+    filename = secure_filename(image.filename)
+    fix_filename = os.path.splitext(filename)
+    # Optionally append strings, question id etc
+    for append in filename_append_list:
+        filename += '_' + append
+    app.logger.debug("A file of that name already exists: %s", os.path.join(image_path, image.filename))
+    image.filename = hash_string(filename) + fix_filename[1]
+    '''
+    use_filename = create_image_filename(image.filename, filename_append_list)
+    
+    if os.path.isfile(os.path.join(image_path, use_filename)):
+        app.logger.debug("A file of that name already exists: %s", os.path.join(image_path, use_filename))
+        return False
+    
+    app.logger.debug("Saving image to %s", os.path.join(image_path, use_filename))
+    image.save(os.path.join(image_path, use_filename))
+    if not os.path.isfile(os.path.join(image_path, use_filename)):
+        return False
+    else:
+        # return os.path.join(app.config['UPLOADED_FILES_DEST'], str(self.id), image.filename)
+        return image.filename
+
+
 # Proposal comments supported by a user
 user_comments = db.Table(
     'user_comments',
@@ -1538,7 +1614,8 @@ class Question(db.Model):
                 "minimum_time": str(self.minimum_time),
                 "maximum_time": str(self.maximum_time),
                 'phase': self.phase,
-                'type': self.question_type.name,
+                'question_type': self.question_type_id,
+                'question_type_name': self.question_type.name,
                 'author': self.author.username,
                 'avatar_url': app.config['PROTOCOL'] + os.path.join(app.config['SITE_DOMAIN'], self.author.get_avatar()),
                 'author_id': self.author.id,
@@ -1617,7 +1694,7 @@ class Question(db.Model):
     question_type = db.relationship('QuestionTypes', lazy='join')
     
     def __init__(self, author, title, blurb,
-                 minimum_time=86400, maximum_time=604800, room=None):
+                 minimum_time=86400, maximum_time=604800, room=None, question_type=1):
         '''
         .. function:: __init__(author, title, blurb
                 [, minimum_time=86400, maximum_time=604800, room=None])
@@ -1646,7 +1723,7 @@ class Question(db.Model):
         self.phase = 'writing'
         self.minimum_time = minimum_time
         self.maximum_time = maximum_time
-        self.question_type_id = 1
+        self.question_type_id = question_type
     
     # sharks
     def get_not_invited(self):
@@ -7564,6 +7641,12 @@ class Proposal(db.Model):
         :rtype: dict
         '''
         num_votes = self.get_vote_count()
+        image_url = ''
+        if len(self.image):
+            image_url = app.config['PROTOCOL'] + os.path.join(
+                app.config['SITE_DOMAIN'],
+                self.get_image())
+
         public = {'id': str(self.id),
                 'uri': url_for('api_get_question_proposals',
                                question_id=self.question.id,
@@ -7575,6 +7658,7 @@ class Proposal(db.Model):
                 'source': str(self.source),
                 'created': str(self.created),
                 'author': self.author.username,
+                'image_url': image_url,
                 'question_count': str(self.get_question_count()),
                 'comment_count': str(self.get_comment_count()),
                 'vote_count': str(num_votes),
@@ -7600,6 +7684,7 @@ class Proposal(db.Model):
     title = db.Column(db.String(120), nullable=False)
     blurb = db.Column(db.Text, nullable=False)
     abstract = db.Column(db.Text, nullable=False)
+    image =  db.Column(db.String(150), nullable=False)
     generation_created = db.Column(db.Integer, default=1)
     created = db.Column(db.DateTime)
     source = db.Column(db.Integer, default=0)
@@ -7622,8 +7707,8 @@ class Proposal(db.Model):
         primaryjoin="Comment.proposal_id == Proposal.id",
         lazy='dynamic')
 
-    def __init__(self, author, question, title, blurb,
-                 abstract='', source=0):
+    def __init__(self, author, question, title, blurb='',
+                 abstract='', source=0, image=''):
         '''
         .. function:: __init__(author, question, title, blurb
                 [, abstract=None, source=0])
@@ -7652,6 +7737,37 @@ class Proposal(db.Model):
         self.abstract = abstract
         self.question = question
         self.source = source
+        self.image = image
+
+
+    def get_image(self):
+        if len(self.image):
+            return os.path.join(
+                app.config['UPLOADED_FILES_DEST'],
+                str(self.author.id), 
+                self.image)
+        else:
+            return ''
+
+    def delete_image(self):
+        current_dir = os.path.dirname(os.path.realpath(__file__))
+        image_file = os.path.join(current_dir, app.config['UPLOADED_FILES_DEST'], str(self.user_id), self.image)
+        app.logger.info("Deleting image file %s", image_file)
+        try:
+            os.remove(image_file)
+            return True
+        except OSError:
+            return False
+
+    def update_image(self, image):
+        image_file = save_image(user, image)
+        if image_file:
+            self.image = image_file
+            # Delete exisiting image if set
+            self.delete_image(self)
+            return self.image
+        else:
+            return False
 
     def all_votes(self, generation=None):
         generation = generation or self.question.generation
@@ -7760,7 +7876,7 @@ class Proposal(db.Model):
     def publish(self):
         self.history.append(QuestionHistory(self))
 
-    def update(self, user, title, blurb, abstract=None):
+    def update(self, user, title, blurb=None, abstract=None, image_file=None):
         '''
         .. function:: update(user, title, blurb[, abstract=None])
 
@@ -7781,12 +7897,17 @@ class Proposal(db.Model):
         if (user.id == self.user_id
                 and self.question.phase == 'writing'
                 and self.question.generation == self.generation_created):
-            if (len(title) > 0 and len(blurb) > 0):
+            if (len(title) > 0):
                 self.title = title
+            if blurb:
                 self.blurb = blurb
+            if abstract:
                 self.abstract = abstract
-                self.updated = datetime.datetime.utcnow()
-                return True
+            if image_file:
+                self.image = image_file
+            
+            self.updated = datetime.datetime.utcnow()
+            return True
         else:
             return False
 

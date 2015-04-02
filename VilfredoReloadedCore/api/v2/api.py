@@ -1109,6 +1109,10 @@ def api_create_question():
         # abort(400)
         response = {message: "Question text must not be empty and no longer than " + str(MAX_LEN_QUESTION_BLURB) + " characters"}
         return jsonify(response), 400
+        
+    elif 'question_type' in request.json and (not isinstance( request.json['question_type'], int )\
+         or not request.json['question_type'] in (1,2)):
+        return jsonify(message="Invalid parameter question_type"), 400
 
     elif 'room' in request.json and request.json['room'] != ''\
          and (len(request.json['room']) > MAX_LEN_ROOM
@@ -1118,17 +1122,13 @@ def api_create_question():
     # Set required parameters
     title = request.json.get('title')
     blurb = request.json.get('blurb')
-    # Set optional parameters
-    room = request.json.get('room', None)
-    minimum_time = request.json.get('minimum_time', 0)
-    maximum_time = request.json.get('maximum_time', 2592000)
+    question_type = request.json.get('question_type', 1)
+                  
+    question = models.Question(author=user, 
+                               title=title,
+                               blurb = blurb,
+                               question_type=question_type)
 
-    question = models.Question(user,
-                               title,
-                               blurb,
-                               minimum_time,
-                               maximum_time,
-                               room)
     db_session.add(question)
     db_session.commit()
 
@@ -2184,8 +2184,251 @@ def api_update_proposal_endorsement(question_id, proposal_id):
     else:
         return jsonify(message="Failed to update endorsement"), 500
 
+
+# Edit proposal V2
 #
-# Create proposal
+@app.route(REST_URL_PREFIX + '/questions/<int:question_id>/proposals/<int:proposal_id>',
+           methods=['POST'])
+@requires_auth
+def api_edit_proposal(question_id, proposal_id):
+    '''
+    .. http:post:: questions/int:question_id/proposals/int:proposal_id
+
+        Edit proposal.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            POST questions/22/proposals/14 HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 201 OK
+            Content-Type: application/json
+
+            {
+              "message": "Proposal updated"
+            }
+
+        :param question_id: question ID
+        :type question_id: int
+        :param proposal_id: proposal ID
+        :type proposal_id: int
+        :json title: title
+        :json blurb: question content
+        :json abstract: optional abstract
+        :statuscode 201: no error
+        :statuscode 400: bad request
+    '''
+    app.logger.debug("api_edit_proposal v2 called...\n")
+
+    # Must be authenticated
+    user = get_authenticated_user(request)
+    if not user:
+        response = {"message": "User not logged in"}
+        return jsonify(response), 400
+
+    if 'question_id' is None or 'proposal_id' is None:
+        response = {"message": "Requires Question ID"}
+        return jsonify(response), 400
+    
+    if 'proposal_id' is None:
+        response = {"message": "Requires Proposal ID"}
+        return jsonify(response), 400
+
+    question = models.Question.query.get(question_id)
+    if question is None:
+        message = {"message": "Question not found"}
+        return jsonify(message), 400
+    
+    if question.question_type_id not in (1,2):
+        console.log("Question has invalid type ID: %s" % question.question_type_id)
+        message = {"message": "Question has invalid type ID"}
+        return jsonify(message), 400
+    
+    proposal = models.Proposal.query.get(proposal_id)
+    if proposal is None:
+        message = {"message": "Proposal not found"}
+        return jsonify(message), 400
+
+    if user.id != proposal.user_id:
+        message = {"message": "You are not authorized to edit this proposal"}
+        return jsonify(message), 403
+
+    num_votes = len(proposal.all_voters(generation=proposal.question.generation))
+    if num_votes > 0:
+        message = {"message": "This proposal has votes and may no longer be edited"}
+        return jsonify(message), 403
+    
+    if not 'title' in request.form or request.form['title'] == ''\
+            or len(request.form['title']) > MAX_LEN_PROPOSAL_TITLE:
+        return jsonify(message="Proposal title must not be empty and must be less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
+
+    title = request.form['title']
+
+    # Update text proposal
+    if question.question_type_id == 1:
+
+        if not 'blurb' in request.form or request.form['blurb'] == ''\
+                or len(request.form['blurb']) > MAX_LEN_PROPOSAL_BLURB:
+            return jsonify(message="Proposal content must not be empty and must be less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
+
+        elif 'abstract' in request.form and \
+                len(request.form['abstract']) > MAX_LEN_PROPOSAL_ABSTRACT:
+            return jsonify(message="Proposal abstract name must less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
+
+        blurb = request.form.get('blurb')
+        abstract = request.form.get('abstract', None)
+
+        if proposal.update(user=user, title=title, blurb=blurb, abstract=abstract):
+            db_session.commit()
+            return jsonify(message="Proposal updated",
+                           proposal=proposal.get_public()), 201
+        else:
+            message = {"message": "There was an error updating this proposal"}
+            return jsonify(message), 400
+
+    # Update image proposal
+    elif question.question_type_id == 2:
+
+        image_file = None
+        # Check if user has uploaded a different image
+        if 'image' in request.files:
+            image = request.files['image']
+            app.logger.debug("Uploaded image = %s", image.filename)
+
+            if not allowed_file(image.filename):
+                message = 'image file must be of type: ' + ', '.join(app.config['ALLOWED_EXTENSIONS'])
+                return jsonify(message=message, error=message), 401
+
+            use_filename = models.create_image_filename(image.filename, [str(question.id)])
+            app.logger.debug("use_filename = %s", use_filename)
+            if models.check_user_file_exists(user, use_filename):
+                message = 'An image of that name already exists'
+                return jsonify(message=message), 401
+
+            image_file = models.save_image(user, image, use_filename)
+            #image_file = models.save_image(user, image)
+            
+            if image_file == False:
+                message = 'Failed to save image. Proposal not updated.'
+                return jsonify(message=message, error=message), 401
+
+        if proposal.update(user=user, title=title, image_file=image_file):
+            db_session.commit()
+            return jsonify(message="Proposal updated",
+                           proposal=proposal.get_public()), 201
+        else:
+            message = {"message": "There was an error updating this proposal"}
+            return jsonify(message), 400
+
+#
+# Add image proposal bang
+#
+@app.route(REST_URL_PREFIX + '/questions/<int:question_id>/upload_image_proposal', methods=['POST'])
+@requires_auth
+def api_upload_image_proposal(question_id):
+    '''
+    .. http:post:: /upload_image_proposal
+
+        Request password reset.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            POST /users HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 201 OK
+            Content-Type: application/json
+
+            {
+                "message": "File saved",
+                "url": "http://0.0.0.0:8080/static/usercontent/profiles/1/831e44b41f77c66d6f97aa8ee4977275.jpg"
+            }
+
+        :json email: registered email address
+        :statuscode 201: no error
+        :statuscode 400: bad request
+        :statuscode 401: bad request
+    '''
+    app.logger.debug("upload_image_proposal called.....\n")
+    
+    # Must be authenticated
+    user = get_authenticated_user(request)
+    if not user:
+        response = {"message": "User not logged in"}
+        return jsonify(response), 400
+    
+    if question_id is None:
+        return jsonify({"message": "Parameter question_id not set"}), 404
+
+    question = models.Question.query.get(int(question_id))
+    if question is None:
+        return jsonify(message = "Question not found"), 404
+
+    # Check user permission: can propose?
+    perm = question.get_permissions(user)
+    if not perm or not models.Question.PROPOSE & perm:
+        app.logger.debug("ACCESS ERROR: User %s with permission %s tried to propose on question %s", user.id, perm, question.id)
+        return jsonify(message = "Question not found"), 404
+    
+    app.logger.debug("request files %s", request.files)
+    app.logger.debug("request files %s", request.files['image'])
+    image = request.files['image']
+    app.logger.debug("Image: %s", type(image))
+    app.logger.debug("image file = %s", image)
+    app.logger.debug("image filename = %s", image.filename)
+    if not image:
+        message = 'Failed to upload file'
+        return jsonify(message=message, error=message), 401
+    
+    if not allowed_file(image.filename):
+        message = 'image file must be of type: ' + ', '.join(app.config['ALLOWED_EXTENSIONS'])
+        return jsonify(message=message, error=message), 401
+
+    app.logger.info("request data form %s", request.form)
+    app.logger.info("request data form %s", request.form['title'])
+    
+    if not 'title' in request.form or request.form['title'] == ''\
+            or len(request.form['title']) > MAX_LEN_PROPOSAL_TITLE:
+        return jsonify(message="Proposal title must not be empty and must be less than " + str(MAX_LEN_PROPOSAL_TITLE) + " characters"), 400
+    
+    title = request.form['title']
+    
+    use_filename = models.create_image_filename(image.filename, [str(question.id)])
+    app.logger.debug("check if hashed use_filename exists ==> %s", use_filename)
+    if models.check_user_file_exists(user, use_filename):
+        message = 'An image of that name already exists'
+        return jsonify(message=message), 401
+
+    #image_file = models.save_image(user, image, [str(question.id)])
+    image_file = models.save_image(user, image, use_filename)
+
+    if image_file == False:
+        message = 'Failed to save image'
+        return jsonify(message=message), 401
+
+    proposal = models.Proposal(author=user, question=question, title=title, image=image_file)
+    db_session.add(proposal)
+    db_session.commit()
+    
+    return jsonify(proposal=proposal.get_public()), 201
+
+
+#
+# Create proposal / Add proposal bang
 #
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/proposals', methods=['POST'])
 @requires_auth
@@ -2232,13 +2475,110 @@ def api_create_proposal(question_id):
     app.logger.debug("Authenticated User = %s\n", user.id)
 
     if question_id is None:
-        abort(400)
+        return jsonify({"message": "Parameter question_id not set"}), 404
 
     question = models.Question.query.get(int(question_id))
     if question is None:
+        return jsonify(message = "Question not found"), 404
+
+    # Check user permission: can propose?
+    perm = question.get_permissions(user)
+    if not perm or not models.Question.PROPOSE & perm:
+        app.logger.debug("ACCESS ERROR: User %s with permission %s tried to propose on question %s", user.id, perm, question.id)
+        return jsonify(message = "Question not found"), 404
+
+    if not request.json:
+        app.logger.debug("Form data not received...\n")
         abort(400)
 
-    # shark
+    if not 'title' in request.json or request.json['title'] == ''\
+            or len(request.json['title']) > MAX_LEN_PROPOSAL_TITLE:
+        return jsonify(message="Proposal title must not be empty and must be less than " + str(MAX_LEN_PROPOSAL_TITLE) + " characters"), 400
+
+    elif not 'blurb' in request.json or request.json['blurb'] == ''\
+            or len(request.json['blurb']) > MAX_LEN_PROPOSAL_BLURB:
+        return jsonify(message="Proposal content must not be empty and must be less than " + str(MAX_LEN_PROPOSAL_BLURB) + " characters"), 400
+
+    elif 'abstract' in request.json and \
+            len(request.json['abstract']) > MAX_LEN_PROPOSAL_ABSTRACT:
+        return jsonify(message="Proposal abstract name must less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
+
+    title = request.json.get('title')
+    blurb = request.json.get('blurb')
+    abstract = request.json.get('abstract', '')
+
+    source = 0
+    if 'source' in request.json:
+        if not isinstance(request.json['source'], int):
+            message = {"message": "source parameter invalid"}
+            return jsonify(message), 400
+        elif not models.Proposal.query.get(int(request.json['source'])):
+            message = {"message": "source proposal not found"}
+            return jsonify(message), 400
+        else:
+            source = request.json['source']
+
+    proposal = models.Proposal(author=user, question=question, title=title, blurb=blurb, abstract=abstract, source=source)
+    db_session.add(proposal)
+    db_session.commit()
+
+    return jsonify(proposal=proposal.get_public()), 201
+
+
+#
+# Create proposal / Add proposal bang
+#
+# @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/proposals', methods=['POST'])
+@requires_auth
+def api_create_proposal_v1(question_id):
+    '''
+    .. http:post:: /questions/(int:question_id)/proposals
+
+        Create a proposal.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            POST /questions/45/proposals HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 201 OK
+            Content-Type: application/json
+
+            {
+                "url": "/api/v1/questions/45/proposals/1"
+            }
+
+        :param question_id: question ID
+        :type question_id: int
+        :json title: proposal title
+        :json blurb: proposal content
+        :json abstract: proposal abstract
+        :json source: parent proposal ID
+        :statuscode 201: no error
+        :statuscode 400: bad request
+    '''
+    app.logger.debug("api_create_proposal called...\n")
+
+    user = get_authenticated_user(request)
+    if not user:
+        return jsonify(message = "User not logged in"), 404
+
+    app.logger.debug("Authenticated User = %s\n", user.id)
+
+    if question_id is None:
+        return jsonify({"message": "Parameter question_id not set"}), 404
+
+    question = models.Question.query.get(int(question_id))
+    if question is None:
+        return jsonify(message = "Question not found"), 404
+
     # Check user permission: can propose?
     perm = question.get_permissions(user)
     if not perm or not models.Question.PROPOSE & perm:
@@ -2276,7 +2616,7 @@ def api_create_proposal(question_id):
         else:
             source = request.json['source']
 
-    proposal = models.Proposal(user, question, title, blurb, abstract, source)
+    proposal = models.Proposal(author=user, question=question, title=title, blurb=blurb, abstract=abstract, source=source)
     db_session.add(proposal)
     db_session.commit()
 
@@ -2343,10 +2683,10 @@ def api_delete_proposal(question_id, proposal_id):
 
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
-        return jsonify(message = "Proposal not found"), 404
+        return jsonify(message = "Proposal %s not found" % int(proposal_id)), 404
     
     if user.id != proposal.user_id:
-        message = {"message": "Only the author delete this proposal"}
+        message = {"message": "Only the author can delete this proposal"}
         return jsonify(message), 403
 
     num_votes = len(proposal.all_voters(generation=proposal.question.generation))
@@ -2360,6 +2700,9 @@ def api_delete_proposal(question_id, proposal_id):
         message = {"message": "This proposal may no longer be deleted"}
         return jsonify(message), 403
     '''
+
+    # Delete image if there's one
+    proposal.delete_image()
 
     user.delete_proposal(proposal)
     db_session.commit()
@@ -2535,12 +2878,12 @@ def api_edit_question(question_id):
     return jsonify(message="Question updated"), 200
 
 
-# Edit proposal
+# Edit proposal V1
 #
-@app.route(REST_URL_PREFIX + '/questions/<int:question_id>/proposals/<int:proposal_id>',
-           methods=['POST'])
+# @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/proposals/<int:proposal_id>',
+#          methods=['POST'])
 @requires_auth
-def api_edit_proposal(question_id, proposal_id):
+def api_edit_proposal_v1(question_id, proposal_id):
     '''
     .. http:post:: questions/int:question_id/proposals/int:proposal_id
 
