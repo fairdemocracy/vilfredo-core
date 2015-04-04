@@ -2106,8 +2106,10 @@ class Question(db.Model):
         :type user_id: Integer
         :rtype: String or Boolean
         '''
+        app.logger.debug('author_move_on: current phase = %s', self.phase)
         # Only the author can move a question on
-        if user_id != self.user_id or not self.minimum_time_passed():
+        if user_id != self.user_id:
+            app.logger.debug('author_move_on: user user_id not author %s', user_id)
             return False
 
         # Record timestamp of phase change
