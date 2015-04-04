@@ -1113,6 +1113,10 @@ def api_create_question():
     elif 'question_type' in request.json and (not isinstance( request.json['question_type'], int )\
          or not request.json['question_type'] in (1,2)):
         return jsonify(message="Invalid parameter question_type"), 400
+    
+    elif 'voting_type' in request.json and (not isinstance( request.json['voting_type'], int )\
+         or not request.json['voting_type'] in (1,2)):
+        return jsonify(message="Invalid parameter voting_type"), 400
 
     elif 'room' in request.json and request.json['room'] != ''\
          and (len(request.json['room']) > MAX_LEN_ROOM
@@ -1123,11 +1127,13 @@ def api_create_question():
     title = request.json.get('title')
     blurb = request.json.get('blurb')
     question_type = request.json.get('question_type', 1)
+    voting_type = request.json.get('voting_type', 1)
                   
     question = models.Question(author=user, 
                                title=title,
                                blurb = blurb,
-                               question_type=question_type)
+                               question_type=question_type,
+                               voting_type=voting_type)
 
     db_session.add(question)
     db_session.commit()

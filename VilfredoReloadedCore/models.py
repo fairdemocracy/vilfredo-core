@@ -1615,6 +1615,7 @@ class Question(db.Model):
                 "maximum_time": str(self.maximum_time),
                 'phase': self.phase,
                 'question_type': self.question_type_id,
+                'voting_type': self.voting_type_id,
                 'question_type_name': self.question_type.name,
                 'author': self.author.username,
                 'avatar_url': app.config['PROTOCOL'] + os.path.join(app.config['SITE_DOMAIN'], self.author.get_avatar()),
@@ -1662,8 +1663,8 @@ class Question(db.Model):
     room = db.Column(db.String(30))
     phase = db.Column(db.Enum('writing', 'voting', 'archived', 'consensus', 'results', name="question_phase_enum"),
                       default='writing')
-    
     question_type_id = db.Column(db.Integer, db.ForeignKey('question_types.id', name='fk_quesion_question_types'), default=1, nullable=False) 
+    voting_type_id = db.Column(db.Integer, db.ForeignKey('voting_types.id', name='fk_quesion_voting_types'), default=1, nullable=False)
     
     # created = db.Column(db.DateTime)
     # last_move_on = db.Column(db.DateTime)
@@ -1693,8 +1694,10 @@ class Question(db.Model):
     
     question_type = db.relationship('QuestionTypes', lazy='join')
     
+    voting_type = db.relationship('VotingTypes', lazy='join')
+    
     def __init__(self, author, title, blurb,
-                 minimum_time=86400, maximum_time=604800, room=None, question_type=1):
+                 minimum_time=86400, maximum_time=604800, room=None, question_type=1, voting_type=1):
         '''
         .. function:: __init__(author, title, blurb
                 [, minimum_time=86400, maximum_time=604800, room=None])
@@ -1724,6 +1727,7 @@ class Question(db.Model):
         self.minimum_time = minimum_time
         self.maximum_time = maximum_time
         self.question_type_id = question_type
+        self.voting_type_id = voting_type
     
     # sharks
     def get_not_invited(self):
@@ -7574,6 +7578,19 @@ class Comment(db.Model):
         else:
             return False
 
+
+class VotingTypes(db.Model):
+    '''
+    Reference table of question types.
+    '''
+
+    __tablename__ = 'voting_types'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(25), nullable=False)
+    
+    def __init__(self, name):
+        self.name = name
 
 class QuestionTypes(db.Model):
     '''

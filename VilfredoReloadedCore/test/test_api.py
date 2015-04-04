@@ -80,6 +80,9 @@ class RESTAPITestCase(unittest.TestCase):
             # Populate QuestionTypes
             db_session.add_all([models.QuestionTypes('standard'),
                                 models.QuestionTypes('image')])
+            # Populate VotingTypes
+            db_session.add_all([models.VotingTypes('triangle'),
+                                models.VotingTypes('linear')])
             db_session.commit()
 
     def tearDown(self):
