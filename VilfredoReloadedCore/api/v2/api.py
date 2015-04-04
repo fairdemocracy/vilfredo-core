@@ -2842,7 +2842,7 @@ def api_edit_question(question_id):
     if 'move_to_results' in request.json:
         question.phase = 'results'
         db_session.commit()
-        return jsonify(message="Qustion now in results phase",
+        return jsonify(message="Question now in results phase",
                        phase=question.phase), 200
     
     if 'move_on' in request.json:
@@ -2850,7 +2850,7 @@ def api_edit_question(question_id):
         db_session.commit()
 
         if not phase:
-            return 500
+            return jsonify(message="Server Error - Question could not be moved on"), 500
         else:
             return jsonify({"question": question.get_public()}), 200
 
