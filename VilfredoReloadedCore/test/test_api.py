@@ -605,6 +605,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         app.logger.debug("New propoal URI = %s", new_proposal_uri)
 
         # Harry edits his proposal
+        '''
         rv = self.open_with_json_auth(
             new_proposal_uri,
             'POST',
@@ -617,6 +618,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
         # Log data received
         app.logger.debug("Data retrieved from Edit Proposal = %s\n",
                          rv.data)
+        '''
 
         #
         # Get Proposals

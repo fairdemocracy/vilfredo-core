@@ -2264,26 +2264,34 @@ def api_edit_proposal(question_id, proposal_id):
     if num_votes > 0:
         message = {"message": "This proposal has votes and may no longer be edited"}
         return jsonify(message), 403
-    
-    if not 'title' in request.form or request.form['title'] == ''\
-            or len(request.form['title']) > MAX_LEN_PROPOSAL_TITLE:
+        
+    request_data = None
+    if 'title' in request.form:
+        request_data = request.form
+    elif 'title' in request.json:
+        request_data = request.json
+    else:
+        return jsonify({"message": "No data uploaded"}), 400
+
+    if not 'title' in request_data or request_data['title'] == ''\
+            or len(request_data['title']) > MAX_LEN_PROPOSAL_TITLE:
         return jsonify(message="Proposal title must not be empty and must be less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
 
-    title = request.form['title']
+    title = request_data['title']
 
     # Update text proposal
     if question.question_type_id == 1:
 
-        if not 'blurb' in request.form or request.form['blurb'] == ''\
-                or len(request.form['blurb']) > MAX_LEN_PROPOSAL_BLURB:
+        if not 'blurb' in request_data or request_data['blurb'] == ''\
+                or len(request_data['blurb']) > MAX_LEN_PROPOSAL_BLURB:
             return jsonify(message="Proposal content must not be empty and must be less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
 
-        elif 'abstract' in request.form and \
-                len(request.form['abstract']) > MAX_LEN_PROPOSAL_ABSTRACT:
+        elif 'abstract' in request_data and \
+                len(request_data['abstract']) > MAX_LEN_PROPOSAL_ABSTRACT:
             return jsonify(message="Proposal abstract name must less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
 
-        blurb = request.form.get('blurb')
-        abstract = request.form.get('abstract', None)
+        blurb = request_data.get('blurb')
+        abstract = request_data.get('abstract', None)
 
         if proposal.update(user=user, title=title, blurb=blurb, abstract=abstract):
             db_session.commit()
@@ -2314,11 +2322,12 @@ def api_edit_proposal(question_id, proposal_id):
 
             image_file = models.save_image(user, image, use_filename)
             #image_file = models.save_image(user, image)
-            
+
             if image_file == False:
                 message = 'Failed to save image. Proposal not updated.'
                 return jsonify(message=message, error=message), 401
 
+        proposal.delete_image()
         if proposal.update(user=user, title=title, image_file=image_file):
             db_session.commit()
             return jsonify(message="Proposal updated",
@@ -2819,7 +2828,7 @@ def api_edit_question(question_id):
 
     user = get_authenticated_user(request)
     if not user:
-        response = {"message": "User not found"}
+        response = {"message": "User not authenticated"}
         return jsonify(response), 401
 
     app.logger.debug("Authenticated User = %s\n", user.id)
@@ -2880,8 +2889,8 @@ def api_edit_question(question_id):
 
 # Edit proposal V1
 #
-# @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/proposals/<int:proposal_id>',
-#          methods=['POST'])
+#@app.route(REST_URL_PREFIX + '/questions/<int:question_id>/proposals/<int:proposal_id>',
+#         methods=['POST'])
 @requires_auth
 def api_edit_proposal_v1(question_id, proposal_id):
     '''
@@ -2918,7 +2927,7 @@ def api_edit_proposal_v1(question_id, proposal_id):
         :statuscode 201: no error
         :statuscode 400: bad request
     '''
-    app.logger.debug("api_edit_proposal called...\n")
+    app.logger.debug("api_edit_proposal V1 %s called...\n", proposal_id)
 
     user = get_authenticated_user(request)
     if not user:
