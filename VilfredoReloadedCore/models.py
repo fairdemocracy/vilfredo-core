@@ -8407,11 +8407,19 @@ class Threshold(db.Model):
     mapx = db.Column(db.Float)
     mapy = db.Column(db.Float)
 
-    def __init__(self, question, coords={'mapx': 0.5, 'mapy': 0.5}):
+    def __init__(self, question, coords=None):
         self.question_id = question.id
         self.generation = question.generation
-        self.mapx = coords['mapx']
-        self.mapy = coords['mapy']
+                
+        if coords:
+            self.mapx = coords['mapx']
+            self.mapy = coords['mapy']
+        elif question.question_type_id == 1:
+            self.mapx = 0.5
+            self.mapy = 0.5
+        elif question.question_type_id == 2:
+            self.mapx = 0.5
+            self.mapy = 1.0
 
 
 class Endorsement(db.Model):

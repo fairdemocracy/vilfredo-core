@@ -2048,7 +2048,8 @@ def api_add_proposal_endorsement(question_id, proposal_id):
 
         coords = request.json['coords']
 
-        if not coords['mapx'] or not coords['mapy']:
+        # if not coords['mapx'] or not coords['mapy']:
+        if not isinstance(coords['mapx'], (int, float)) or not isinstance(coords['mapy'], (int, float)):
             message = {"message": "Using votemap: No votemap coordinates received"}
             return jsonify(message), 403
 
