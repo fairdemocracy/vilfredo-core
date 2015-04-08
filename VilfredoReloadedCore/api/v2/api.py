@@ -2792,6 +2792,135 @@ def api_delete_question(question_id):
     return jsonify(message="Question deleted"), 200
 
 
+# Finished Writing
+#
+@app.route(REST_URL_PREFIX + '/questions/<int:question_id>/finished_writing', methods=['POST'])
+@requires_auth
+def api_finished_writing(question_id):
+    '''
+    .. http:post:: /questions/(int:question_id)/finished_writing
+
+        Indicate that a user has finished writing proposals for this genration of a question.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            POST /questions/33//finished_writing HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 201 OK
+            Content-Type: application/json
+
+            {
+             "message": "Writing status updated"
+            }
+
+        :param question_id: question ID
+        :type question_id: int
+        :statuscode 201: no error
+        :statuscode 400: bad request
+    '''
+    app.logger.debug("api_finished_writing called...\n")
+
+    user = get_authenticated_user(request)
+    if not user:
+        response = {"message": "User not authenticated"}
+        return jsonify(response), 401
+
+    if 'question_id' is None:
+        return jsonify(message="Parameter question_id not set"), 404
+
+    question = models.Question.query.get(question_id)
+    if question is None:
+        return jsonify(message="Question not found"), 404
+    
+    finished_writing = db_session.query(models.FinishedWriting)\
+                .filter(and_(models.FinishedWriting.user_id == user.id,
+                             models.FinishedWriting.question_id == question.id,
+                             models.FinishedWriting.generation == question.generation))\
+                .first()
+    
+    if finished_writing:
+        return jsonify(message="Finished Writing status already set",
+                       writing_status=1), 200
+    
+    finished_writing = models.FinishedWriting(user=user,
+                                              question=question)
+
+    db_session.add(finished_writing)
+    db_session.commit()
+    return jsonify(message="Writing status updated",
+                   writing_status=1), 201
+
+# Delete finished writing status
+@app.route(REST_URL_PREFIX + '/questions/<int:question_id>/finished_writing', methods=['DELETE'])
+@requires_auth
+def api_delete_finished_writing(question_id):
+    '''
+    .. http:delete:: /questions/(int:question_id)/finished_writing
+
+        Indicate that a user has removed his finished writing status for this genration of a question.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            DELETE /questions/33//finished_writing HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 201 OK
+            Content-Type: application/json
+
+            {
+             "message": "Writing status updated"
+            }
+
+        :param question_id: question ID
+        :type question_id: int
+        :statuscode 201: no error
+        :statuscode 400: bad request
+    '''
+    app.logger.debug("api_finished_writing called...\n")
+
+    user = get_authenticated_user(request)
+    if not user:
+        response = {"message": "User not authenticated"}
+        return jsonify(response), 401
+
+    if 'question_id' is None:
+        return jsonify(message="Parameter question_id not set"), 404
+
+    question = models.Question.query.get(question_id)
+    if question is None:
+        return jsonify(message="Question not found"), 404
+
+    finished_writing = db_session.query(models.FinishedWriting)\
+                .filter(and_(models.FinishedWriting.user_id == user.id,
+                             models.FinishedWriting.question_id == question.id,
+                             models.FinishedWriting.generation == question.generation))\
+                .first()
+
+    if finished_writing is None:
+        return jsonify(message="Finished Writing status already not set",
+                       writing_status=0), 200
+    
+    db_session.delete(finished_writing)
+    db_session.commit()
+    return jsonify(message="Writing status updated",
+                   writing_status=0), 201
+
+
 # Edit Question
 #
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>', methods=['POST'])
@@ -3910,6 +4039,15 @@ def api_question_participation_table(question_id=None):
         {"username": "jack", "evaluations": 0, "authored": 1}
      ]}
     '''
+    finished_writing = db_session.query(models.FinishedWriting.user_id)\
+                .filter(and_(models.FinishedWriting.question_id == question.id,
+                             models.FinishedWriting.generation == question.generation))\
+                .all()
+    app.logger.debug("participation_table: Finished writing = %s", finished_writing)
+
+    finished = list()
+    for row in finished_writing:
+        finished.append(row.user_id)
 
     participation_table = []
     for user in participants:
@@ -3921,6 +4059,11 @@ def api_question_participation_table(question_id=None):
             participant['proposals_written'] = 0
         else:
             participant['proposals_written'] = authors[user.id]
+        
+        if user.id in finished:
+            participant['finished_writing'] = 1
+        else:
+            participant['finished_writing'] = 0
         
         app.logger.debug("participant==>%s", participant)
         participation_table.append(participant)

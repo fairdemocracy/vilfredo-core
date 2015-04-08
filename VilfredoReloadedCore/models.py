@@ -419,6 +419,10 @@ class User(db.Model, UserMixin):
                                    primaryjoin="User.id==Endorsement.user_id",
                                    backref='endorser', lazy='dynamic',
                                    cascade="all, delete-orphan")
+    
+    finished_writing = db.relationship('FinishedWriting', lazy='dynamic', backref='user',
+                              primaryjoin="FinishedWriting.user_id == User.id",
+                              cascade="all, delete-orphan")
 
     # updates 1:M
     subscribed_questions = db.relationship("Update", backref='subscriber',
@@ -1288,6 +1292,25 @@ class VerifyEmail(db.Model):
         auth_token = user.get_auth_token()
         return auth_token
 
+
+class FinishedWriting(db.Model):
+    '''
+    Indicates if user has finished writing for a particular generation.
+    '''
+    __tablename__ = 'finished_writing'
+
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', name='fk_finished_writing_user', ondelete='CASCADE'), nullable=False)
+    question_id = db.Column(db.Integer, db.ForeignKey('question.id', name='fk_finished_writing_question', ondelete='CASCADE'), nullable=False)
+    generation = db.Column(db.Integer, nullable=False)
+    db.UniqueConstraint('user_id', 'question_id', 'generation', name='uq_finished_writing_1') 
+
+    def __init__(self, user, question):
+        self.user_id = user.id
+        self.question_id = question.id
+        self.generation = question.generation
+
+
 class EmailInvite(db.Model):
     '''
     Stores users email invitaions to participate in questions
@@ -1653,6 +1676,17 @@ class Question(db.Model):
         else:
             public['can_vote'] = False
             public['can_propose'] = False
+        
+        if user:
+            finished_writing = db_session.query(FinishedWriting)\
+                .filter(and_(FinishedWriting.user_id == user.id,
+                             FinishedWriting.question_id == self.id,
+                             FinishedWriting.generation == self.generation))\
+                .first()
+            if finished_writing:
+                public['finished_writing'] = 1
+            else:
+                public['finished_writing'] = 0
 
         return public
 
@@ -1691,6 +1725,10 @@ class Question(db.Model):
     invites_sent = db.relationship('UserInvite', lazy='dynamic', backref='question',
                               primaryjoin="UserInvite.question_id == Question.id",
                               cascade="all, delete-orphan")
+    finished_writing = db.relationship('FinishedWriting', lazy='dynamic', backref='question',
+                              primaryjoin="FinishedWriting.question_id == Question.id",
+                              cascade="all, delete-orphan",
+                              passive_deletes=True)
     
     question_type = db.relationship('QuestionTypes', lazy='join')
     
