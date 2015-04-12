@@ -1626,6 +1626,17 @@ class Question(db.Model):
         consensus_found = self.consensus_found(generation=self.generation-1)
         completed_voter_count = self.get_completed_voter_count(generation=self.generation)
         voters_voting_count = self.get_voters_voting_count()
+        
+        finished_writing_count = None
+        if (self.phase == 'writing'):
+            finished_writing = db_session.query(FinishedWriting.user_id)\
+                    .filter(and_(FinishedWriting.question_id == self.id,
+                                 FinishedWriting.generation == self.generation))\
+                    .all()
+            users_finished_writing = list()
+            for row in finished_writing:
+                users_finished_writing.append(row.user_id)
+            finished_writing_count = len(users_finished_writing)
 
         public = {'id': self.id,
                 'url': url_for('api_get_questions', question_id=self.id),
@@ -1653,6 +1664,7 @@ class Question(db.Model):
                 'mapx': threshold.mapx,
                 'mapy': threshold.mapy,
                 'completed_voter_count': completed_voter_count,
+                'finished_writing_count': finished_writing_count,
                 'voters_voting_count': voters_voting_count}
 
         # Add user permissions
@@ -1668,7 +1680,6 @@ class Question(db.Model):
                     public['user_permissions'] = user_permissions
                 else:
                     public['user_permissions'] = list()
-            
 
         if permissions:
             public['can_vote'] = bool(Question.VOTE & permissions)
@@ -1678,6 +1689,12 @@ class Question(db.Model):
             public['can_propose'] = False
         
         if user:
+            if user.id in users_finished_writing:
+                public['finished_writing'] = 1
+            else:
+                public['finished_writing'] = 0
+                
+            '''
             finished_writing = db_session.query(FinishedWriting)\
                 .filter(and_(FinishedWriting.user_id == user.id,
                              FinishedWriting.question_id == self.id,
@@ -1687,6 +1704,7 @@ class Question(db.Model):
                 public['finished_writing'] = 1
             else:
                 public['finished_writing'] = 0
+            '''
 
         return public
 
