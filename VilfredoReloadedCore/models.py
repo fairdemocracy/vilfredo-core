@@ -7619,36 +7619,36 @@ class Proposal(db.Model):
                 app.config['SITE_DOMAIN'],
                 self.get_image())
 
-        public = {'id': str(self.id),
+        public = {'id': self.id,
                 'uri': url_for('api_get_question_proposals',
                                question_id=self.question.id,
                                proposal_id=self.id),
                 'title': self.title,
                 'blurb': self.blurb,
                 'abstract': self.abstract,
-                'generation_created': str(self.generation_created),
+                'generation_created': self.generation_created,
                 'source': str(self.source),
                 'created': str(self.created),
                 'author': self.author.username,
                 'image_url': image_url,
-                'question_count': str(self.get_question_count()),
-                'comment_count': str(self.get_comment_count()),
-                'vote_count': str(num_votes),
-                'author_id': str(self.author.id),
-                'geomedy': str(self.geomedx),
-                'geomedy': str(self.geomedy),
+                'question_count': self.get_question_count(),
+                'comment_count': self.get_comment_count(),
+                'vote_count': num_votes,
+                'author_id': self.author.id,
+                'geomedy': self.geomedx,
+                'geomedy': self.geomedy,
                 'author_url': url_for('api_get_users', user_id=self.user_id),
                 'question_url': url_for('api_get_questions',
                                         question_id=self.question_id)}
         if user:
             endorsement_data = self.get_endorsement_data(user)
             public['endorse_type'] = endorsement_data['endorsement_type']
-            public['mapx'] = str(endorsement_data['mapx'])
-            public['mapy'] = str(endorsement_data['mapy'])
+            public['mapx'] = endorsement_data['mapx']
+            public['mapy'] = endorsement_data['mapy']
         else:
             public['endorse_type'] = 'notvoted'
-            public['mapx'] = 'None'
-            public['mapy'] = 'None'
+            public['mapx'] = None
+            public['mapy'] = None
 
         return public
 
