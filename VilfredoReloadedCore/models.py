@@ -1628,12 +1628,12 @@ class Question(db.Model):
         voters_voting_count = self.get_voters_voting_count()
         
         finished_writing_count = None
+        users_finished_writing = list()
         if (self.phase == 'writing'):
             finished_writing = db_session.query(FinishedWriting.user_id)\
                     .filter(and_(FinishedWriting.question_id == self.id,
                                  FinishedWriting.generation == self.generation))\
                     .all()
-            users_finished_writing = list()
             for row in finished_writing:
                 users_finished_writing.append(row.user_id)
             finished_writing_count = len(users_finished_writing)
