@@ -1835,6 +1835,13 @@ class Question(db.Model):
                     participants.append(user)
         return participants
     
+    def check_for_duplicate_proposal_title(self, title):
+        count = db_session.query(Proposal)\
+                        .filter(Proposal.question_id == self.id)\
+                        .filter(func.lower(Proposal.title) == func.lower(title))\
+                        .count()
+        return count != 0
+    
     def get_participant_permissions(self):
         '''
         .. function:: get_participant_permissions()

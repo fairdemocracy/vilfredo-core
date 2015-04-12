@@ -2520,6 +2520,10 @@ def api_create_proposal(question_id):
         return jsonify(message="Proposal abstract name must less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
 
     title = request.json.get('title')
+    
+    if question.check_for_duplicate_proposal_title(title):
+        return jsonify(message = "Proposal with that title already exists for this question"), 404
+    
     blurb = request.json.get('blurb')
     abstract = request.json.get('abstract', '')
 
