@@ -1622,7 +1622,6 @@ class Question(db.Model):
             raise
 
         inherited_proposal_count = self.get_inherited_proposal_count()
-        #consensus_found = (inherited_proposal_count == 1) and (self.get_new_proposal_count() == 0)
         consensus_found = self.consensus_found(generation=self.generation-1)
         completed_voter_count = self.get_completed_voter_count(generation=self.generation)
         voters_voting_count = self.get_voters_voting_count()
@@ -1900,13 +1899,16 @@ class Question(db.Model):
                 .filter(Endorsement.generation == generation)\
                 .all()
 
+        voter_ids = set()
         if not endorsements:
             return dict()
         else:
             app.logger.debug("endorsements ==> %s", endorsements)
-            
             endorsement_data = dict()
             for endorsement in endorsements:
+                # Collect ids of userers who have voted
+                voter_ids.add(endorsement.user_id)
+                
                 pid = endorsement.proposal_id
                 if not pid in endorsement_data:
                     endorsement_data.update({pid: {'mapx': [endorsement.mapx], 
@@ -1924,6 +1926,7 @@ class Question(db.Model):
             app.logger.debug("endorsement_data ==> %s", endorsement_data)
 
             results = dict()
+            results['voter_ids'] = list(voter_ids)
             for (pid, coords) in endorsement_data.iteritems():
                 results.update( {pid: {'median': {'medx': median(coords['mapx']),
                                                   'medy': median(coords['mapy'])},
