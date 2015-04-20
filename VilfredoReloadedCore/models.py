@@ -1956,6 +1956,7 @@ class Question(db.Model):
             for (proposal_id, data) in relations.iteritems():
                 if proposal_id in results:
                     results[proposal_id]['dominated_by'] = int(not data['pareto'])
+                    results[proposal_id]['pareto'] = data['pareto']
 
             app.logger.debug("results ==> %s", results)
             
