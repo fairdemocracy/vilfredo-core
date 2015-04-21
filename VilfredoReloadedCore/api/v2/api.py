@@ -1017,7 +1017,7 @@ def api_get_questions(question_id=None):
         perm = question.get_permissions(user)
         if not perm:
             app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
-            return jsonify(message = "Question not found"), 404
+            return jsonify(message = app.config['QUESTION_PERMISSION_DENIED_MESSAGE']), 400
 
         question_data = question.get_public(user)
         app.logger.debug("Qustion data ==> %s", question_data);
@@ -1255,7 +1255,7 @@ def api_get_question_proposals(question_id=None, proposal_id=None):
         perm = question.get_permissions(user)
         if not perm:
             app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
-            return jsonify(message = "Question not found"), 404
+            return jsonify(message = app.config['QUESTION_PERMISSION_DENIED_MESSAGE']), 400
 
     if not proposal_id is None:
         proposal_id = int(proposal_id)
@@ -2021,9 +2021,13 @@ def api_add_proposal_endorsement(question_id, proposal_id):
 
     # Check user permission: can vote?
     perm = question.get_permissions(user)
-    if not perm or not models.Question.VOTE & perm:
+    if not perm:
         app.logger.debug("ACCESS ERROR: User %s with permission %s tried to vote on question %s", user.id, perm, question.id)
-        return jsonify(message = "Question not found"), 404
+        return jsonify(message = app.config['QUESTION_PERMISSION_DENIED_MESSAGE']), 400
+    
+    if not models.Question.VOTE & perm:
+        app.logger.debug("ACCESS ERROR: User %s with permission %s tried to vote on question %s", user.id, perm, question.id)
+        return jsonify(message = app.config['QUESTION_VOTE_PERMISSION_DENIED_MESSAGE']), 400
 
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
@@ -2168,9 +2172,13 @@ def api_update_proposal_endorsement(question_id, proposal_id):
     # shark
     # Check user permission: can vote?
     perm = question.get_permissions(user)
-    if not perm or not models.Question.VOTE & perm:
+    if not perm:
         app.logger.debug("ACCESS ERROR: User %s with permission %s tried to vote on question %s", user.id, perm, question.id)
-        return jsonify(message = "Question not found"), 404
+        return jsonify(message = app.config['QUESTION_PERMISSION_DENIED_MESSAGE']), 400
+    
+    if not models.Question.VOTE & perm:
+        app.logger.debug("ACCESS ERROR: User %s with permission %s tried to vote on question %s", user.id, perm, question.id)
+        return jsonify(message = app.config['QUESTION_VOTE_PERMISSION_DENIED_MESSAGE']), 400
 
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
@@ -2396,9 +2404,13 @@ def api_upload_image_proposal(question_id):
 
     # Check user permission: can propose?
     perm = question.get_permissions(user)
-    if not perm or not models.Question.PROPOSE & perm:
-        app.logger.debug("ACCESS ERROR: User %s with permission %s tried to propose on question %s", user.id, perm, question.id)
-        return jsonify(message = "Question not found"), 404
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s with permission %s tried to vote on question %s", user.id, perm, question.id)
+        return jsonify(message = app.config['QUESTION_PERMISSION_DENIED_MESSAGE']), 400
+    
+    elif not models.Question.PROPOSE & perm:
+        app.logger.debug("ACCESS ERROR: User %s with permission %s tried to vote on question %s", user.id, perm, question.id)
+        return jsonify(message = app.config['QUESTION_PROPOSE_PERMISSION_DENIED_MESSAGE']), 400
     
     app.logger.debug("request files %s", request.files)
     app.logger.debug("request files %s", request.files['image'])
@@ -2499,9 +2511,12 @@ def api_create_proposal(question_id):
 
     # Check user permission: can propose?
     perm = question.get_permissions(user)
-    if not perm or not models.Question.PROPOSE & perm:
-        app.logger.debug("ACCESS ERROR: User %s with permission %s tried to propose on question %s", user.id, perm, question.id)
-        return jsonify(message = "Question not found"), 404
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s with permission %s tried to vote on question %s", user.id, perm, question.id)
+        return jsonify(message = app.config['QUESTION_PERMISSION_DENIED_MESSAGE']), 400
+    elif not models.Question.PROPOSE & perm:
+        app.logger.debug("ACCESS ERROR: User %s with permission %s tried to vote on question %s", user.id, perm, question.id)
+        return jsonify(message = app.config['QUESTION_PROPOSE_PERMISSION_DENIED_MESSAGE']), 400
 
     if not request.json:
         app.logger.debug("Form data not received...\n")
@@ -2601,9 +2616,13 @@ def api_create_proposal_v1(question_id):
 
     # Check user permission: can propose?
     perm = question.get_permissions(user)
-    if not perm or not models.Question.PROPOSE & perm:
-        app.logger.debug("ACCESS ERROR: User %s with permission %s tried to propose on question %s", user.id, perm, question.id)
-        return jsonify(message = "Question not found"), 404
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s with permission %s tried to vote on question %s", user.id, perm, question.id)
+        return jsonify(message = app.config['QUESTION_PERMISSION_DENIED_MESSAGE']), 400
+
+    elif not models.Question.PROPOSE & perm:
+        app.logger.debug("ACCESS ERROR: User %s with permission %s tried to vote on question %s", user.id, perm, question.id)
+        return jsonify(message = app.config['QUESTION_PROPOSE_PERMISSION_DENIED_MESSAGE']), 400
 
     if not request.json:
         app.logger.debug("Non json request received...\n")
@@ -2693,13 +2712,6 @@ def api_delete_proposal(question_id, proposal_id):
     question = models.Question.query.get(question_id)
     if question is None:
         return jsonify(message = "Question not found"), 404
-
-    '''
-    perm = question.get_permissions(user)
-    if not perm or not models.Question.PROPOSE & perm:
-        app.logger.debug("ACCESS ERROR: User %s with permission %s tried to delete a proposal on question %s", user.id, perm, question.id)
-        return jsonify(message = "Question not found"), 404
-    '''
 
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
@@ -4514,8 +4526,8 @@ def api_get_voting_data(question_id):
         
     perm = question.get_permissions(user)
     if not perm:
-        app.logger.debug("ACCESS ERROR: User %s tried to access voting_data for question %s", user.id, question.id)
-        return jsonify(message = "Question not found"), 404
+        app.logger.debug("ACCESS ERROR: User %s with permission %s tried to vote on question %s", user.id, perm, question.id)
+        return jsonify(message = app.config['QUESTION_PERMISSION_DENIED_MESSAGE']), 400
     
     generation = int(request.args.get('generation', question.generation))
 
