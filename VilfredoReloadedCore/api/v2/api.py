@@ -311,6 +311,11 @@ def api_get_auth_token():
         return jsonify(message = "User email unverified.",
                        user_message = "Before you can log in you must activate your account by clicking on the link we emailed to you when you registered."), 400
 
+    import datetime
+    user.last_seen = datetime.datetime.utcnow()
+    db_session.add(user)
+    db_session.commit()
+    
     token = user.get_auth_token()
     response = {'token': token}
 
