@@ -518,14 +518,32 @@ class User(db.Model, UserMixin):
             app.logger.info("deleting current file in avatar path = %s", os.path.join(avatar_path, '*'))
             test_user_avatar_path = os.path.join(current_dir, app.config['UPLOADED_AVATAR_DEST'], str(self.id), '*')
             files = glob.glob(test_user_avatar_path)
-            os.remove(files[0])
+            if len(files) > 0:
+                os.remove(files[0])
 
         from werkzeug import secure_filename
         filename = secure_filename(avatar.filename)
         fix_filename = os.path.splitext(filename)
         avatar.filename = hash_string(filename) + fix_filename[1]
-        app.logger.debug("Saving avatar to %s", os.path.join(avatar_path, avatar.filename))
-        avatar.save(os.path.join(avatar_path, avatar.filename))
+
+        #app.logger.debug("Saving avatar to %s", os.path.join(avatar_path, avatar.filename))
+        #avatar.save(os.path.join(avatar_path, avatar.filename))
+        
+        # create thumbnail from image
+        from PIL import Image
+        thumbnail_size = (100, 100)
+        file_extension = fix_filename[1]
+        app.logger.debug("file_extension = %s", file_extension)
+        outfile = os.path.join(avatar_path, avatar.filename)
+        try:
+            thumbnail = Image.open(avatar)
+            thumbnail.thumbnail(thumbnail_size)
+            app.logger.debug("Saving avatar to %s", outfile)
+            thumbnail.save(outfile)
+        except IOError:
+            app.logger.debug("set_avatar: Failed to create thumbnail")
+            return False
+
         if not os.path.isfile(os.path.join(avatar_path, avatar.filename)):
             return False
         else:
