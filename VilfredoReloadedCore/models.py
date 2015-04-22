@@ -1851,14 +1851,44 @@ class Question(db.Model):
                 if user:
                     participants.append(user)
         return participants
-    
-    def check_for_duplicate_proposal_title(self, title):
+
+    def check_for_duplicate_proposal_title_v1(self, title):
         count = db_session.query(Proposal)\
                         .filter(Proposal.question_id == self.id)\
                         .filter(func.lower(Proposal.title) == func.lower(title))\
                         .count()
         return count != 0
+
+    def check_for_duplicate_proposal_blurb_v1(self, blurb):
+        count = db_session.query(Proposal)\
+                        .filter(Proposal.question_id == self.id)\
+                        .filter(func.lower(Proposal.blurb) == func.lower(blurb))\
+                        .count()
+        return count != 0
     
+    def check_for_duplicate_proposal_title(self, title, proposal_id=None):
+        query = db_session.query(Proposal)\
+                        .filter(Proposal.question_id == self.id)\
+                        .filter(func.lower(Proposal.title) == func.lower(title))
+
+        app.logger.debug("check_for_duplicate_proposal_title: prop id == %s", proposal_id)
+        if proposal_id:
+            query = query.filter(Proposal.id != proposal_id)
+
+        count = query.count()
+        return count != 0
+
+    def check_for_duplicate_proposal_blurb(self, blurb, proposal_id=None):
+        query = db_session.query(Proposal)\
+                        .filter(Proposal.question_id == self.id)\
+                        .filter(func.lower(Proposal.blurb) == func.lower(blurb))
+
+        if proposal_id:
+            query = query.filter(Proposal.id != proposal_id)
+
+        count = query.count()
+        return count != 0
+
     def get_participant_permissions(self):
         '''
         .. function:: get_participant_permissions()

@@ -2298,6 +2298,8 @@ def api_edit_proposal(question_id, proposal_id):
         return jsonify(message="Proposal title must not be empty and must be less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
 
     title = request_data['title']
+    if question.check_for_duplicate_proposal_title(title, proposal_id):
+        return jsonify(message = "A proposal with that title already exists for this question"), 404
 
     # Update text proposal
     if question.question_type_id == 1:
@@ -2311,6 +2313,9 @@ def api_edit_proposal(question_id, proposal_id):
             return jsonify(message="Proposal abstract name must less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
 
         blurb = request_data.get('blurb')
+        if question.check_for_duplicate_proposal_blurb(blurb, proposal_id):
+            return jsonify(message = "A proposal with that content already exists for this question"), 404
+        
         abstract = request_data.get('abstract', None)
 
         if proposal.update(user=user, title=title, blurb=blurb, abstract=abstract):
@@ -2540,11 +2545,13 @@ def api_create_proposal(question_id):
         return jsonify(message="Proposal abstract name must less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
 
     title = request.json.get('title')
-    
     if question.check_for_duplicate_proposal_title(title):
-        return jsonify(message = "Proposal with that title already exists for this question"), 404
-    
+        return jsonify(message = "A proposal with that title already exists for this question"), 404
+
     blurb = request.json.get('blurb')
+    if question.check_for_duplicate_proposal_blurb(blurb):
+        return jsonify(message = "A proposal with that content already exists for this question"), 404
+
     abstract = request.json.get('abstract', '')
 
     source = 0
