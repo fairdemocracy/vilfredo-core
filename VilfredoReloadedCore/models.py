@@ -1852,20 +1852,6 @@ class Question(db.Model):
                     participants.append(user)
         return participants
 
-    def check_for_duplicate_proposal_title_v1(self, title):
-        count = db_session.query(Proposal)\
-                        .filter(Proposal.question_id == self.id)\
-                        .filter(func.lower(Proposal.title) == func.lower(title))\
-                        .count()
-        return count != 0
-
-    def check_for_duplicate_proposal_blurb_v1(self, blurb):
-        count = db_session.query(Proposal)\
-                        .filter(Proposal.question_id == self.id)\
-                        .filter(func.lower(Proposal.blurb) == func.lower(blurb))\
-                        .count()
-        return count != 0
-    
     def check_for_duplicate_proposal_title(self, title, proposal_id=None):
         query = db_session.query(Proposal)\
                         .filter(Proposal.question_id == self.id)\
