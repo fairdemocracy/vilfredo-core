@@ -2040,11 +2040,11 @@ class Question(db.Model):
         generation = generation or self.generation
         num_proposals = self.get_proposal_count(generation)
 
-        return db_session.query(func.count(Endorsement))\
+        return db_session.query(func.count(Endorsement.id))\
         .filter(Endorsement.question_id == self.id)\
         .filter(Endorsement.generation == generation)\
         .group_by(Endorsement.user_id)\
-        .having(func.count(Endorsement) >= 1)\
+        .having(func.count(Endorsement.id) >= 1)\
         .count()
     
     def get_completed_voter_count(self, generation=None):
@@ -2061,11 +2061,11 @@ class Question(db.Model):
         generation = generation or self.generation
         num_proposals = self.get_proposal_count(generation)
 
-        return db_session.query(func.count(Endorsement))\
+        return db_session.query(func.count(Endorsement.id))\
         .filter(Endorsement.question_id == self.id)\
         .filter(Endorsement.generation == generation)\
         .group_by(Endorsement.user_id)\
-        .having(func.count(Endorsement) == num_proposals)\
+        .having(func.count(Endorsement.id) == num_proposals)\
         .count()
 
     def get_voter_count(self, generation=None):
