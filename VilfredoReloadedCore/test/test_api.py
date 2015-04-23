@@ -55,24 +55,26 @@ os.environ["EMAIL_OFF"] = '1'
 class RESTAPITestCase(unittest.TestCase):
     def setUp(self):
         # app.logger.debug("Create DB")
-        # init_db()
-        app.logger.debug('Running tests on database %s', app.config['SQLALCHEMY_DATABASE_URI'])
         # For SQLite development DB only
-        if 'vr.db' in app.config['SQLALCHEMY_DATABASE_URI']:
+        if 'sqlite' in app.config['SQLALCHEMY_DATABASE_URI']:
             # Drop existing DB first
-            if os.path.isfile('/var/tmp/vr.db') and DELETE_DB_ON_START:
+            import re
+            sqlite_path = re.sub('^%s' % 'sqlite:///', '', app.config['SQLALCHEMY_DATABASE_URI'])
+            if os.path.isfile(sqlite_path) and DELETE_DB_ON_START:
                 app.logger.debug("Dropping existing sqlite db\n")
-                drop_db()
+                try:
+                    os.remove(sqlite_path)
+                except OSError:
+                    app.logger.debug("Failed to delete sqlite db\n")
+            app.logger.debug("Initializing DB\n")
+            init_db()
         else:
             if DELETE_DB_ON_START:
                 app.logger.debug("Dropping existing DB\n")
-                drop_db()
-
-        app.logger.debug("Initializing DB\n")
-        init_db()
-        app.config['TESTING'] = True
-        self.app = app.test_client()
-
+                drop_db()                
+            app.logger.debug("Initializing DB\n")
+            init_db()
+        
         # Populate QuestionTypes
         db_session.add_all([models.QuestionTypes('standard'),
                             models.QuestionTypes('image')])
@@ -80,11 +82,30 @@ class RESTAPITestCase(unittest.TestCase):
         db_session.add_all([models.VotingTypes('triangle'),
                             models.VotingTypes('linear')])
         db_session.commit()
+        
+        # Use Flask-Migrate to create the database
+        path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        app.logger.debug("SET PATH TO ==> %s", path)
+        os.chdir(path)
+        os.system('python VilfredoReloadedCore/manage.py db stamp head')
+        
+        app.config['TESTING'] = True
+        self.app = app.test_client()
 
     def tearDown(self):
         if DELETE_DB_ON_EXIT:
             app.logger.debug("Dropping DB\n")
-            drop_db()
+            if 'sqlite' in app.config['SQLALCHEMY_DATABASE_URI']:
+                import re
+                sqlite_path = re.sub('^%s' % 'sqlite:///', '', app.config['SQLALCHEMY_DATABASE_URI'])
+                if os.path.isfile(sqlite_path):
+                    app.logger.debug("Dropping existing sqlite db\n")
+                    try:
+                        os.remove(sqlite_path)
+                    except OSError:
+                        app.logger.debug("Failed to delete sqlite db\n")
+            else:
+                drop_db()
 
     def open_with_json_auth(self, url, method, data, username, password):
         return self.app.open(

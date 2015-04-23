@@ -85,8 +85,8 @@ def drop_db():
     Drop the database
     '''
     # TODO: this could be slower than a native query
-    # meta = MetaData(engine)
-    # meta.reflect()
-    # meta.drop_all()
-    #from . import models, db
-    db.drop_all()
+    from sqlalchemy import MetaData
+    meta = MetaData(db.engine)
+    meta.reflect()
+    meta.drop_all()
+    # db.drop_all()
