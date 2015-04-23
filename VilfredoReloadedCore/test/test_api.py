@@ -33,7 +33,6 @@ except ImportError:
     import unittest
 
 from .. import app
-# from .. import api
 from VilfredoReloadedCore.api.v2 import api
 from VilfredoReloadedCore import models
 from .. database import drop_db, init_db, db_session
@@ -64,33 +63,26 @@ class RESTAPITestCase(unittest.TestCase):
             if os.path.isfile('/var/tmp/vr.db') and DELETE_DB_ON_START:
                 app.logger.debug("Dropping existing sqlite db\n")
                 drop_db()
-            # Create empty SQLite test DB
-            app.logger.debug("Initializing sqlite db\n")
-            init_db()
-            app.config['TESTING'] = True
-            self.app = app.test_client()
         else:
             if DELETE_DB_ON_START:
                 app.logger.debug("Dropping existing DB\n")
                 drop_db()
-            app.logger.debug("Initializing DB\n")
-            init_db()
-            app.config['TESTING'] = True
-            self.app = app.test_client()
-            # Populate QuestionTypes
-            db_session.add_all([models.QuestionTypes('standard'),
-                                models.QuestionTypes('image')])
-            # Populate VotingTypes
-            db_session.add_all([models.VotingTypes('triangle'),
-                                models.VotingTypes('linear')])
-            db_session.commit()
+
+        app.logger.debug("Initializing DB\n")
+        init_db()
+        app.config['TESTING'] = True
+        self.app = app.test_client()
+
+        # Populate QuestionTypes
+        db_session.add_all([models.QuestionTypes('standard'),
+                            models.QuestionTypes('image')])
+        # Populate VotingTypes
+        db_session.add_all([models.VotingTypes('triangle'),
+                            models.VotingTypes('linear')])
+        db_session.commit()
 
     def tearDown(self):
-        # For SQLite development DB only
-        if 'vr.db' in app.config['SQLALCHEMY_DATABASE_URI'] and DELETE_DB_ON_EXIT:
-            app.logger.debug("Dropping sqlite db\n")
-            drop_db()
-        elif DELETE_DB_ON_EXIT:
+        if DELETE_DB_ON_EXIT:
             app.logger.debug("Dropping DB\n")
             drop_db()
 
