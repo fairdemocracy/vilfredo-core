@@ -1720,8 +1720,10 @@ def api_update_proposal_comment(question_id, proposal_id, comment_id):
 
     new_comment_text = None
     if 'new_comment_text' in request.json:
-        if request.json['new_comment_text'] == '' \
-                or len(request.json['new_comment_text']) > MAX_LEN_PROPOSAL_COMMENT:
+        if request.json['new_comment_text'] == '':
+            message = {"message": "Comment text empty"}
+            return jsonify(message), 400
+        elif len(request.json['new_comment_text']) > MAX_LEN_PROPOSAL_COMMENT:
             message = {"message": "Comment text must be no longer than " + str(MAX_LEN_PROPOSAL_COMMENT) + " characters"}
             return jsonify(message), 400
         else:
@@ -1746,7 +1748,7 @@ def api_update_proposal_comment(question_id, proposal_id, comment_id):
     return jsonify(message="Comment updated"), 201
 
 
-# Create Comment
+# Add Comment
 #
 @app.route(
     REST_URL_PREFIX + '/questions/<int:question_id>/proposals/' +
@@ -1831,8 +1833,10 @@ def api_add_proposal_comment(question_id, proposal_id):
 
     comment = None
     if 'comment' in request.json:
-        if request.json['comment'] == '' \
-                or len(request.json['comment']) > MAX_LEN_PROPOSAL_COMMENT:
+        if request.json['comment'] == '':
+            message = {"message": "Comment text empty"}
+            return jsonify(message), 400
+        elif len(request.json['comment']) > MAX_LEN_PROPOSAL_COMMENT:
             message = {"message": "Comment text must be no longer than " + str(MAX_LEN_PROPOSAL_COMMENT) + " characters"}
             return jsonify(message), 400
         else:
