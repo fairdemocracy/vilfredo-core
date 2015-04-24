@@ -82,13 +82,13 @@ class RESTAPITestCase(unittest.TestCase):
         db_session.add_all([models.VotingTypes('triangle'),
                             models.VotingTypes('linear')])
         db_session.commit()
-        
-        # Use Flask-Migrate to create the database
+
+        # Stamp the database with latest version for Flask-Migrate 
         path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         app.logger.debug("SET PATH TO ==> %s", path)
         os.chdir(path)
         os.system('python VilfredoReloadedCore/manage.py db stamp head')
-        
+
         app.config['TESTING'] = True
         self.app = app.test_client()
 
