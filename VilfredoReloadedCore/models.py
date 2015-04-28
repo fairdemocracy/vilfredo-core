@@ -88,7 +88,15 @@ def objfunc(testMedian, dataPoints):
     return temp
 
 def findGeometricMedian(dataPoints):
-    # Return if too few points
+    '''
+        .. function:: findGeometricMedian(dataPoints)
+
+        Find the median from a list of floats.
+
+        :param dataPoints: list of floats
+        :type dataPoints: List
+        :rtype: float
+        '''
     if len(dataPoints) == 1:
         return dataPoints[0]
 
@@ -186,30 +194,30 @@ def make_map_filename_hashed(question,
                              user_level_type=GraphLevelType.layers,
                              algorithm=None):
     '''
-        .. function:: make_map_filename_hashed(
-            question[,
-            generation,
-            map_type="all",
-            proposal_level_type=GraphLevelType.layers,
-            user_level_type=GraphLevelType.layers,
-            algorithm=None])
+    .. function:: make_map_filename_hashed(
+        question[,
+        generation,
+        map_type="all",
+        proposal_level_type=GraphLevelType.layers,
+        user_level_type=GraphLevelType.layers,
+        algorithm=None])
 
-        Create the filname for the voting map.
+    Create the filname for the voting map.
 
-        :param question: question
-        :type question_id: Question
-        :param generation: generation of the voting map
-        :type generation: int
-        :param map_type: map type
-        :type map_type: string
-        :param proposal_level_type: GraphLevelType
-        :type proposal_level_type: GraphLevelType
-        :param user_level_type: GraphLevelType
-        :type user_level_type: GraphLevelType
-        :param algorithm: algorithm version number
-        :type algorithm: int
-        :rtype: String
-        '''
+    :param question: question
+    :type question_id: Question
+    :param generation: generation of the voting map
+    :type generation: int
+    :param map_type: map type
+    :type map_type: string
+    :param proposal_level_type: GraphLevelType
+    :type proposal_level_type: GraphLevelType
+    :param user_level_type: GraphLevelType
+    :type user_level_type: GraphLevelType
+    :param algorithm: algorithm version number
+    :type algorithm: int
+    :rtype: String
+    '''
     algorithm = algorithm or app.config['ALGORITHM_VERSION']
     generation = generation or question.generation
     import hashlib, json, pickle
@@ -231,27 +239,27 @@ def make_map_filename(question_id,
                       proposal_level_type=GraphLevelType.layers,
                       user_level_type=GraphLevelType.layers):
     '''
-        .. function:: make_map_filename(
-            question_id,
-            generation[,
-            map_type="all",
-            proposal_level_type=GraphLevelType.layers,
-            user_level_type=GraphLevelType.layers])
+    .. function:: make_map_filename(
+        question_id,
+        generation,
+        [map_type="all",
+        proposal_level_type=GraphLevelType.layers,
+        user_level_type=GraphLevelType.layers])
 
-        Create the filname for the voting map.
+    Create the filname for the voting map.
 
-        :param question_id: question id
-        :type question_id: int
-        :param generation: generation of the voting map
-        :type generation: int
-        :param map_type: map type
-        :type map_type: string
-        :param proposal_level_type: GraphLevelType
-        :type proposal_level_type: GraphLevelType
-        :type user_level_type: GraphLevelType
-        :param user_level_type: GraphLevelType
-        :rtype: String
-        '''
+    :param question_id: question id
+    :type question_id: int
+    :param generation: generation of the voting map
+    :type generation: int
+    :param map_type: map type
+    :type map_type: string
+    :param proposal_level_type: GraphLevelType
+    :type proposal_level_type: GraphLevelType
+    :type user_level_type: GraphLevelType
+    :param user_level_type: GraphLevelType
+    :rtype: String
+    '''
     return "map" + "_Q" + str(question_id) + "_G" + \
            str(generation) + "_" + str(map_type) + \
            "_" + str(proposal_level_type) + \
@@ -259,11 +267,33 @@ def make_map_filename(question_id,
 
 
 def check_user_file_exists(user, filename):
+    '''
+    .. function:: check_user_file_exists(user, filename)
+
+    Check if a user fil exists.
+
+    :param user: file owner
+    :type user: User
+    :param filename: filename to use
+    :type filename: string
+    :rtype: boolean
+    '''
     current_dir = os.path.dirname(os.path.realpath(__file__))
     image_path = os.path.join(current_dir, app.config['UPLOADED_FILES_DEST'], str(user.id), filename)
     return os.path.exists(image_path)
 
 def create_image_filename(image_filename, filename_append_list=[]):
+    '''
+    .. function:: create_image_filename(image_filename, filename_append_list=[])
+
+    Generate a filename with optional strings appended.
+
+    :param image_filename: file owner
+    :type image_filename: User
+    :param image_filename: list of strings to append to the gnerated filename
+    :type image_filename: List
+    :rtype: String
+    '''
     from werkzeug import secure_filename
     new_filename = secure_filename(image_filename)
     fix_filename = os.path.splitext(new_filename)
@@ -277,6 +307,19 @@ def create_image_filename(image_filename, filename_append_list=[]):
     return new_filename
 
 def save_image(user, image, use_filename):
+    '''
+    .. function:: save_image(user, image, use_filename)
+
+    Store an image.
+
+    :param user: file owner
+    :type user: User
+    :param image: image file
+    :type image: werkzeug.datastructures.FileStorage
+    :param use_filename: filename to use
+    :type use_filename: string
+    :rtype: boolean
+    '''
     current_dir = os.path.dirname(os.path.realpath(__file__))
     image_path = os.path.join(current_dir, app.config['UPLOADED_FILES_DEST'], str(user.id))
     app.logger.info("image path = %s", image_path)
@@ -296,42 +339,7 @@ def save_image(user, image, use_filename):
     if not os.path.isfile(os.path.join(image_path, use_filename)):
         return False
     else:
-        return use_filename
-
-def save_image_v1(user, image, filename_append_list=[]):
-    current_dir = os.path.dirname(os.path.realpath(__file__))
-    image_path = os.path.join(current_dir, app.config['UPLOADED_FILES_DEST'], str(user.id))
-    app.logger.info("image path = %s", image_path)
-    if not os.path.exists(image_path):
-        try:
-            os.makedirs(image_path)
-        except IOError:
-            app.logger.debug('save_image: Failed to create image path %s', image_path)
-            return False
-
-    '''
-    from werkzeug import secure_filename
-    filename = secure_filename(image.filename)
-    fix_filename = os.path.splitext(filename)
-    # Optionally append strings, question id etc
-    for append in filename_append_list:
-        filename += '_' + append
-    app.logger.debug("A file of that name already exists: %s", os.path.join(image_path, image.filename))
-    image.filename = hash_string(filename) + fix_filename[1]
-    '''
-    use_filename = create_image_filename(image.filename, filename_append_list)
-    
-    if os.path.isfile(os.path.join(image_path, use_filename)):
-        app.logger.debug("A file of that name already exists: %s", os.path.join(image_path, use_filename))
-        return False
-    
-    app.logger.debug("Saving image to %s", os.path.join(image_path, use_filename))
-    image.save(os.path.join(image_path, use_filename))
-    if not os.path.isfile(os.path.join(image_path, use_filename)):
-        return False
-    else:
-        # return os.path.join(app.config['UPLOADED_FILES_DEST'], str(self.id), image.filename)
-        return image.filename
+        return True
 
 
 # Proposal comments supported by a user
@@ -344,7 +352,16 @@ user_comments = db.Table(
 #
 # Useful Functions
 #
-def get_ids_from_proposals(proposals): # fix?
+def get_ids_from_proposals(proposals): #
+    '''
+    .. function:: get_ids_from_proposals(proposals)
+
+    Extract proposal ids from proposals.
+
+    :param proposals: list of proposals
+    :type proposals: List
+    :rtype: List
+    '''
     ids = set()
     for prop in proposals:
         ids.add(prop.id)
@@ -352,6 +369,15 @@ def get_ids_from_proposals(proposals): # fix?
 
 
 def get_ids_as_string_from_proposals(proposals): # fix?
+    '''
+    .. function:: get_ids_as_string_from_proposals(proposals)
+
+    Extract propisal ids from proposals.
+
+    :param proposals: list of proposals
+    :type proposals: List
+    :rtype: stri
+    '''
     proposal_ids = get_ids_from_proposals(proposals)
     return '(' + ', '.join(str(id) for id in proposal_ids) + ')'
 
@@ -495,6 +521,13 @@ class User(db.Model, UserMixin):
     
     @staticmethod
     def get_default_avatar():
+        '''
+        .. function:: get_default_avatar()
+
+        Return the path of the default avatar.
+
+        :rtype: string
+        '''
         avatar = ''
         current_dir = os.path.dirname(os.path.realpath(__file__))
         app.logger.debug("current_dir => %s", current_dir)
@@ -505,6 +538,15 @@ class User(db.Model, UserMixin):
         return avatar
 
     def set_avatar(self, avatar):
+        '''
+        .. function:: set_avatar(avatar)
+
+        Store a thumbnail of the user's avatar.
+
+        :param avatar: image file
+        :type avatar: werkzeug.datastructures.FileStorage
+        :rtype: boolean
+        '''
         current_dir = os.path.dirname(os.path.realpath(__file__))
         avatar_path = os.path.join(current_dir, app.config['UPLOADED_AVATAR_DEST'], str(self.id))
         app.logger.info("avatar path = %s", avatar_path)
@@ -550,6 +592,13 @@ class User(db.Model, UserMixin):
             return os.path.join(app.config['UPLOADED_AVATAR_DEST'], str(self.id), avatar.filename)
     
     def get_avatar(self):
+        '''
+        .. function:: get_avatar()
+
+        Return the path of a user's avatar.
+
+        :rtype: string
+        '''
         current_dir = os.path.dirname(os.path.realpath(__file__))
         avatar = ''
         test_user_avatar_path = os.path.join(current_dir, app.config['UPLOADED_AVATAR_DEST'], str(self.id), '*')
@@ -574,7 +623,7 @@ class User(db.Model, UserMixin):
         '''
         self.comments.append(comment)
 
-    def get_uninvited_associated_users(self, question): # arse
+    def get_uninvited_associated_users(self, question): 
         '''
         .. function:: get_uninvited_associated_users()
 
@@ -2353,7 +2402,7 @@ class Question(db.Model):
 
         :param utc_date_time: a time in the past.
         :type utc_date_time: DateTime
-        :rtype: string
+        :rtype: String
         '''
         time_passed = Question.time_passed_dhm(utc_date_time)
         return "%s days %s hrs %s mins" % (time_passed['days'],
@@ -4621,7 +4670,7 @@ class Question(db.Model):
         :type generation: Integer
         :param map_type: map type
         :type map_type: string
-        :rtype: string or Boolean
+        :rtype: String or Boolean
         '''
         # Generate filename
         '''
@@ -4714,7 +4763,7 @@ class Question(db.Model):
         :type generation: Integer
         :param map_type: map type
         :type map_type: string
-        :rtype: string or Boolean
+        :rtype: String or Boolean
         '''
         # Generate filename
         '''
@@ -4922,6 +4971,18 @@ class Question(db.Model):
         return below
 
     def create_new_graph(self, generation=None, algorithm=2): # LIVE bang
+        '''
+        .. function:: create_new_graph(
+            dom_map)
+
+        Use the complex algorithm to creat the domination graph
+
+        :param generation: The question generation
+        :type generation: int
+        :param algorithm: the algorithm
+        :type algorithm: int
+        :rtype: String
+        '''
         app.logger.debug("create_new_graph called: Algorithm = %s", algorithm)
         generation = generation or self.generation
         proposals = self.get_proposals_list(generation)
@@ -5221,7 +5282,7 @@ class Question(db.Model):
         :type generation: int or None
         :param algorithm: the algorithm to use
         :type algorithm: int or None
-        :rtype: string
+        :rtype: String
         '''
         generation = generation or self.generation
 
@@ -5713,7 +5774,7 @@ class Question(db.Model):
         :type proposal_level_type: GraphLevelType
         :param user_level_type: required layout of user nodes
         :type user_level_type: GraphLevelType
-        :rtype: string
+        :rtype: String
         '''
         app.logger.debug("make_graphviz_map_plain called....")
         
@@ -6200,7 +6261,7 @@ class Question(db.Model):
         :type highlight_user1: string
         :param highlight_proposal1: User to highlight
         :type highlight_proposal1: string
-        :rtype: string
+        :rtype: String
         '''
         generation = generation or self.generation
         algorithm = algorithm or app.config['ALGORITHM_VERSION'] # sick
@@ -6806,7 +6867,7 @@ class Question(db.Model):
         :type proposal: Proposal
         :param combined_proposals: proposals grouped into single nodes
         :type combined_proposals: dict
-        :rtype: string
+        :rtype: String
         '''
         prop_id = ''
         if (proposal in combined_proposals):
@@ -6829,7 +6890,7 @@ class Question(db.Model):
         :type user: User
         :param combined_users: users grouped into single nodes
         :type combined_users: dict
-        :rtype: string
+        :rtype: String
         '''
         app.logger.debug("calculate_user_node_id for user %s", user.id)
         user_id = ''
@@ -8126,7 +8187,7 @@ class Proposal(db.Model):
         :param user: user
         :param generation: question generation
         :type generation: int or None
-        :rtype: string
+        :rtype: String
         '''
         generation = generation or self.question.generation
 

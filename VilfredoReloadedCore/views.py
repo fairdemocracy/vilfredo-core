@@ -56,10 +56,39 @@ def page_not_found(e):
 @app.route('/')
 @app.route('/index')
 def index():
+    '''
+    .. http:get:: /
+
+        Display index page.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET http://example.com HTTP/1.1
+            Host: example.com
+            Accept: application/json
+    '''
     return render_template("index.html")
 
 @app.route('/question/<int:question_id>')
 def display_question(question_id):
+    '''
+    .. http:get:: /question/(int:question_id)
+
+        Display a question's page.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET /question/24 HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        :param question_id: question id
+        :type question_id: int
+    '''
     auth = request.cookies.get('vgaclient')
     if not auth:
         return redirect(redirect_url())
@@ -68,6 +97,22 @@ def display_question(question_id):
 
 @app.route('/question/<int:question_id>/results')
 def display_results(question_id):
+    '''
+    .. http:get:: /question/(int:question_id)/results
+
+        Display a question's results page.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET /question/24/results HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        :param question_id: question id
+        :type question_id: int
+    '''
     auth = request.cookies.get('vgaclient')
     if not auth:
         return redirect(redirect_url())
@@ -76,6 +121,22 @@ def display_results(question_id):
         
 @app.route('/invitation')
 def add_invitation_from_token():
+    '''
+    .. http:get:: /invitation
+
+        Allow user to participate in a question if a valid token supplied.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET http://exampl.com/invitation?eit=f95682169cdc4434804ca891c7b18ecd HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        :param eit: Email invitation token
+        :type eit: String
+    '''
     token = request.args.get('eit')
     auth = request.cookies.get('vgaclient')
     user = api.load_token(auth)
@@ -92,10 +153,44 @@ def add_invitation_from_token():
 
 @app.route('/resetpwd/<token>')
 def reset_password_from_token(token):
+    '''
+    .. http:get:: /resetpwd
+
+        Allow user to reset their password if a valid token supplied.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET http://exampl.com/resetpwd?f956821g7hhyg65gf8ja891c7b18ecd HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        :param: Password reset token
+        :type: String
+    '''
     return render_template("resetpwd.html")
 
 @app.route('/activate')
 def activate():
+    '''
+    .. http:get:: /activate
+
+        Activate user account if a valid token supplied.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET http://exampl.com/activate?u=34&t=f9h7he5gf63lokja891c7b18ecd HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        :param u: User id
+        :type u: integer
+        :param t: Account activation token
+        :type t: String
+    '''
     from .database import db_session
     redirect_to_index = redirect(url_for('index'))
     resp = make_response(redirect_to_index)    
@@ -156,10 +251,36 @@ def activate():
 
 @app.route('/privacy')
 def pivacy():
+    '''
+    .. http:get:: /privacy
+
+        Display privacy page.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET http://exampl.com/privacy HTTP/1.1
+            Host: example.com
+            Accept: application/json
+    '''
     return render_template("privacy.html")
     
 @app.route('/newquestion')
 def new_question():
+    '''
+    .. http:get:: /newquestion
+
+        Display new question page.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET http://exampl.com/newquestion HTTP/1.1
+            Host: example.com
+            Accept: application/json
+    '''
     auth = request.cookies.get('vgaclient')
     if not auth:
         return redirect(redirect_url())
@@ -168,10 +289,36 @@ def new_question():
 
 @app.route('/lostpassword')
 def lost_password():
+    '''
+    .. http:get:: /lostpassword
+
+        Display lost password page.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET http://exampl.com/lostpassword HTTP/1.1
+            Host: example.com
+            Accept: application/json
+    '''
     return render_template("lostpassword.html")
     
 @app.route('/mysettings')
 def mysettings():
+    '''
+    .. http:get:: /mysettings
+
+        Display user settings page.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET http://exampl.com/mysettings HTTP/1.1
+            Host: example.com
+            Accept: application/json
+    '''
     auth = request.cookies.get('vgaclient')
     if not auth:
         return redirect(redirect_url())
@@ -180,6 +327,19 @@ def mysettings():
 
 @app.route('/domination/<int:question_id>/gen/<int:generation>')
 def display_domination(question_id, generation):
+    '''
+    .. http:get:: /domination
+
+        Display domination page.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET http://exampl.com/domination/34/gen/2 HTTP/1.1
+            Host: example.com
+            Accept: application/json
+    '''
     auth = request.cookies.get('vgaclient')
     if not auth:
         return redirect(redirect_url())

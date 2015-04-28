@@ -68,18 +68,6 @@ EMAIL_VERIFY_LIFETIME = 3600*24*2
 
 DOMINATION_MAP_SYMBOLS = {-2: '&approx;', -1: '&equiv;', 0: '&hellip;', 1: '^', 2: '<', 3: '&uHar;', 4: '&lHar;', 5: '<span class="partial2full">^</span>', 6: '<span class="partial2full"><</span>'}
 
-'''
-from flask_login import LoginManager
-login_manager = LoginManager()
-login_manager.init_app(app)
-# Login_serializer used to encryt and decrypt the cookie token for the remember
-# me option of flask-login
-from itsdangerous import URLSafeTimedSerializer
-try:
-    login_serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'], app.config['SALT'])
-except Exception:
-    print 'Failed to create login_serializer'
-'''
 
 # For a given file, return whether it's an allowed type or not
 def allowed_file(filename, permitted=None):
@@ -246,23 +234,19 @@ def api_index():
             Content-Type: application/json
 
             {
-                "current_api_url": "https://" + app.config['SITE_DOMAIN'] + "/api/v1",
-                "api_v1_url": "https://" + app.config['SITE_DOMAIN'] + "/api/v1"
+                "current_api_url": "https://example.com/api/v2",
+                "api_v1_url": "https://example.com/api/v1",
+                "api_v2_url": "https://example.com/api/v2",
             }
 
         :statuscode 200: no error
     '''
     app.logger.debug("api_index called...\n")
-    '''
-    api_info = {
-        "current_api_url": "https://api.vilrefo.org/v1",
-        "api_v1_url": "https://api.vilrefo.org/v1"
-    }
-    '''
 
     api_info = {
-        "current_api_url": "https://" + app.config['SITE_DOMAIN'] + "/api/v1",
-        "api_v1_url": "https://" + app.config['SITE_DOMAIN'] + "/api/v1"
+        "current_api_url": "https://" + app.config['SITE_DOMAIN'] + REST_URL_PREFIX,
+        "api_v1_url": "https://" + app.config['SITE_DOMAIN'] + "/api/v1",
+        "api_v2_url": "https://" + app.config['SITE_DOMAIN'] + "/api/v2"
     }
     return jsonify(api_info), 200
 
@@ -2456,13 +2440,13 @@ def api_upload_image_proposal(question_id):
         return jsonify(message=message), 401
 
     #image_file = models.save_image(user, image, [str(question.id)])
-    image_file = models.save_image(user, image, use_filename)
+    file_saved = models.save_image(user, image, use_filename)
 
-    if image_file == False:
+    if file_saved == False:
         message = 'Failed to save image'
         return jsonify(message=message), 401
 
-    proposal = models.Proposal(author=user, question=question, title=title, image=image_file)
+    proposal = models.Proposal(author=user, question=question, title=title, image=use_filename)
     db_session.add(proposal)
     db_session.commit()
     
@@ -3184,7 +3168,7 @@ def api_associated_users():
             {
               "query_generation": "1",
               "current_generation": "1",
-              "endorsers": [
+              "not_invited": [
                 {
                   "username": "john",
                   "url": "/users/1",
@@ -4788,6 +4772,7 @@ def api_question_domination_map(question_id=None):
         for (pid, relation) in dominations.iteritems():
             doms.append({"pid": pid, "relation": relation})
         '''
+        
         # app.logger.debug("dominations===>>>>> %s", dominations)
 
         app.logger.debug("Dom Table Symbols: %s", DOMINATION_MAP_SYMBOLS)
