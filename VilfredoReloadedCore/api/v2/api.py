@@ -3241,7 +3241,7 @@ def api_associated_users():
 @requires_auth
 def api_decline_new_invite(user_id, invite_id):
     '''
-    .. http:get:: /users/(int:user_id)/new_invites
+    .. http:get:: /users/(int:user_id)/new_invites/(int:invite_id)/decline
 
         Decline an invitation to participate in a question.
 
@@ -3310,7 +3310,7 @@ def api_decline_new_invite(user_id, invite_id):
 @requires_auth
 def api_accept_new_invite(user_id, invite_id):
     '''
-    .. http:get:: /users/(int:user_id)/new_invites
+    .. http:get:: /users/(int:user_id)/new_invites/(int:invite_id)/accept
 
         Accept an invitation to participate in a question.
 
