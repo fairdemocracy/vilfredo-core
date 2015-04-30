@@ -1499,7 +1499,7 @@ def api_unsupport_proposal_comment(question_id, proposal_id, comment_id):
 @requires_auth # added
 def api_get_proposal_comments(question_id, proposal_id, comment_id=None):
     '''
-    .. http:get:: /questions/(int:question_id)/proposals/(int:proposal_id)/comments/(int:comment_id)
+    .. http:get:: /questions/(int:question_id)/proposals/(int:proposal_id)/comments
 
         A user or list of comments.
 
