@@ -5095,15 +5095,27 @@ class Question(db.Model):
         app.logger.debug('Proposals remaining after step 3 = %s', proposals)
         app.logger.debug('Graph after Step 3 = %s', proposals_below)
 
+
         # Step 4
         step4 = []
         app.logger.debug("*** Step 4 ***")
         for prop in list(proposals):
-            if cases[prop.id] in [3,7]:
+            if cases[prop.id] in [3]:
                 graph.append(prop.id)
+                top_level.append(prop.id)
+                pareto_understood.append(prop.id)
                 step4.append(prop.id)
                 proposals_below[prop.id] = []
+                proposals.remove(prop)
+            elif cases[prop.id] in [7]:
+                graph.append(prop.id)
+                top_level.append(prop.id)
+                pareto_not_understood.append(prop.id)
+                step4.append(prop.id)
+                proposals_below[prop.id] = []
+                proposals.remove(prop)
         app.logger.debug("Proposals added in Step 4 ====> %s", step4)
+        
         
         # Step 5
         app.logger.debug("*** Step 5 ***")
