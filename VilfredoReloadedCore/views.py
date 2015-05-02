@@ -336,7 +336,7 @@ def display_domination(question_id, generation):
 
         .. sourcecode:: http
 
-            GET http://exampl.com/domination/34/gen/2 HTTP/1.1
+            GET http://example.com/domination/34/gen/2 HTTP/1.1
             Host: example.com
             Accept: application/json
     '''
