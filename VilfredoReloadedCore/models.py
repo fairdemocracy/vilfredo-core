@@ -4740,17 +4740,14 @@ class Question(db.Model):
             keys.append(k)
         return inv
 
-    # bang
     def get_complex_voting_graph(self, generation=None):
         '''
-        .. function:: get_complex_voting_graph(generation, map_type)
+        .. function:: get_complex_voting_graph(generation)
 
         Generates the svg map file from the dot string and returns the map URL.
 
         :param generation: the question generation
         :type generation: Integer
-        :param map_type: map type
-        :type map_type: string
         :rtype: String or Boolean
         '''
         # Generate filename
