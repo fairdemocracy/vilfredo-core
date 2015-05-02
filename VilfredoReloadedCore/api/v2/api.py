@@ -932,7 +932,7 @@ def api_create_user():
 #
 @app.route(REST_URL_PREFIX + '/questions', methods=['GET'])
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>', methods=['GET'])
-@requires_auth # added
+@requires_auth
 def api_get_questions(question_id=None):
     '''
     .. http:get:: /questions/(int:question_id)
@@ -1496,7 +1496,7 @@ def api_unsupport_proposal_comment(question_id, proposal_id, comment_id):
     REST_URL_PREFIX + '/questions/<int:question_id>/proposals/' +
     '<int:proposal_id>/comments/<int:comment_id>',
     methods=['GET'])
-@requires_auth # added
+@requires_auth
 def api_get_proposal_comments(question_id, proposal_id, comment_id=None):
     '''
     .. http:get:: /questions/(int:question_id)/proposals/(int:proposal_id)/comments
@@ -3532,7 +3532,7 @@ def api_not_invited(question_id):
 # Get Question Participants
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/permissions',
            methods=['GET'])
-@requires_auth # added
+@requires_auth
 def api_get_question_participants(question_id):
     '''
     .. http:get:: /questions/(int:question_id)/permissions
@@ -3619,7 +3619,7 @@ def api_get_question_participants(question_id):
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/proposals/' +
            '<int:proposal_id>/endorsers',
            methods=['GET'])
-@requires_auth # added
+@requires_auth
 def api_get_question_proposal_endorsers(question_id, proposal_id):
     '''
     .. http:get:: /questions/(int:question_id)/proposals/(int:proposal_id)/endorsers
@@ -3721,7 +3721,7 @@ def api_get_question_proposal_endorsers(question_id, proposal_id):
 # Get Pareto Front
 #
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/pareto', methods=['GET'])
-@requires_auth # added
+@requires_auth
 def api_question_pareto(question_id=None):
     '''
     .. http:post:: /questions/(int:question_id)/pareto
@@ -3832,7 +3832,7 @@ def api_question_pareto(question_id=None):
 
 
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/results', methods=['GET'])
-@requires_auth # added
+@requires_auth
 def api_question_results(question_id=None):
     '''
     .. http:post:: /questions/(int:question_id)/results
@@ -3947,7 +3947,7 @@ def api_question_results(question_id=None):
 
 
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/participation_table', methods=['GET'])
-@requires_auth # added
+@requires_auth
 def api_question_participation_table(question_id=None):
     '''
     .. http:post:: /questions/(int:question_id)/participation_table
@@ -4093,7 +4093,7 @@ def api_question_participation_table(question_id=None):
 
 
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/key_players', methods=['GET'])
-@requires_auth # added
+@requires_auth
 def api_question_key_players(question_id=None):
     '''
     .. http:post:: /questions/(int:question_id)/key_players
@@ -4190,7 +4190,7 @@ def api_question_key_players(question_id=None):
 
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/endorser_effects',
            methods=['GET'])
-@requires_auth # added
+@requires_auth
 def api_question_endorser_effects(question_id=None):
     '''
     .. http:post:: /questions/(int:question_id)/endorser_effects
@@ -4360,7 +4360,7 @@ def replaceWithPublic(collection):
 #
 # http://[hostname]/api/v1.0/questions/47/graph?generation=2&map_type=pareto
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/graph', methods=['GET'])
-@requires_auth # added
+@requires_auth
 def api_question_graph(question_id):
     '''
     .. http:get:: questions/(int:question_id)/graph
@@ -4491,7 +4491,7 @@ def api_get_voting_data(question_id):
 
         .. sourcecode:: http
 
-            GET questions/42/voting_map HTTP/1.1
+            GET questions/42/voting_data HTTP/1.1
             Host: example.com
             Accept: application/json
 
@@ -4544,12 +4544,12 @@ def api_get_voting_data(question_id):
 
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/voting_map',
            methods=['GET'])
-@requires_auth # added
+@requires_auth
 def api_question_voting_map(question_id):
     '''
-    .. http:post:: questions/(int:question_id)/voting_map
+    .. http:get:: questions/(int:question_id)/voting_map
 
-        A map of proposal dominations.
+        Return a map of proposal dominations.
 
         **Example request**:
 
@@ -4613,10 +4613,10 @@ def api_question_voting_map(question_id):
 
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/levels_map',
            methods=['GET'])
-@requires_auth # added
+@requires_auth
 def api_question_levels_map(question_id=None):
     '''
-    .. http:post:: questions/(int:question_id)/levels_map
+    .. http:get:: questions/(int:question_id)/levels_map
 
         A map of proposal dominations.
 
@@ -4689,12 +4689,12 @@ def api_question_levels_map(question_id=None):
 
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/domination_map',
            methods=['GET'])
-@requires_auth # added
+@requires_auth
 def api_question_domination_map(question_id=None):
     '''
-    .. http:post:: questions/(int:question_id)/domination_map
+    .. http:get:: questions/(int:question_id)/domination_map
 
-        A map of proposal dominations.
+        Return a map of proposal dominations.
 
         **Example request**:
 
@@ -4792,7 +4792,7 @@ def api_question_domination_map(question_id=None):
 
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/proposal_relations',
            methods=['GET'])
-@requires_auth # added
+@requires_auth
 def api_question_proposal_relations(question_id=None):
     '''
     .. http:post:: questions/(int:question_id)/proposal_relations
@@ -5020,7 +5020,7 @@ def api_get_new_invites(question_id):
 # Get Invitations
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/invitations',
            methods=['GET'])
-@requires_auth # added
+@requires_auth
 def api_get_invitations(question_id):
     '''
     .. http:get:: /questions/(int:question_id)/invitations
@@ -5323,7 +5323,7 @@ def api_create_invitation(question_id):
 @app.route(REST_URL_PREFIX + '/users/<int:user_id>/subscriptions', methods=['GET'])
 @app.route(REST_URL_PREFIX + '/users/<int:user_id>/subscriptions/<int:question_id>',
            methods=['GET'])
-@requires_auth # added
+@requires_auth
 def api_get_user_subscriptions(user_id, question_id=None):
     '''
     .. http:get:: users/(int:user_id)/subscriptions
