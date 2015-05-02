@@ -2513,7 +2513,7 @@ class Question(db.Model):
         for entry in history:
             history_data[entry.proposal_id] = entry
         return history_data
-
+    
     def current_voting_map(self, generation=None):
         '''
         .. function:: current_voting_map([generation=None])
@@ -4206,7 +4206,15 @@ class Question(db.Model):
 
         app.logger.debug("calculate_pareto_front: ************ Using Algorithm %s ************", algorithm)
         app.logger.debug("calculate_pareto_front: ************ Save PF %s ************", save)
-
+        
+        
+        '''
+        
+        if algorithm == 2:
+            # app.logger.debug("************** USING ALGORITHM 2 & calculate_complex_pareto_front function ************")
+            return calculate_complex_pareto_front(generation)
+        '''
+        
         if algorithm == 2:
             # app.logger.debug("************** USING ALGORITHM 2 ************")
             return self.calculate_pareto_front_qualified(proposals,
@@ -4219,6 +4227,7 @@ class Question(db.Model):
                                                          exclude_user,
                                                          generation,
                                                          save)
+
     # bang
     def calculate_pareto_front_qualified(self,
                                proposals=None,
@@ -5048,6 +5057,237 @@ class Question(db.Model):
 
         return below
 
+    def calculate_complex_pareto_front(self, generation=None):
+        '''
+        .. function:: calculate_complex_pareto_front([generation])
+
+        Calculate complex pareto front
+
+        :param generation: The question generation
+        :type generation: integer
+        :rtype: dict
+        '''
+        app.logger.debug("calculate_complex_pareto_front called..")
+        generation = generation or self.generation
+        algorithm = 2
+
+        filenamehash = make_new_map_filename_hashed(self,
+                                                    generation,
+                                                    algorithm)
+
+        app.logger.debug("calculate_complex_pareto_front: filenamehash = %s", filenamehash)
+        filepath = app.config['WORK_FILE_DIRECTORY'] + '/' + 'complex_pareto_' + filenamehash + '.pkl'
+        app.logger.debug("calculate_complex_pareto_front: check for cache file %s", filepath)
+
+        if app.config['CACHE_COMPLEX_DOM']:
+            if os.path.isfile(filepath):
+                app.logger.debug('calculate_complex_pareto_front: RETURNING CACHED DATA')
+                with open(filepath, 'rb') as input:
+                    #return pickle.load(input)
+                    complex_pareto = pickle.load(input)
+                    pareto_proposals = []
+                    for data in complex_pareto:
+                        pareto_proposals.append(Proposal.query.get(data['id']))
+                    return set(pareto_proposals)
+            else:
+                app.logger.debug("Cache file %s not found", filepath)
+
+        proposals = self.get_proposals_list(generation)
+        all_proposals = copy.copy(proposals)
+        proposals_by_id = self.get_proposals_list_by_id(generation)
+
+        dom_map = self.calculate_domination_map(generation=generation, algorithm=algorithm)
+        app.logger.debug('dom_map = %s', dom_map)
+        cases = self.find_domination_cases(proposals=proposals, dom_map=dom_map, generation=generation)
+        app.logger.debug('cases = %s', cases)
+
+        relations = self.calculate_proposal_relation_ids(generation=generation, algorithm=algorithm)
+        app.logger.debug("relations ==> %s", relations)
+        
+        pareto_understood = []
+        pareto_not_understood = []
+        
+        top_level = []
+        graph = []
+        proposals_below = dict()
+        for proposal in proposals:
+            proposals_below[proposal.id] = []
+        
+        app.logger.debug('Proposals at start = %s', proposals)
+
+        # Step 1
+        app.logger.debug("*** Step 1 ***")
+        understood_undominated = []
+        for prop in list(proposals):
+            if len(relations[prop.id]['dominated']) == 0 and relations[prop.id]['understood']:
+                top_level.append(prop.id)
+                pareto_understood.append(prop.id)
+                graph.append(prop.id)
+                proposals_below[prop.id] = []
+                proposals.remove(prop)
+
+        notunderstood_undominated = []
+        for prop in list(proposals):
+            if len(relations[prop.id]['dominated']) == 0 and not relations[prop.id]['understood']:
+                top_level.append(prop.id)
+                pareto_not_understood.append(prop.id)
+                graph.append(prop.id)
+                proposals_below[prop.id] = []
+                proposals.remove(prop)
+
+        app.logger.debug('Proposals added to the Pareto in Step 1 ====> %s', graph)
+        
+        app.logger.debug('Proposals remaining after step 1 = %s', proposals)
+        app.logger.debug('proposals_below after adding Pareto in Step 1 = %s', proposals_below)
+
+        app.logger.debug('pareto_understood = %s', pareto_understood)
+        app.logger.debug('pareto_not_understood = %s', pareto_not_understood)
+
+        # Step 2
+        step2 = []
+        app.logger.debug("*** Step 2 ***")
+        start_graph_len = len(graph)
+        while True:
+            for prop in list(proposals):
+                if cases[prop.id] in [2,6,8,4]:
+                    dominators = []
+                    all_dominators_in_map = True
+                    for (dominating_prop, relation) in dom_map[prop.id].iteritems():
+                        if relation in [2,6] and dominating_prop in graph:
+                            dominators.append(dominating_prop)
+                        else:
+                            all_dominators_in_map = False
+                            break
+
+                    if all_dominators_in_map:
+                        step2.append(prop.id)
+                        proposals.remove(prop)
+                        for dominating_prop in dominators:
+                            proposals_below[dominating_prop].append(prop.id)
+                            graph.append(prop.id)
+
+            # Quit if no new proposals were added to the graph
+            if len(graph) == start_graph_len:
+                break
+            else:
+                start_graph_len = len(graph)
+
+        app.logger.debug("Proposals added in Step 2 ====> %s", step2)
+        
+        app.logger.debug('Proposals remaining after step 2 = %s', proposals)
+        app.logger.debug('Graph after Step 2 = %s', graph)
+
+        adding = []
+        # Step 3 - Add partially dominated all in one go
+        app.logger.debug("*** Step 3 ***")
+        for prop in list(proposals):
+            app.logger.debug("Step 3: Looking at proposal %s", prop.id)
+            if cases[prop.id] in [3,7]:
+                for (dominating_prop, relation) in dom_map[prop.id].iteritems():
+                    if relation == 4 and dominating_prop in graph:
+                        app.logger.debug('Adding proposal %s below %s', prop.id, dominating_prop)
+                        proposals_below[dominating_prop].append(prop.id)
+                        adding.append(prop.id)
+
+        app.logger.debug("Proposals added in Step 3 ====> %s", adding)
+        graph = graph + adding
+
+        for prop in list(proposals):
+            if prop.id in adding:
+                app.logger.debug('Removing prop %s from remaining proposals %s', prop.id, proposals)
+                proposals.remove(prop)
+                app.logger.debug('Remaining roposals now %s', proposals)
+
+        app.logger.debug('Proposals remaining after step 3 = %s', proposals)
+        app.logger.debug('Graph after Step 3 = %s', proposals_below)
+
+
+        # Step 4
+        step4 = []
+        app.logger.debug("*** Step 4 ***")
+        for prop in list(proposals):
+            if cases[prop.id] in [3]:
+                graph.append(prop.id)
+                top_level.append(prop.id)
+                pareto_understood.append(prop.id)
+                step4.append(prop.id)
+                proposals_below[prop.id] = []
+                proposals.remove(prop)
+            elif cases[prop.id] in [7]:
+                graph.append(prop.id)
+                top_level.append(prop.id)
+                pareto_not_understood.append(prop.id)
+                step4.append(prop.id)
+                proposals_below[prop.id] = []
+                proposals.remove(prop)
+        app.logger.debug("Proposals added in Step 4 ====> %s", step4)
+        
+        # Step 5
+        app.logger.debug("*** Step 5 ***")
+        step5 = []
+        start_graph_len = len(graph)
+        app.logger.debug("Beginning Step 5 with %s proposals left", start_graph_len)
+        while True:
+            for prop in list(proposals):
+                if cases[prop.id] in [2,6,8,4]:
+                    dominators = []
+                    all_dominators_in_map = True
+                    for (dominating_prop, relation) in dom_map[prop.id].iteritems():
+                        if relation in [2,6]:
+                            if dominating_prop in graph:
+                                dominators.append(dominating_prop)
+                            else:
+                                all_dominators_in_map = False
+                                break
+
+                    if all_dominators_in_map:
+                        step5.append(prop.id)
+                        proposals.remove(prop)
+                        for dominating_prop in dominators:
+                            proposals_below[dominating_prop].append(prop.id)
+                            graph.append(prop.id)
+
+            # Quit if no new proposals were added to the graph
+            if len(graph) == start_graph_len:
+                break
+            else:
+                start_graph_len = len(graph)
+        app.logger.debug("Proposals added in Step 5 ====> %s", step5)
+        
+        # Step 6 - Add remaining to the pareto front
+        app.logger.debug("*** Step 6 ***")
+        step6 = []
+        for prop in list(proposals):
+            graph.append(prop.id)
+            step6.append(prop.id)
+
+            if relations[prop.id]['understood']:
+                pareto_understood.append(prop.id)
+            else:
+                pareto_not_understood.append(prop.id)
+            
+            proposals_below[prop.id] = []
+            proposals.remove(prop)
+
+        app.logger.debug("Proposals added in Step 6 ====> %s", step6)
+
+        complex_pareto = []
+        for pid in pareto_understood:
+            complex_pareto.append({'id': pid, 'understood': True})
+        
+        for pid in pareto_not_understood:
+            complex_pareto.append({'id': pid, 'understood': False})
+         
+        if app.config['CACHE_COMPLEX_DOM']:
+            app.logger.debug("calculate_complex_pareto_front: saving cache to file %s", filepath)
+            save_object(complex_pareto, r'' + filepath)
+        
+        pareto_proposals = []
+        for data in complex_pareto:
+            pareto_proposals.append(Proposal.query.get(data['id']))
+
+        return set(pareto_proposals)
+
     def create_new_graph(self, generation=None, algorithm=2): # LIVE bang
         '''
         .. function:: create_new_graph(
@@ -5193,8 +5433,8 @@ class Question(db.Model):
                 proposals_below[prop.id] = []
                 proposals.remove(prop)
         app.logger.debug("Proposals added in Step 4 ====> %s", step4)
-        
-        
+
+
         # Step 5
         app.logger.debug("*** Step 5 ***")
         step5 = []
@@ -5351,7 +5591,7 @@ class Question(db.Model):
         voting_graph += "\n}"
 
         return voting_graph
-
+    
     # oldgraph
     def make_graphviz_map_plain(self,
                           proposals=None,
