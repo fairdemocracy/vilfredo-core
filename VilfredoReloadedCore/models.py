@@ -164,6 +164,44 @@ def make_new_map_filename_hashed(question,
             algorithm=None])
 
         Create the hash filname for the voting map.
+        Uses current_voting_map() to distinguish changes between not understanding, opposing and endorsing.
+
+        :param question: question
+        :type question: Question
+        :param generation: generation of the voting map
+        :type generation: int
+        :param algorithm: algorithm version number
+        :type algorithm: int
+        :rtype: String
+        '''
+    algorithm = algorithm or app.config['ALGORITHM_VERSION']
+    generation = generation or question.generation
+    import hashlib, json, pickle
+    from flask import jsonify
+    m = hashlib.md5()
+    m.update(str(question.id) + str(generation))
+    m.update(str(app.config['ANONYMIZE_GRAPH']))
+    m.update(str(algorithm))
+    voting_map = question.current_voting_map()
+    # app.logger.debug('******************* make_new_map_filename_hashed  START *********************************')
+    # app.logger.debug('*** voting_map ==> %s', voting_map)
+    m.update(json.dumps(voting_map))
+    hashed = m.hexdigest()
+    # app.logger.debug('***')
+    # app.logger.debug('*** hashed ==> %s', hashed)
+    # app.logger.debug('******************* make_new_map_filename_hashed  END *********************************')
+    return hashed
+
+def make_new_map_filename_hashed_v1(question,
+                                 generation=None,
+                                 algorithm=None):
+    '''
+        .. function:: make_new_map_filename_hashed(
+            question[,
+            generation=None,
+            algorithm=None])
+
+        Create the hash filname for the voting map.
 
         :param question: question
         :type question: Question
@@ -2476,6 +2514,33 @@ class Question(db.Model):
             history_data[entry.proposal_id] = entry
         return history_data
 
+    def current_voting_map(self, generation=None):
+        '''
+        .. function:: current_voting_map([generation=None])
+
+        Returns the voting types of each proposal of the question.
+
+        :param generation: question generation.
+        :type generation: int
+        :rtype: dict
+        '''
+        voting_map = dict()
+        generation = generation or self.generation
+        proposals = self.get_proposals_list(generation)
+        votes = dict()
+        confused_count = 0
+        oppose_count = 0
+        for proposal in proposals:
+            voters_by_type = proposal.voters_by_type(generation=generation)
+            votes[proposal.id]= {'proposal': proposal.id, 'votes': voters_by_type}
+            confused_count = confused_count + len(voters_by_type['confused'])
+            oppose_count = oppose_count + len(voters_by_type['oppose'])
+        voting_map = {'generation': generation, 
+                      'proposals': votes, 
+                      'confused_count': confused_count, 
+                      'oppose_count': oppose_count}
+        return voting_map
+    
     def voting_map(self, generation=None):
         '''
         .. function:: voting_map([generation=None])
