@@ -166,10 +166,10 @@ def make_new_map_filename_hashed(question,
         Create the hash filname for the voting map.
 
         :param question: question
-        :type question: Qustion
+        :type question: Question
         :param generation: generation of the voting map
         :type generation: int
-        :param algorithm: algorithm version number
+        :param algorithm: algorithm version
         :type algorithm: int
         :rtype: String
         '''
@@ -182,10 +182,16 @@ def make_new_map_filename_hashed(question,
     m.update(str(app.config['ANONYMIZE_GRAPH']))
     m.update(str(algorithm))
     all_endorsers = question.get_proposal_endorsers(generation)
-    # app.logger.debug('*******************make_map_filename_hashed::proposal_endorsers ==> %s', proposal_endorsers)
-    # app.logger.debug('make_map_filename_hashed::json ==> %s', json.dumps(proposal_endorsers))
+    # app.logger.debug('******************* make_new_map_filename_hashed  START *********************************')
+    # app.logger.debug('*** all_endorsers ==> %s', all_endorsers)
+    # app.logger.debug('***')
+    # app.logger.debug('*** all_endorsers-->json ==> %s', json.dumps(all_endorsers))
     m.update(json.dumps(all_endorsers))
-    return m.hexdigest()
+    hashed = m.hexdigest()
+    # app.logger.debug('***')
+    # app.logger.debug('*** hashed ==> %s', hashed)
+    # app.logger.debug('******************* make_new_map_filename_hashed  END *********************************')
+    return hashed
 
 def make_map_filename_hashed(question,
                              generation=None,
@@ -2471,6 +2477,16 @@ class Question(db.Model):
         return history_data
 
     def voting_map(self, generation=None):
+        '''
+        .. function:: voting_map([generation=None])
+
+        Returns the voting history of each proposal in each
+        generation of the question.
+
+        :param generation: question generation.
+        :type generation: int
+        :rtype: dict
+        '''
         gen = 1
         voting_map = dict()
         generation = generation or self.generation
