@@ -5119,7 +5119,7 @@ class Question(db.Model):
         app.logger.debug("*** Step 1 ***")
         understood_undominated = []
         for prop in list(proposals):
-            if len(relations[prop.id]['dominated']) == 0 and relations[prop.id]['understood']:
+            if cases[prop.id] == 1:
                 top_level.append(prop.id)
                 pareto_understood.append(prop.id)
                 graph.append(prop.id)
@@ -5128,7 +5128,7 @@ class Question(db.Model):
 
         notunderstood_undominated = []
         for prop in list(proposals):
-            if len(relations[prop.id]['dominated']) == 0 and not relations[prop.id]['understood']:
+            if cases[prop.id] == 5:
                 top_level.append(prop.id)
                 pareto_not_understood.append(prop.id)
                 graph.append(prop.id)
@@ -5331,7 +5331,8 @@ class Question(db.Model):
         app.logger.debug("*** Step 1 ***")
         understood_undominated = []
         for prop in list(proposals):
-            if len(relations[prop.id]['dominated']) == 0 and relations[prop.id]['understood']:
+            # if len(relations[prop.id]['dominated']) == 0 and relations[prop.id]['understood']:
+            if cases[prop.id] == 1:
                 top_level.append(prop.id)
                 pareto_understood.append(prop.id)
                 graph.append(prop.id)
@@ -5340,7 +5341,8 @@ class Question(db.Model):
 
         notunderstood_undominated = []
         for prop in list(proposals):
-            if len(relations[prop.id]['dominated']) == 0 and not relations[prop.id]['understood']:
+            # if len(relations[prop.id]['dominated']) == 0 and not relations[prop.id]['understood']:
+            if cases[prop.id] == 5:
                 top_level.append(prop.id)
                 pareto_not_understood.append(prop.id)
                 graph.append(prop.id)
