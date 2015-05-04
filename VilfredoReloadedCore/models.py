@@ -4209,18 +4209,17 @@ class Question(db.Model):
         
         
         '''
-        
-        if algorithm == 2:
-            # app.logger.debug("************** USING ALGORITHM 2 & calculate_complex_pareto_front function ************")
-            return calculate_complex_pareto_front(generation)
-        '''
-        
         if algorithm == 2:
             # app.logger.debug("************** USING ALGORITHM 2 ************")
             return self.calculate_pareto_front_qualified(proposals,
                                                          exclude_user,
                                                          generation,
                                                          save)
+        '''
+        
+        if algorithm == 2:
+            # app.logger.debug("************** USING ALGORITHM 2 & calculate_complex_pareto_front function ************")
+            return calculate_complex_pareto_front(generation)
         else:
             # app.logger.debug("************** USING ALGORITHM 1 ************")
             return self.calculate_pareto_front_original(proposals,
@@ -4228,7 +4227,6 @@ class Question(db.Model):
                                                          generation,
                                                          save)
 
-    # bang
     def calculate_pareto_front_qualified(self,
                                proposals=None,
                                exclude_user=None,
@@ -5112,7 +5110,7 @@ class Question(db.Model):
         proposals_below = dict()
         for proposal in proposals:
             proposals_below[proposal.id] = []
-        
+
         app.logger.debug('Proposals at start = %s', proposals)
 
         # Step 1
