@@ -2200,7 +2200,7 @@ def api_update_proposal_endorsement(question_id, proposal_id):
 @requires_auth
 def api_edit_proposal(question_id, proposal_id):
     '''
-    .. http:post:: questions/int:question_id/proposals/int:proposal_id
+    .. http:post:: questions/(int:question_id)/proposals/(int:proposal_id)
 
         Edit proposal.
 
@@ -2356,7 +2356,7 @@ def api_edit_proposal(question_id, proposal_id):
 @requires_auth
 def api_upload_image_proposal(question_id):
     '''
-    .. http:post:: /upload_image_proposal
+    .. http:post:: questions/(int:question_id)/upload_image_proposal
 
         Request password reset.
 
@@ -2377,10 +2377,11 @@ def api_upload_image_proposal(question_id):
 
             {
                 "message": "File saved",
-                "url": "http://0.0.0.0:8080/static/usercontent/profiles/1/831e44b41f77c66d6f97aa8ee4977275.jpg"
+                "url": "http://0.0.0.0:8080/static/usercontent/uploads/1/831e44b41f77c66d6f97aa8ee4977275.jpg"
             }
 
-        :json email: registered email address
+        :form title: proposal title
+        :files image: proposal image
         :statuscode 201: no error
         :statuscode 400: bad request
         :statuscode 401: bad request
@@ -3046,7 +3047,7 @@ def api_edit_question(question_id):
 @requires_auth
 def api_edit_proposal_v1(question_id, proposal_id):
     '''
-    .. http:post:: questions/int:question_id/proposals/int:proposal_id
+    .. http:post:: questions/(int:question_id)/proposals/(int:proposal_id)
 
         Edit proposal.
 
