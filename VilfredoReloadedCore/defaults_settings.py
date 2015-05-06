@@ -72,7 +72,7 @@ GRAPHVIZ_DOT_PATH = None
 # Directory to put the voting maps - it will be created if not found
 # MAP_PATH = 'maps/'
 MAP_PATH = 'VilfredoReloadedCore/static/maps/'
-EXTERNAL_MAP_PATH = 'static/maps/'
+EXTERNAL_MAP_PATH = 'maps/'
 # MAP_PATH = 'maps/'
 # EXTERNAL_MAP_PATH = 'maps/'
 
