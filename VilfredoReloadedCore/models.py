@@ -578,7 +578,7 @@ class User(db.Model, UserMixin):
         test_default_avatar_path = os.path.join(current_dir, app.config['UPLOADED_AVATAR_DEST'], 'default', '*')
         files = glob.glob(test_default_avatar_path)
         if len(files) > 0:
-            avatar = os.path.join(app.config['UPLOADED_AVATAR_DEST'], 'default', os.path.basename(files[0]))
+            avatar = os.path.join(app.config['PROFILE_PICS'], 'default', os.path.basename(files[0]))
         return avatar
 
     def set_avatar(self, avatar):
