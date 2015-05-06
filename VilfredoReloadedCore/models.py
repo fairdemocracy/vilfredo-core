@@ -650,7 +650,7 @@ class User(db.Model, UserMixin):
         files = glob.glob(test_user_avatar_path)
         app.logger.debug("test_user_avatar_path = %s", files)
         if len(files) > 0:
-            avatar = os.path.join(app.config['UPLOADED_AVATAR_DEST'], str(self.id), os.path.basename(files[0]))
+            avatar = os.path.join(app.config['PROFILE_PICS'], str(self.id), os.path.basename(files[0]))
         else:
             avatar = User.get_default_avatar()
         return avatar
@@ -7679,7 +7679,7 @@ class Proposal(db.Model):
     def get_image(self):
         if len(self.image):
             return os.path.join(
-                app.config['UPLOADED_FILES_DEST'],
+                app.config['USER_CONTENT'],
                 str(self.author.id), 
                 self.image)
         else:

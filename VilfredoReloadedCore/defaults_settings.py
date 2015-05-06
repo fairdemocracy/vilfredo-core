@@ -48,8 +48,12 @@ REGISTER_INVITATION_ONLY = False
 # Set path to uploaded user files
 UPLOADED_FILES_DEST = 'static/usercontent/uploads'
 
+USER_CONTENT = 'usercontent/uploads'
+
 # Set path to uploaded user files
 UPLOADED_AVATAR_DEST = 'static/usercontent/profiles'
+
+PROFILE_PICS = 'usercontent/profiles'
 
 # Set permitted extensions for uploaded user files
 ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif']

@@ -66,6 +66,7 @@ except ImportError:
     sys.exit("You should not reach this point")
 
 from flask.ext.mail import Mail
+from flask.ext.cdn import CDN
 
 
 def config_app(app):
@@ -81,13 +82,15 @@ def config_app(app):
     #config = os.path.join(app.root_path, 'settings.cfg')
     #app.config.from_pyfile(config, silent=True)
 
-app = Flask(__name__)
+app = Flask(__name__, static_url_path='')
 config_app(app)
 
 import VilfredoReloadedCore.views
 import VilfredoReloadedCore.api.v2.api
 
 mail = Mail(app)
+
+CDN(app)
 
 from flask_util_js import FlaskUtilJs
 fujs = FlaskUtilJs(app)
