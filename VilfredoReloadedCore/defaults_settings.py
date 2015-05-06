@@ -28,6 +28,9 @@ PROTOCOL = 'http://'
 # Set site domain
 SITE_DOMAIN = '0.0.0.0:8080'
 
+# Set static domain
+CDN_DOMAIN = SITE_DOMAIN
+
 # DATABASE_URI = 'sqlite:////var/tmp/vr.db'
 development_db = 'sqlite:////var/tmp/vr.db'
 
