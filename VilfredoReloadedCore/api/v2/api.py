@@ -1085,18 +1085,18 @@ def api_create_question():
 
     if not request.json:
         app.logger.debug("Non json request received...\n")
-        response = {message: "No question data received"}
+        response = {'message': "No question data received"}
         return jsonify(response), 400
 
     if not 'title' in request.json or request.json['title'] == ''\
             or len(request.json['title']) > MAX_LEN_QUESTION_TITLE:
-        response = {message: "Question title must not be empty and no longer than " + str(MAX_LEN_QUESTION_BLURB) + " characters"}
+        response = {'message': "Question title must not be empty and no longer than " + str(MAX_LEN_QUESTION_BLURB) + " characters"}
         return jsonify(response), 400
 
     elif not 'blurb' in request.json or request.json['blurb'] == ''\
             or len(request.json['blurb']) > MAX_LEN_QUESTION_BLURB:
         # abort(400)
-        response = {message: "Question text must not be empty and no longer than " + str(MAX_LEN_QUESTION_BLURB) + " characters"}
+        response = {'message': "Question text must not be empty and no longer than " + str(MAX_LEN_QUESTION_BLURB) + " characters"}
         return jsonify(response), 400
         
     elif 'question_type' in request.json and (not isinstance( request.json['question_type'], int )\
