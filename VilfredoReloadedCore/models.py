@@ -4219,7 +4219,7 @@ class Question(db.Model):
         
         if algorithm == 2:
             # app.logger.debug("************** USING ALGORITHM 2 & calculate_complex_pareto_front function ************")
-            return calculate_complex_pareto_front(generation)
+            return self.calculate_complex_pareto_front(generation)
         else:
             # app.logger.debug("************** USING ALGORITHM 1 ************")
             return self.calculate_pareto_front_original(proposals,
