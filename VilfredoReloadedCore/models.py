@@ -634,7 +634,7 @@ class User(db.Model, UserMixin):
             return False
         else:
             return os.path.join(app.config['UPLOADED_AVATAR_DEST'], str(self.id), avatar.filename)
-    
+
     def get_avatar(self):
         '''
         .. function:: get_avatar()
@@ -2329,11 +2329,11 @@ class Question(db.Model):
         app.logger.debug('author_move_on question now generation %s', self.generation)
 
         try:
-          SEND_EMAIL_NOTIFICATIONS
+          app.config['SEND_EMAIL_NOTIFICATIONS']
         except NameError:
           app.logger.debug("SEND_EMAIL_NOTIFICATIONS not defined! Not sending email notifications!")
         else:
-          if SEND_EMAIL_NOTIFICATIONS:
+          if app.config['SEND_EMAIL_NOTIFICATIONS']:
               # Send email notifications
               self.notify_users_moved_on()
           else:
