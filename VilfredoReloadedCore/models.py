@@ -581,6 +581,33 @@ class User(db.Model, UserMixin):
             avatar = os.path.join(app.config['PROFILE_PICS'], 'default', os.path.basename(files[0]))
         return avatar
 
+    @staticmethod
+    def resize_avatars():
+        '''
+        .. function:: resize_avatars()
+
+        Resize user avatars to thumbnails.
+
+        :rtype: None
+        '''
+        from PIL import Image
+        thumbnail_size = (100, 100)
+        current_dir = os.path.dirname(os.path.realpath(__file__))
+        avatar_path = os.path.join(current_dir, app.config['UPLOADED_AVATAR_DEST'])
+        for dirName, subdirList, fileList in os.walk(avatar_path, topdown=False):
+            for fname in fileList:
+                # print(fname)
+                # print(os.path.join(dirName, fname))
+                avatar_file = os.path.join(dirName, fname)
+                try:
+                    thumbnail = Image.open(avatar_file)
+                    thumbnail.thumbnail(thumbnail_size)
+                    app.logger.debug("Saving avatar %s to %s", thumbnail, avatar_file)
+                    thumbnail.save(avatar_file)
+                except IOError:
+                    pass
+                    # app.logger.debug("set_avatar: Failed to create thumbnail")
+    
     def set_avatar(self, avatar):
         '''
         .. function:: set_avatar(avatar)
