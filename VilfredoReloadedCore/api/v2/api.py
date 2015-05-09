@@ -1037,7 +1037,7 @@ def api_get_questions(question_id=None):
                            questions=results), 200
 
 #
-# Create Question
+# Create Question  Add Question
 #
 @app.route(REST_URL_PREFIX + '/questions', methods=['POST'])
 @requires_auth
@@ -1107,14 +1107,26 @@ def api_create_question():
          or not request.json['voting_type'] in (1,2)):
         return jsonify(message="Invalid parameter voting_type"), 400
 
-    elif 'room' in request.json and request.json['room'] != ''\
-         and (len(request.json['room']) > MAX_LEN_ROOM
-              or len(request.json['room']) < MIN_LEN_ROOM):
-        return jsonify(message="Room name must longer than " + str(MIN_LEN_ROOM) + " and less than " + str(MAX_LEN_ROOM) + " characters"), 400
-
-    # Set required parameters
-    title = request.json.get('title')
+    # Check link count in blurb
     blurb = request.json.get('blurb')
+    num_links = blurb.count('http')
+    app.logger.debug("%s links in quetion text", num_links)
+    if num_links > app.config['MAX_LINKS_IN_QUESTION']:
+        message = "Text contains %s links. Text can contain no more than %s links" % (num_links, app.config['MAX_LINKS_IN_QUESTION'])
+        return jsonify(message=message), 400
+    elif num_links > app.config['MAX_LINKS_IN_QUESTION_WITHOUT_VALIDATION']: 
+        if 'recaptcha' not in request.json or len(request.json['recaptcha']) == 0:
+            message = "Text contains %s links. Text containing more than %s links requires validation with recaptcha" % (num_links, app.config['MAX_LINKS_IN_QUESTION_WITHOUT_VALIDATION'])
+            return jsonify(message=message), 400
+        else:
+            import requests
+            params = {'secret': app.config['RECAPTCHA_SECRET'], 'response': request.json['recaptcha']}
+            r = requests.post(app.config['RECAPTCHA_API_URL'], data=params)
+            if not r.ok:
+                message = "Text contains %s links. Invalid recaptcha parameter value received." % (num_links)
+                return jsonify(message=message), 400
+
+    title = request.json.get('title')
     question_type = request.json.get('question_type', 1)
     voting_type = request.json.get('voting_type', 1)
                   
@@ -3032,8 +3044,27 @@ def api_edit_question(question_id):
         message = {"message": "Missing or empty content field"}
         return jsonify(message), 400
 
+    # Check link count in blurb
+    blurb = request.json.get('blurb')
+    num_links = blurb.count('http')
+    app.logger.debug("%s links in quetion text", num_links)
+    if num_links > app.config['MAX_LINKS_IN_QUESTION']:
+        message = "Text contains %s links. Text can contain no more than %s links" % (num_links, app.config['MAX_LINKS_IN_QUESTION'])
+        return jsonify(message=message), 400
+    elif num_links > app.config['MAX_LINKS_IN_QUESTION_WITHOUT_VALIDATION']: 
+        if 'recaptcha' not in request.json or len(request.json['recaptcha']) == 0:
+            message = "Text contains %s links. Text containing more than %s links requires validation with recaptcha" % (num_links, app.config['MAX_LINKS_IN_QUESTION_WITHOUT_VALIDATION'])
+            return jsonify(message=message), 400
+        else:
+            import requests
+            params = {'secret': app.config['RECAPTCHA_SECRET'], 'response': request.json['recaptcha']}
+            r = requests.post(app.config['RECAPTCHA_API_URL'], data=params)
+            if not r.ok:
+                message = "Text contains %s links. Invalid recaptcha parameter value received." % (num_links)
+                return jsonify(message=message), 400
+    
+    question.blurb = blurb
     question.title = request.json.get('title')
-    question.blurb = request.json.get('blurb')
 
     db_session.add(question)
     db_session.commit()
