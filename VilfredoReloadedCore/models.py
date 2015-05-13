@@ -2048,6 +2048,13 @@ class Question(db.Model):
         app.logger.debug("There were %s voters in generation %s", voter_count, generation)
         
         proposals = self.get_proposals_list_by_id()
+        
+        # Fetch pareto ids
+        pareto = self.calculate_pareto_front(generation=generation)
+        pareto_ids = []
+        for proposal in pareto:
+            pareto_ids.append(proposal.id)
+        app.logger.debug("pareto_ids =====> %s", pareto_ids)
 
         endorsements = db_session.query(Endorsement)\
                 .filter(Endorsement.question_id == self.id)\
@@ -2082,7 +2089,8 @@ class Question(db.Model):
                 results.update( {pid: {'median': {'medx': median(coords['mapx']),
                                                   'medy': median(coords['mapy'])},
                                        'voters': coords['voters'],
-                                       'voter_count' : len(coords['voters'])} } )
+                                       'voter_count' : len(coords['voters']),
+                                       'pareto': pid in pareto_ids} } )
 
                 # Update DB with proposal medians
                 geomedx = median(coords['mapx'])
@@ -2097,21 +2105,12 @@ class Question(db.Model):
                 not_voted = voter_count - len(coords['mapx'])
                 if not_voted > 0:
 
-                    app.logger.debug("Adding %s error points for pid %s", not_voted, pid)
-
                     results[pid]['o_error'] = {'mapx': median(coords['mapx'] + [0] * not_voted),
                                                'mapy': median(coords['mapy'] + [0] * not_voted)}
                     results[pid]['e_error'] = {'mapx': median(coords['mapx'] + [1] * not_voted),
                                                'mapy': median(coords['mapy'] + [0] * not_voted)}
                     results[pid]['c_error'] = {'mapx': median(coords['mapx'] + [0.5] * not_voted),
                                                'mapy': median(coords['mapy'] + [1] * not_voted)}
-
-            # Add PF data
-            relations = self.calculate_proposal_relation_ids(generation=generation)
-            for (proposal_id, data) in relations.iteritems():
-                if proposal_id in results:
-                    results[proposal_id]['dominated_by'] = int(not data['pareto'])
-                    results[proposal_id]['pareto'] = data['pareto']
 
             app.logger.debug("results ==> %s", results)
             
