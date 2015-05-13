@@ -1808,6 +1808,7 @@ class Question(db.Model):
         permissions = None
         if user:
             permissions = self.get_permissions(user)
+            public['my_permissions'] = permissions
             
             # Add participant permissions if user is question author
             

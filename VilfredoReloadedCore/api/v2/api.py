@@ -928,7 +928,7 @@ def api_create_user():
 
 
 #
-# Get Questions
+# Get Questions  fetch questions
 #
 @app.route(REST_URL_PREFIX + '/questions', methods=['GET'])
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>', methods=['GET'])
