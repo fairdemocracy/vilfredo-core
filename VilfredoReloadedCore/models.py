@@ -1756,7 +1756,7 @@ class Question(db.Model):
 
     def __repr__(self):
         return "<Question(%s '%s' by %s - Gen %s - %s)>" % (self.id,
-                                                       unicode(self.title, "utf-8"),
+                                                       self.title.encode("utf-8"),
                                                        self.author.username,
                                                        self.generation,
                                                        self.phase)
@@ -7621,7 +7621,7 @@ class Proposal(db.Model):
     def __repr__(self):
         return "<Proposal(%s '%s' by %s, Q:'%s')>"\
             % (self.id,
-               unicode(self.title, "utf-8"),
+               self.title.encode("utf-8"),
                self.author.username,
                self.question_id)
 
