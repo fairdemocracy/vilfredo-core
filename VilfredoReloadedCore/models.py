@@ -703,7 +703,15 @@ class User(db.Model, UserMixin):
 
         :rtype: list
         '''
-        users_by_invitation = self.get_users_by_invitation(ignore_question_id=question.id)
+        invited_uids = set()
+        current_invites = question.invites.all()
+        for invite in current_invites:
+            invited_uids.add(invite.receiver_id)
+        new_invites = question.invites_sent.all()
+        for invite in new_invites:
+            invited_uids.add(invite.receiver_id)
+                
+        users_by_invitation = self.get_users_by_invitation(ignore_question_id=question.id, ignore_user_ids=invited_uids)
         uninvited_associates = list()
         for user in users_by_invitation:
             uninvited_associates.append({'username': user.username, 'user_id': user.id})
@@ -828,7 +836,11 @@ class User(db.Model, UserMixin):
         query = User.query.filter((User.id.in_(uids)))
         return query.paginate(page, app.config['RESULTS_PER_PAGE'], False)
     
-    def get_users_by_invitation(self, ignore_question_id=None, page=None, paginate=False):
+    def get_users_by_invitation(self, 
+                                ignore_question_id=None, 
+                                ignore_user_ids=None, 
+                                page=None, 
+                                paginate=False):
         '''
         .. function:: get_users_by_invitation()
 
@@ -847,6 +859,7 @@ class User(db.Model, UserMixin):
         if ignore_question_id:
             app.logger.debug('get_associated_users - Ignore question = %s', ignore_question_id)
             query = query.filter(Invite.question_id != ignore_question_id)
+            # query = query.filter(Invite.question_id.in_(ignore_question_ids))
 
         invitations = query.all()
 
@@ -856,11 +869,14 @@ class User(db.Model, UserMixin):
             uids.add(invite.receiver_id)
         # Remove self
         uids.remove(self.id)
+        
+        if ignore_user_ids:
+            uids = uids - set(ignore_user_ids)
 
         uids = list(uids)
         app.logger.debug('get_associated_users - Associated User IDs = %s', uids)
 
-        user_query = User.query.filter((User.id.in_(uids)))
+        user_query = User.query.filter(User.id.in_(uids))
 
         if paginate:
             return user_query.paginate(page, app.config['RESULTS_PER_PAGE'], False)
