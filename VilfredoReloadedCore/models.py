@@ -7472,24 +7472,25 @@ class Comment(db.Model):
         '''
         supporters = self.fetch_supporter_ids()
 
-        return {'id': str(self.id),
+        return {'id': self.id,
                 'url': url_for('api_get_proposal_comments',
                                question_id=self.question_id,
                                proposal_id=self.proposal_id,
                                comment_id=self.id),
                 'comment': self.comment,
                 'comment_type': self.comment_type,
-                'reply_to': str(self.reply_to),
-                'generation': str(self.generation),
-                'created': str(self.created),
-                'author_id': str(self.user_id),
+                'reply_to': self.reply_to,
+                'generation': self.generation,
+                'created': self.created,
+                'author_id': self.user_id,
                 'author_url': url_for('api_get_users', user_id=self.user_id),
                 'proposal_url': url_for('api_get_question_proposals',
                                         question_id=self.question_id,
                                         proposal_id=self.proposal_id),
                 'question_url': url_for('api_get_questions',
                                         question_id=self.question_id),
-                'supporters': str(supporters)}
+                'supporters': str(supporters),
+                'num_supporters': len(supporters)}
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer)
