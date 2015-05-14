@@ -3261,7 +3261,8 @@ def api_associated_users():
         app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
         return jsonify(message = "You do not have permission to view this question"), 404
 
-    not_invited = user.get_uninvited_associated_users(question=question)
+    #not_invited = user.get_uninvited_associated_users(question=question)
+    not_invited = user.get_uninvited_associated_users_by_invitation(question=question)
 
     return jsonify(question_id=str(question.id),
                    num_items=str(len(not_invited)),

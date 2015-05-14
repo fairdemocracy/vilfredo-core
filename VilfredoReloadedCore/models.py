@@ -694,6 +694,22 @@ class User(db.Model, UserMixin):
         '''
         self.comments.append(comment)
 
+    def get_uninvited_associated_users_by_invitation(self, question): 
+        '''
+        .. function:: get_uninvited_associated_users_by_invitation()
+
+        Get all users who participated in OTHER questions also participated in
+        by this user.
+
+        :rtype: list
+        '''
+        users_by_invitation = self.get_users_by_invitation(ignore_question_id=question.id)
+        uninvited_associates = list()
+        for user in users_by_invitation:
+            uninvited_associates.append({'username': user.username, 'user_id': user.id})
+
+        return uninvited_associates
+    
     def get_uninvited_associated_users(self, question): 
         '''
         .. function:: get_uninvited_associated_users()
@@ -812,49 +828,44 @@ class User(db.Model, UserMixin):
         query = User.query.filter((User.id.in_(uids)))
         return query.paginate(page, app.config['RESULTS_PER_PAGE'], False)
     
-    def get_associated_users_v1(self):
+    def get_users_by_invitation(self, ignore_question_id=None, page=None, paginate=False):
         '''
-        .. function:: get_associated_users()
+        .. function:: get_users_by_invitation()
 
         Get all users who participated in OTHER questions also participated in
         by this user.
 
         :rtype: list
         '''
-        '''
-        invitations = self.invites_received.\
-        filter(Invite.question_id != ignore_question_id).\
-        all()
-        '''
 
-        #if ignore_question_id:
-        #invitations_query.filter(Invite.question_id != ignore_question_id)
+        page = page or 1
         
-        #invitations = invitations_query.all()
-        
-        # current_participants = 
-        
-        invitations = db_session.query(Invite).\
+        query = db_session.query(Invite).\
             filter(or_(Invite.sender_id == self.id,
-                       Invite.receiver_id == self.id)).\
-            all()
+                       Invite.receiver_id == self.id))
 
-        qids = set()
+        if ignore_question_id:
+            app.logger.debug('get_associated_users - Ignore question = %s', ignore_question_id)
+            query = query.filter(Invite.question_id != ignore_question_id)
+
+        invitations = query.all()
+
+        uids = set()
         for invite in invitations:
-            qids.add(invite.question_id)
+            uids.add(invite.sender_id)
+            uids.add(invite.receiver_id)
+        # Remove self
+        uids.remove(self.id)
 
-        #return qids
+        uids = list(uids)
+        app.logger.debug('get_associated_users - Associated User IDs = %s', uids)
 
-        associate_invites = db_session.query(Invite).\
-                filter(Invite.question_id.in_(qids)).\
-                filter(Invite.receiver_id != self.id).\
-                group_by(Invite.receiver_id).\
-                all()
+        user_query = User.query.filter((User.id.in_(uids)))
 
-        associates = list()
-        for invite in associate_invites:
-            associates.append({'username': invite.receiver.username, 'user_id': invite.receiver_id})
-        return associates
+        if paginate:
+            return user_query.paginate(page, app.config['RESULTS_PER_PAGE'], False)
+        else:
+            return user_query.all()
 
     def get_question_permission(self, question):
         invite = self.invites_received.filter(Invite.question_id == question.id).first()
@@ -1456,7 +1467,7 @@ class EmailInvite(db.Model):
     Stores users email invitaions to participate in questions
     '''
     __tablename__ = 'email_invite'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     sender_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     receiver_email = db.Column(db.String(120))
@@ -1465,7 +1476,7 @@ class EmailInvite(db.Model):
     token = db.Column(db.String(32), unique=True)
     email_sent = db.Column(db.Boolean, unique=False, default=False)
     accepted = db.Column(db.Boolean, unique=False, default=False)
-    
+
     sender = db.relationship("User",
                              primaryjoin="EmailInvite.sender_id==User.id",
                              backref="email_invites_sent",
