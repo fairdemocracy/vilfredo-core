@@ -771,7 +771,7 @@ class User(db.Model, UserMixin):
             uids.add(user[0])
 
         uids = list(uids)
-        
+
         if userid in uids:
             return User.query.get(userid)
         else:
@@ -795,6 +795,7 @@ class User(db.Model, UserMixin):
         for item in questions_participated:
             qids.add(item[0])
         qids = list(qids)
+        app.logger.debug('get_associated_users - Associated Question IDs = %s', qids)
 
         associates = db_session.query(Invite.receiver_id)\
             .filter(Invite.question_id.in_(qids))\
@@ -806,10 +807,11 @@ class User(db.Model, UserMixin):
             uids.add(user[0])
 
         uids = list(uids)
+        app.logger.debug('get_associated_users - Associated User IDs = %s', uids)
 
         query = User.query.filter((User.id.in_(uids)))
         return query.paginate(page, app.config['RESULTS_PER_PAGE'], False)
-
+    
     def get_associated_users_v1(self):
         '''
         .. function:: get_associated_users()
