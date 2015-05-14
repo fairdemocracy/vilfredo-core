@@ -1411,7 +1411,8 @@ def api_support_proposal_comment(question_id, proposal_id, comment_id):
     # Return updated supporters list
     supporters = comment.fetch_supporter_ids()
     return jsonify(message="Support added",
-                   supporters=str(supporters)), 201
+                   supporters=str(supporters),
+                   num_supporters = len(supporters)), 201
 
 
 # Unsupport Comment
@@ -1494,7 +1495,8 @@ def api_unsupport_proposal_comment(question_id, proposal_id, comment_id):
     supporters = comment.fetch_supporter_ids()
     app.logger.debug("Updated supporters list==> %s", supporters)
     return jsonify(message="Support removed",
-                   supporters=str(supporters)), 201
+                   supporters=str(supporters),
+                   num_supporters = len(supporters)), 201
 
 
 #
@@ -1874,7 +1876,7 @@ def api_add_proposal_comment(question_id, proposal_id):
                 db_session.commit()
                 response = new_comment.get_public()
                 response['question_count'] = str(proposal.get_question_count())
-                response['comment_count'] = str(proposal.get_comment_count())
+                response['comment_count'] = proposal.get_comment_count()
                 return jsonify(comment=response), 201
 
 
