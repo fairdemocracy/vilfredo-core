@@ -2547,15 +2547,15 @@ def api_create_proposal(question_id):
             len(request.json['abstract']) > MAX_LEN_PROPOSAL_ABSTRACT:
         return jsonify(message="Proposal abstract name must less than " + str(MAX_LEN_PROPOSAL_ABSTRACT) + " characters"), 400
 
-    title = request.json.get('title')
+    title = request.json.get('title').strip()
     if question.check_for_duplicate_proposal_title(title):
         return jsonify(message = "A proposal with that title already exists for this question"), 404
 
-    blurb = request.json.get('blurb')
+    blurb = request.json.get('blurb').strip()
     if question.check_for_duplicate_proposal_blurb(blurb):
         return jsonify(message = "A proposal with that content already exists for this question"), 404
 
-    abstract = request.json.get('abstract', '')
+    abstract = request.json.get('abstract', '').strip()
 
     source = 0
     if 'source' in request.json:
