@@ -28,7 +28,7 @@ from sqlalchemy import and_, or_, not_, event, distinct, func
 
 from database import db_session, db
 
-import datetime, math, time
+import datetime, math, time, pytz
 
 import copy, os, glob
 
@@ -1809,7 +1809,7 @@ class Question(db.Model):
                 'title': self.title,
                 'blurb': self.blurb,
                 'generation': self.generation,
-                'created': str(self.created),
+                'created': datetime.datetime.fromtimestamp(self.created, tz=pytz.utc).strftime("%Y-%m-%dT%H:%M:%S Z"),
                 "last_move_on": str(self.last_move_on),
                 "minimum_time": str(self.minimum_time),
                 "maximum_time": str(self.maximum_time),
@@ -1987,7 +1987,7 @@ class Question(db.Model):
     
     def get_participants(self):
         '''
-        .. function:: get_participant_permissions()
+        .. function:: get_participants()
 
         Get a question's participants.
 
@@ -2037,7 +2037,7 @@ class Question(db.Model):
         invitations = self.invites.all()
         if not invitations is None:
             for invitation in invitations:
-                participants.append({'username': invitation.receiver.username, 'user_id': str(invitation.receiver.id), 'permissions': str(invitation.permissions)})
+                participants.append({'username': invitation.receiver.username, 'user_id': invitation.receiver.id, 'permissions': invitation.permissions})
 
         return participants
     

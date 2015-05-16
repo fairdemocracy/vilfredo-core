@@ -1623,7 +1623,7 @@ def api_get_proposal_comments(question_id, proposal_id, comment_id=None):
         for c in comments:
             results.append(c.get_public())
 
-        return jsonify(total_items=total_items, items=str(items),
+        return jsonify(total_items=total_items, items=items,
                        comments=results), 200
 
 
