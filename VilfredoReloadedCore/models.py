@@ -520,6 +520,11 @@ class User(db.Model, UserMixin):
                               primaryjoin="User.id==UserInvite.receiver_id",
                               backref="invited", lazy='dynamic',
                               cascade="all, delete-orphan")
+                              
+    email_invites_sent = db.relationship("EmailInvite",
+                              primaryjoin="User.id==EmailInvite.sender_id",
+                              backref="sender", lazy='dynamic',
+                              cascade="all, delete-orphan")
 
     comments = db.relationship(
         'Comment',
@@ -694,6 +699,36 @@ class User(db.Model, UserMixin):
         '''
         self.comments.append(comment)
 
+    def get_invitations_sent(self, question):
+        '''
+        .. function:: get_invitations_sent()
+
+        Get a question's invitations and their associatd permissions.
+
+        :rtype: list
+        '''
+        invitations_sent = self.invites_sent.filter_by(question_id=question.id).all()
+        invitations = list()
+        for invitation in invitations_sent:
+            invitations.append({'username': invitation.receiver.username, 'user_id': invitation.receiver.id, 'permissions': invitation.permissions})
+
+        return invitations
+
+    def get_email_invitations_sent(self, question):
+        '''
+        .. function:: get_email_invitations_sent()
+
+        Get a question's invitations and their associatd permissions.
+
+        :rtype: list
+        '''
+        invitations_sent = self.email_invites_sent.filter_by(question_id=question.id).all()
+        invitations = list()
+        for invitation in invitations_sent:
+            invitations.append({'email': invitation.receiver_email, 'permissions': invitation.permissions})
+
+        return invitations
+    
     def get_uninvited_associated_users_by_invitation(self, question): 
         '''
         .. function:: get_uninvited_associated_users_by_invitation()
@@ -1493,10 +1528,6 @@ class EmailInvite(db.Model):
     email_sent = db.Column(db.Boolean, unique=False, default=False)
     accepted = db.Column(db.Boolean, unique=False, default=False)
 
-    sender = db.relationship("User",
-                             primaryjoin="EmailInvite.sender_id==User.id",
-                             backref="email_invites_sent",
-                             lazy='static', single_parent=True)
 
     def get_public(self):
         '''
@@ -1599,6 +1630,7 @@ class UserInvite(db.Model):
         return {'id': self.id,
                 'sender_id': self.sender_id,
                 'sender_username': self.sender.username,
+                'receiver_username': self.receiver.username,
                 'receiver_id': self.receiver_id,
                 'question_id': self.question_id,
                 'question_title': self.question.title,
@@ -2024,7 +2056,7 @@ class Question(db.Model):
 
         count = query.count()
         return count != 0
-
+    
     def get_participant_permissions(self):
         '''
         .. function:: get_participant_permissions()

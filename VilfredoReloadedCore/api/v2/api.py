@@ -3645,10 +3645,14 @@ def api_get_question_participants(question_id):
         return jsonify(message = "You do not have permission to view this question"), 404
 
     permissions = question.get_participant_permissions()
+    invitations_sent = user.get_invitations_sent(question)
+    email_invitations_sent = user.get_email_invitations_sent(question)
 
     return jsonify(question_id=str(question.id),
                    num_items=str(len(permissions)),
-                   permissions=permissions), 200
+                   permissions=permissions,
+                   invitations_sent=invitations_sent,
+                   email_invitations_sent=email_invitations_sent), 200
 
 # Get Proposal Endorsers
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/proposals/' +
