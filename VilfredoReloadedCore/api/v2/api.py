@@ -3473,7 +3473,7 @@ def api_new_invites(user_id):
     for invite in new_invitations:
         invites.append(invite.get_public())
 
-    return jsonify(num_items=str(len(invites)),
+    return jsonify(num_items=len(invites),
                    invites=invites), 200
 
 
@@ -3647,8 +3647,8 @@ def api_get_question_participants(question_id):
     invitations_sent = user.get_invitations_sent(question)
     email_invitations_sent = user.get_email_invitations_sent(question)
 
-    return jsonify(question_id=str(question.id),
-                   num_items=str(len(permissions)),
+    return jsonify(question_id=question.id,
+                   num_items=len(permissions),
                    permissions=permissions,
                    invitations_sent=invitations_sent,
                    email_invitations_sent=email_invitations_sent), 200
