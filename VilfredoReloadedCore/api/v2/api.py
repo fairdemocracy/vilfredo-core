@@ -1068,9 +1068,8 @@ def api_create_question():
 
         :json title: question title
         :json blurb: question content
-        :json room: question room
-        :json minimum_time: minimum time before question can be moved on
-        :json maximum_time: maximum time before question is automatically moved on
+        :json question_type: proposal type
+        :json voting_type: voting type
         :statuscode 201: no error
         :statuscode 400: bad request
     '''
