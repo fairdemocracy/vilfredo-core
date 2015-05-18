@@ -701,10 +701,12 @@ class User(db.Model, UserMixin):
 
     def get_invitations_sent(self, question):
         '''
-        .. function:: get_invitations_sent()
+        .. function:: get_invitations_sent(question)
 
-        Get a question's invitations and their associatd permissions.
+        Get a list of invitations and their associated permissions.
 
+        :param question: question
+        :type question: Question
         :rtype: list
         '''
         invitations_sent = self.invites_sent.filter_by(question_id=question.id).all()
@@ -718,8 +720,10 @@ class User(db.Model, UserMixin):
         '''
         .. function:: get_email_invitations_sent()
 
-        Get a question's invitations and their associatd permissions.
+        Get a list of email invitations and their associated permissions.
 
+        :param question: question
+        :type question: Question
         :rtype: list
         '''
         invitations_sent = self.email_invites_sent.filter_by(question_id=question.id).all()
@@ -736,6 +740,8 @@ class User(db.Model, UserMixin):
         Get all users who participated in OTHER questions also participated in
         by this user.
 
+        :param question: question
+        :type question: Question
         :rtype: list
         '''
         invited_uids = set()
@@ -760,6 +766,8 @@ class User(db.Model, UserMixin):
         Get all users who participated in OTHER questions also participated in
         by this user.
 
+        :param question: question
+        :type question: Question
         :rtype: list
         '''
         invited_uids = set()
@@ -808,6 +816,8 @@ class User(db.Model, UserMixin):
 
         Get user if associated with this user.
 
+        :param userid: user ID
+        :type userid: int
         :rtype: User or None
         '''
 
@@ -842,6 +852,7 @@ class User(db.Model, UserMixin):
 
         Get all users associated with this user.
 
+         
         :rtype: flask.ext.sqlalchemy.Pagination
         '''
         page = page or 1
