@@ -587,7 +587,7 @@ class User(db.Model, UserMixin):
         return avatar
 
     @staticmethod
-    def resize_avatars():
+    def resize_avatars(maxsize=100):
         '''
         .. function:: resize_avatars()
 
@@ -596,22 +596,50 @@ class User(db.Model, UserMixin):
         :rtype: None
         '''
         from PIL import Image
-        thumbnail_size = (100, 100)
+        thumbnail_size = (maxsize, maxsize)
         current_dir = os.path.dirname(os.path.realpath(__file__))
         avatar_path = os.path.join(current_dir, app.config['UPLOADED_AVATAR_DEST'])
         for dirName, subdirList, fileList in os.walk(avatar_path, topdown=False):
+            has_thumbnail = False
             for fname in fileList:
-                # print(fname)
-                # print(os.path.join(dirName, fname))
-                avatar_file = os.path.join(dirName, fname)
+                if '-thumb' in fname:
+                    has_thumbnail = True
+                    break
+            if has_thumbnail:
+                continue
+
+            for fname in fileList:
+                # Test for system files, like .DS_Store on Mac
+                if fname[0] == '.':
+                    continue
+
+                current_avatar_path = os.path.join(dirName, fname)
+                thumbnail_filname = None
+                
+                if '-thumb' not in fname:
+                    split_filename = os.path.splitext(fname)
+                    thumbnail_filname = split_filename[0] + '-thumb' + split_filename[1]
+                    app.logger.debug("%s Renaming image file %s to %s", dirName, fname, thumbnail_filname)
+                else:
+                    thumbnail_filname = fname
+
+                thumbnail_outfile = os.path.join(dirName, thumbnail_filename)
+                
                 try:
                     thumbnail = Image.open(avatar_file)
-                    thumbnail.thumbnail(thumbnail_size)
-                    app.logger.debug("Saving avatar %s to %s", thumbnail, avatar_file)
-                    thumbnail.save(avatar_file)
+                    scale = False
+                    for dim in thumbnail.size:
+                        if dim > maxsize:
+                            scale = True
+
+                    if scale:
+                        app.logger.debug("Scaling avatar %s", thumbnail_outfile)
+                        thumbnail.thumbnail(thumbnail_size)
+                    
+                    app.logger.debug("Saving avatar to %s", thumbnail_outfile)
+                    #thumbnail.save(thumbnail_outfile)
                 except IOError:
-                    pass
-                    # app.logger.debug("set_avatar: Failed to create thumbnail")
+                    app.logger.debug("Failed to process file %s - perhaps not image", avatar_file)
     
     def set_avatar(self, avatar):
         '''
@@ -633,39 +661,43 @@ class User(db.Model, UserMixin):
                 app.logger.debug('Failed to create map path %s', avatar_path)
                 return False
         else:
-            app.logger.info("deleting current file in avatar path = %s", os.path.join(avatar_path, '*'))
+            app.logger.info("deleting current files in avatar path = %s", os.path.join(avatar_path, '*'))
             test_user_avatar_path = os.path.join(current_dir, app.config['UPLOADED_AVATAR_DEST'], str(self.id), '*')
             files = glob.glob(test_user_avatar_path)
             if len(files) > 0:
-                os.remove(files[0])
+                for f in files:
+                    os.remove(f)
 
         from werkzeug import secure_filename
         filename = secure_filename(avatar.filename)
         fix_filename = os.path.splitext(filename)
-        avatar.filename = hash_string(filename) + fix_filename[1]
+        file_extension = fix_filename[1]
+        hashed = hash_string(filename)
+        
+        avatar_filename = hashed + file_extension
+        thumbnail_filename = hashed + '-thumb' + file_extension
 
-        #app.logger.debug("Saving avatar to %s", os.path.join(avatar_path, avatar.filename))
-        #avatar.save(os.path.join(avatar_path, avatar.filename))
+        app.logger.debug("Saving avatar to %s", os.path.join(avatar_path, avatar_filename))
+        avatar.save(os.path.join(avatar_path, avatar_filename))
         
         # create thumbnail from image
         from PIL import Image
         thumbnail_size = (100, 100)
-        file_extension = fix_filename[1]
         app.logger.debug("file_extension = %s", file_extension)
-        outfile = os.path.join(avatar_path, avatar.filename)
+        thumbnail_outfile = os.path.join(avatar_path, thumbnail_filename)
         try:
             thumbnail = Image.open(avatar)
             thumbnail.thumbnail(thumbnail_size)
-            app.logger.debug("Saving avatar to %s", outfile)
-            thumbnail.save(outfile)
+            app.logger.debug("Saving avatar to %s", thumbnail_outfile)
+            thumbnail.save(thumbnail_outfile)
         except IOError:
             app.logger.debug("set_avatar: Failed to create thumbnail")
             return False
 
-        if not os.path.isfile(os.path.join(avatar_path, avatar.filename)):
+        if not os.path.isfile(thumbnail_outfile):
             return False
         else:
-            return os.path.join(app.config['UPLOADED_AVATAR_DEST'], str(self.id), avatar.filename)
+            return os.path.join(app.config['PROFILE_PICS'], str(self.id), thumbnail_filename)
 
     def get_avatar(self):
         '''
@@ -677,7 +709,7 @@ class User(db.Model, UserMixin):
         '''
         current_dir = os.path.dirname(os.path.realpath(__file__))
         avatar = ''
-        test_user_avatar_path = os.path.join(current_dir, app.config['UPLOADED_AVATAR_DEST'], str(self.id), '*')
+        test_user_avatar_path = os.path.join(current_dir, app.config['UPLOADED_AVATAR_DEST'], str(self.id), '*-thumb*')
         app.logger.debug("test_user_avatar_path = %s", test_user_avatar_path)
         files = glob.glob(test_user_avatar_path)
         app.logger.debug("test_user_avatar_path = %s", files)
