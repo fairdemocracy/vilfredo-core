@@ -626,7 +626,7 @@ class User(db.Model, UserMixin):
                 thumbnail_outfile = os.path.join(dirName, thumbnail_filename)
                 
                 try:
-                    thumbnail = Image.open(avatar_file)
+                    thumbnail = Image.open(current_avatar_path)
                     scale = False
                     for dim in thumbnail.size:
                         if dim > maxsize:
