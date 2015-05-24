@@ -604,6 +604,7 @@ class User(db.Model, UserMixin):
             for fname in fileList:
                 if '-thumb' in fname:
                     has_thumbnail = True
+                    app.logger.debug("%s Thumbnail exists: OK %s", dirName, fname)
                     break
             if has_thumbnail:
                 continue
@@ -614,14 +615,14 @@ class User(db.Model, UserMixin):
                     continue
 
                 current_avatar_path = os.path.join(dirName, fname)
-                thumbnail_filname = None
+                thumbnail_filename = None
                 
                 if '-thumb' not in fname:
                     split_filename = os.path.splitext(fname)
-                    thumbnail_filname = split_filename[0] + '-thumb' + split_filename[1]
-                    app.logger.debug("%s Renaming image file %s to %s", dirName, fname, thumbnail_filname)
+                    thumbnail_filename = split_filename[0] + '-thumb' + split_filename[1]
+                    app.logger.debug("%s Renaming image file %s to %s", dirName, fname, thumbnail_filename)
                 else:
-                    thumbnail_filname = fname
+                    thumbnail_filename = fname
 
                 thumbnail_outfile = os.path.join(dirName, thumbnail_filename)
                 
@@ -635,9 +636,11 @@ class User(db.Model, UserMixin):
                     if scale:
                         app.logger.debug("Scaling avatar %s", thumbnail_outfile)
                         thumbnail.thumbnail(thumbnail_size)
+                    else:
+                        app.logger.debug("Avatar %s size OK - no need to scale", thumbnail_outfile)
                     
                     app.logger.debug("Saving avatar to %s", thumbnail_outfile)
-                    #thumbnail.save(thumbnail_outfile)
+                    thumbnail.save(thumbnail_outfile)
                 except IOError:
                     app.logger.debug("Failed to process file %s - perhaps not image", avatar_file)
     
