@@ -99,7 +99,7 @@ You should have an account with writing privileges.
     cd
     mkdir vilfredo
     cd vilfredo
-    git clone git@git.ahref.eu:vilfredo/vilfredo-reloaded-core.git
+    git clone https://github.com/fairdemocracy/vilfredo-core.git
     cd vilfredo-reloaded-core
     git checkout -b develop origin/develop
 
