@@ -8052,6 +8052,7 @@ class Proposal(db.Model):
         '''
         endorsement = self.endorsements.filter(and_(
             Endorsement.user_id == endorser.id,
+            Endorsement.generation == self.question.generation,
             Endorsement.proposal_id == self.id)).first()
         if endorsement:
             endorsement.endorsement_type = endorsement_type
