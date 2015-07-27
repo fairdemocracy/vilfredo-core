@@ -48,7 +48,7 @@ Developer Instructions
 Requirements
 ------------
 
-This guide assumes that you develop ``vilfredo-reloaded-core`` on a ``Debian/GNU
+This guide assumes that you develop ``vilfredo-core`` on a ``Debian/GNU
 Linux`` version ``Wheezy``.
 
 .. code:: sh
@@ -100,14 +100,14 @@ You should have an account with writing privileges.
     mkdir vilfredo
     cd vilfredo
     git clone https://github.com/fairdemocracy/vilfredo-core.git
-    cd vilfredo-reloaded-core
+    cd vilfredo-core
     git checkout -b develop origin/develop
 
 
 Development
 -----------
 
-``vilfredo-reloaded-core`` is developed as a python packages.  The ``develop``
+``vilfredo-core`` is developed as a python packages.  The ``develop``
 command will download and install the requirements.
 
 .. code:: sh
@@ -120,7 +120,7 @@ You can start developing following the issues for your milestone.
 Testing
 -------
 
-``vilfredo-reloaded-core`` follow a strict testing procedure.  Before every
+``vilfredo-core`` follow a strict testing procedure.  Before every
 commit you must check that the test pass and that the source code respect the
 best practices defined by the ``python`` community.
 
@@ -200,7 +200,7 @@ Open sourcetree and clone the project:
 
 	https://github.com/fairdemocracy/vilfredo-core.git
 
-choosing the directory. I used Desktop/projects/vilfredo-reloaded-core/
+choosing the directory. I used Desktop/projects/vilfredo-core/
 
 if not go to the directory where you want to clone it and type:
 
@@ -212,7 +212,7 @@ then go to the directory and check that the project is there
 
 .. code:: sh
 
-    cd Desktop/projects/vilfredo-reloaded-core/
+    cd Desktop/projects/vilfredo-core/
     python setup.py develop
 
 once you have run the develop and installed everything. You run it by typing vr in the shell.
