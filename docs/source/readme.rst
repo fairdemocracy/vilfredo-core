@@ -69,7 +69,7 @@ If not just follow the following suggestions:
     cd
     mkdir ve
     cd ve
-    vitutualenv vilfredo-ve
+    virtualenv vilfredo-ve
     . vilfredo-ve/bin/activate
 
 .. warning::
