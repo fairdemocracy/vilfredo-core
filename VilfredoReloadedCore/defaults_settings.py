@@ -49,6 +49,15 @@ LOG_FILE_PATH = '/var/tmp/vr.log'
 # Set path to pickle work files
 WORK_FILE_DIRECTORY = '/var/tmp/work'
 
+
+# Log performance profile
+PROFILE = False
+# Set path to log file directory
+PROFILE_LOG_PATH = WORK_FILE_DIRECTORY + '/profile_logs'
+# Set path to log file
+PROFILE_LOG = 'profile.log' 
+
+
 # Set max upload file size 
 MAX_CONTENT_LENGTH = 2 * 1024 * 1024
 

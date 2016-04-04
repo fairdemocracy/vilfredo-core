@@ -70,17 +70,21 @@ from flask.ext.cdn import CDN
 
 
 def config_app(app):
-    # Load setting using various methods
-    # TODO: do relative o package import
+    # Load settings (summing defaults and custom config)
+    # TODO: We should do a relative or package import
     app.config.from_object('VilfredoReloadedCore.defaults_settings')
-    # TODO: document the VCR_VARIABLE
-    if 'VILFREDO_SETTINGS' in os.environ:
-	    config = os.path.join(os.environ['VILFREDO_SETTINGS'], 'settings.cfg')
-	    if os.path.isfile(config):
-	        app.config.from_pyfile(config, silent=True)
-    #app.config.from_envvar('VILFREDO_SETTINGS', silent=True)
-    #config = os.path.join(app.root_path, 'settings.cfg')
-    #app.config.from_pyfile(config, silent=True)
+    config = os.path.join(app.root_path, 'settings.cfg')
+    if os.path.isfile(config):
+        app.config.from_pyfile(config)
+        app.logger.info("Loading config file: "+config)
+    elif 'VILFREDO_SETTINGS' in os.environ:
+      config = os.path.join(os.environ['VILFREDO_SETTINGS'], 'settings.cfg')
+      if os.path.isfile(config):
+          app.config.from_pyfile(config)
+          app.logger.info("Loading config file: "+os.path.join(os.environ['VILFREDO_SETTINGS'], 'settings.cfg'))
+      else:
+          app.logger.warning('Failed to load configuration file from VILFREDO_SETTINGS: %s', config)
+
 
 app = Flask(__name__, static_url_path='')
 config_app(app)
@@ -92,15 +96,35 @@ mail = Mail(app)
 
 CDN(app)
 
+if not os.path.exists(app.config['WORK_FILE_DIRECTORY']):
+    try:
+        os.makedirs(app.config['WORK_FILE_DIRECTORY'])
+    except IOError:
+        raise SystemExit('Failed to create work directory %s', app.config['WORK_FILE_DIRECTORY'])
+
+if not os.path.exists(app.config['PROFILE_LOG_PATH']):
+    try:
+        os.makedirs(app.config['PROFILE_LOG_PATH'])
+    except IOError:
+        raise SystemExit('Failed to create profile log directory %s', app.config['PROFILE_LOG_PATH'])
+
+
+if app.config['PROFILE']:
+    from werkzeug.contrib.profiler import ProfilerMiddleware
+    # ProfilerMiddleware(app, stream=None, sort_by=('cumulative', 'time', 'calls'), restrictions=(), profile_dir=None)
+    if app.config['PROFILE_LOG']:
+      try:
+          log_file_path = os.path.join(app.config['PROFILE_LOG_PATH'], app.config['PROFILE_LOG'])
+          profile_log = open(log_file_path, "a")
+          app.wsgi_app = ProfilerMiddleware(app.wsgi_app, sort_by=('time', 'calls'), stream=profile_log, restrictions=[30])
+      except IOError:
+          raise SystemExit('Failed to create profile log file %s', app.config['PROFILE_LOG'])
+    else:
+      app.wsgi_app = ProfilerMiddleware(app.wsgi_app, sort_by=('time', 'calls'), restrictions=[30])
+
+
 from flask_util_js import FlaskUtilJs
 fujs = FlaskUtilJs(app)
-
-# Passing mode='w' to file handler not causing overwrite
-if os.path.isfile(app.config['LOG_FILE_PATH']):
-    try:
-        os.remove(app.config['LOG_FILE_PATH'])
-    except IOError:
-        print 'Failed to delete log file ' + app.config['LOG_FILE_PATH']
 
 # Logging
 import logging
