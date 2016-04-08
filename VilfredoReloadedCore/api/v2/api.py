@@ -1128,6 +1128,9 @@ def api_create_question():
     title = request.json.get('title')
     question_type = request.json.get('question_type', 1)
     voting_type = request.json.get('voting_type', 1)
+
+    # Get author permissions - defaults to VOTE_PROPOSE_READ
+    author_permissions = int(request.json.get('permissions', models.Question.VOTE_PROPOSE_READ))
                   
     question = models.Question(author=user, 
                                title=title,
@@ -1140,7 +1143,8 @@ def api_create_question():
 
     # Set default threshold for voting map
     question.thresholds.append(models.Threshold(question))
-    user.invites.append(models.Invite(user, user.id, models.Question.VOTE_PROPOSE_READ, question.id))
+    # Set author permissions
+    user.invites.append(models.Invite(user, user.id, author_permissions, question.id))
     db_session.commit()
 
     # url = {'url': url_for('api_get_questions', question_id=question.id)}
