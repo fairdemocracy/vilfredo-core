@@ -1098,17 +1098,17 @@ def api_create_question():
         response = {'message': "Question text must not be empty and no longer than " + str(MAX_LEN_QUESTION_BLURB) + " characters"}
         return jsonify(response), 400
         
-    elif 'question_type' in request.json and (not isinstance( request.json['question_type'], int )\
+    elif not 'question_type' in request.json or 'question_type' in request.json and (not isinstance( request.json['question_type'], int )\
          or not request.json['question_type'] in (1,2)):
-        return jsonify(message="Invalid parameter question_type"), 400
+        return jsonify(message="Invalid or missing parameter question_type"), 400
     
-    elif 'voting_type' in request.json and (not isinstance( request.json['voting_type'], int )\
+    elif not 'voting_type' in request.json or 'voting_type' in request.json and (not isinstance( request.json['voting_type'], int )\
          or not request.json['voting_type'] in (1,2)):
-        return jsonify(message="Invalid parameter voting_type"), 400
+        return jsonify(message="Invalid or missing parameter voting_type"), 400
     
-    elif 'permissions' in request.json and (not isinstance( request.json['permissions'], int )\
+    elif not 'permissions' in request.json or 'permissions' in request.json and (not isinstance( request.json['permissions'], int )\
          or not request.json['permissions'] in (1,3,5,7)):
-        return jsonify(message="Invalid parameter permissions"), 400
+        return jsonify(message="Invalid or missing parameter permissions"), 400
 
 
     # Check link count in blurb
@@ -3054,6 +3054,18 @@ def api_edit_question(question_id):
         message = {"message": "Missing or empty content field"}
         return jsonify(message), 400
 
+    elif not 'question_type' in request.json or 'question_type' in request.json and 'question_type' in request.json and (not isinstance( request.json['question_type'], int )\
+         or not request.json['question_type'] in (1,2)):
+        return jsonify(message="Invalid or missing parameter question_type"), 400
+
+    elif not 'voting_type' in request.json or 'voting_type' in request.json and (not isinstance( request.json['voting_type'], int )\
+         or not request.json['voting_type'] in (1,2)):
+        return jsonify(message="Invalid or missing parameter voting_type"), 400
+
+    elif not 'permissions' in request.json or 'permissions' in request.json and (not isinstance( request.json['permissions'], int )\
+         or not request.json['permissions'] in (1,3,5,7)):
+        return jsonify(message="Invalid or missing parameter permissions"), 400
+
     # Check link count in blurb
     blurb = request.json.get('blurb')
     num_links = blurb.count('http')
@@ -3075,9 +3087,22 @@ def api_edit_question(question_id):
     
     question.blurb = blurb
     question.title = request.json.get('title')
+    question.question_type_id = request.json.get('question_type', 1)
+    question.voting_type_id = request.json.get('voting_type', 1)
 
+    # Get author permissions - defaults to VOTE_PROPOSE_READ
+    author_permissions = int(request.json.get('permissions', models.Question.VOTE_PROPOSE_READ))
+
+    # Update question
     db_session.add(question)
     db_session.commit()
+
+    # Update author permissions
+    # user.invites.append(models.Invite(user, user.id, author_permissions, question.id))
+    invite = user.invites.filter_by(receiver_id=user.id,question_id=question.id).first()
+    invite.permissions = author_permissions
+    db_session.commit()
+
     return jsonify(message="Question updated"), 200
 
 

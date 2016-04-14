@@ -287,6 +287,27 @@ def new_question():
     else:
         return render_template("newquestion.html")
 
+@app.route('/editquestion')
+def edit_question():
+    '''
+    .. http:get:: /editquestion
+
+        Goto edit question page.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            GET http://exampl.com/editquestion HTTP/1.1
+            Host: example.com
+            Accept: application/json
+    '''
+    auth = request.cookies.get('vgaclient')
+    if not auth:
+        return redirect(redirect_url())
+    else:
+        return render_template("editquestion.html")
+
 @app.route('/lostpassword')
 def lost_password():
     '''
