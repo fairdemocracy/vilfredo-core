@@ -1105,6 +1105,11 @@ def api_create_question():
     elif 'voting_type' in request.json and (not isinstance( request.json['voting_type'], int )\
          or not request.json['voting_type'] in (1,2)):
         return jsonify(message="Invalid parameter voting_type"), 400
+    
+    elif 'permissions' in request.json and (not isinstance( request.json['permissions'], int )\
+         or not request.json['permissions'] in (1,3,5,7)):
+        return jsonify(message="Invalid parameter permissions"), 400
+
 
     # Check link count in blurb
     blurb = request.json.get('blurb')
