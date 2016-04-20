@@ -59,8 +59,6 @@ MAX_LEN_PROPOSAL_QUESTION = 1000
 MAX_LEN_PROPOSAL_QUESTION_ANSWER = 1000
 ENDORSEMENT_TYPES = ['endorse', 'oppose', 'confused']
 COMMENT_TYPES = ['for', 'against', 'question', 'answer']
-PWD_RESET_LIFETIME = 3600*24*2
-EMAIL_VERIFY_LIFETIME = 3600*24*2
 
 
 # &hellip; ....
@@ -571,7 +569,7 @@ def api_upload_avatar():
     '''
     .. http:post:: /upload_avatar
 
-        Request password reset.
+        Upload user avatar.
 
         **Example request**:
 
@@ -689,20 +687,43 @@ def api_request_password_reset():
     pwd_reset = db_session.query(models.PWDReset)\
             .filter(models.PWDReset.email == email)\
             .first()
-    if pwd_reset:
-        message = "A password had already been requested for this address. Please check your spam folder."
-        return jsonify(message=message), 403
 
-    pwd_reset_token = uuid.uuid4().get_hex()
-    timeout = models.get_timestamp() + PWD_RESET_LIFETIME
-    pwd_reset = models.PWDReset(user, pwd_reset_token, timeout)
-    db_session.add(pwd_reset)
-    db_session.commit()
-    # email reset token to user
-    ret_code = emails.send_password_reset_email(email, pwd_reset_token)
-    app.logger.debug("api_request_password_reset: Ret Code from send_password_reset_email = %s", ret_code)
-    message = 'Password reset email sent'
-    return jsonify(message=message), 201
+    if pwd_reset:
+        # Resend if token still valid
+        if pwd_reset.timeout > models.get_timestamp():
+            # Resend if token still valid
+            app.logger.debug('Valid token found. Resending to %s', email)
+            ret_code = emails.send_password_reset_email(email, pwd_reset.token)
+            app.logger.debug("api_request_password_reset: Password reset token rsent to address %s", email)
+            message = 'The password reset token has been resent to your address. Please check your spam folder.'
+            return jsonify(message=message), 201
+        else:
+            # Reset token and timeout
+            app.logger.debug('Expired token found. Resend new token to %s', email)
+            pwd_reset.token = uuid.uuid4().get_hex()
+            pwd_reset.timeout = models.get_timestamp() + app.config['PWD_RESET_LIFETIME']
+            db_session.add(pwd_reset)
+            db_session.commit()
+            # email reset token to user
+            app.logger.debug('Resending new password reset token to %s', email)
+            ret_code = emails.send_password_reset_email(email, pwd_reset.token)
+            app.logger.debug("api_request_password_reset: Ret Code from send_password_reset_email = %s", ret_code)
+            message = 'A new password reset token has been sent to your address. Please check your spam folder.'
+            return jsonify(message=message), 201
+
+    # else generate a new token
+    else:
+        app.logger.debug('Send new password reset token to %s', email)
+        pwd_reset_token = uuid.uuid4().get_hex()
+        timeout = models.get_timestamp() + app.config['PWD_RESET_LIFETIME']
+        pwd_reset = models.PWDReset(user, pwd_reset_token, timeout)
+        db_session.add(pwd_reset)
+        db_session.commit()
+        # email reset token to user
+        ret_code = emails.send_password_reset_email(email, pwd_reset_token)
+        app.logger.debug("api_request_password_reset: Ret Code from send_password_reset_email = %s", ret_code)
+        message = 'A password reset token has been sent to your address. Please check your spam folder.'
+        return jsonify(message=message), 201
 
 
 #
@@ -763,6 +784,13 @@ def api_reset_password():
 
     if not pwd_reset:
         response = {"message": "Invalid password reset token"}
+        return jsonify(response), 400
+
+    # Check for expired reset token entry
+    elif pwd_reset.timeout < models.get_timestamp():
+        # Delete expired reset token entry
+        db_session.delete(pwd_reset)
+        response = {"message": "This password reset token has expired. Please request a new one if still required."}
         return jsonify(response), 400
 
     user = models.User.query.get(pwd_reset.user_id)
@@ -914,7 +942,7 @@ def api_create_user():
     if verify_new_users_email_adress and os.environ.get('EMAIL_VALIDATION_OFF', '0') == '0':
         email = request.json['email']
         token = uuid.uuid4().get_hex()
-        timeout = models.get_timestamp() + EMAIL_VERIFY_LIFETIME
+        timeout = models.get_timestamp() + app.config['EMAIL_VERIFY_LIFETIME']
         verify_email = models.VerifyEmail(user, email, token, timeout)
         ret_code = emails.send_email_verification(user.id, email, token)
         app.logger.debug("api_create_user: Ret Code from send_email_verification = %s", ret_code)
