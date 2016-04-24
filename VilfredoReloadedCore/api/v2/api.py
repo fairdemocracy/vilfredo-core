@@ -31,7 +31,7 @@ from flask import request,\
 from VilfredoReloadedCore import app, models, emails
 from VilfredoReloadedCore.auth import login_manager, login_serializer
 from VilfredoReloadedCore.database import db_session
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 from functools import wraps
 from flask import Response
 import json, os
@@ -676,14 +676,16 @@ def api_request_password_reset():
         message = "A valid email is required"
         return jsonify(message=message), 402
 
-    email = request.json['email']
-    app.logger.debug("Reset Email given = %s\n", email)
-    user = models.User.query.filter_by(email=email).first()
-    app.logger.debug("DB OK")
+    user_data = request.json['email']
+    app.logger.debug("Reset data given = %s\n", user_data)
+    # user = models.User.query.filter_by(email=email).first()
+    user = models.User.query.filter(or_(models.User.username==user_data, models.User.email==user_data)).first()
+
     if not user:
-        message = "That is not a registered email address."
+        message = "Sorry, no user was found which matched your details."
         return jsonify(message=message), 403
 
+    email = user.email
     pwd_reset = db_session.query(models.PWDReset)\
             .filter(models.PWDReset.email == email)\
             .first()
