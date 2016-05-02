@@ -28,6 +28,7 @@ from . import app
 from email.mime.text import MIMEText
 from subprocess import Popen, PIPE
 import os
+from datetime import datetime, timedelta
 
 def send_email(subject, sender_email, recipient_email, text_body):
     if os.environ.get('EMAIL_OFF', '0') == '0':
@@ -44,7 +45,7 @@ def send_email(subject, sender_email, recipient_email, text_body):
 
 def send_added_to_question_email(inviter, receiver, question):
     '''
-    .. function:: send_email_verification(email, token)
+    .. function:: send_added_to_question_email(email, token)
 
     Send an email to notify someone that they have been added to a question.
 
@@ -72,7 +73,7 @@ def send_added_to_question_email(inviter, receiver, question):
 
 def send_user_already_added_email(user, email, question):
     '''
-    .. function:: send_email_verification(email, token)
+    .. function:: send_user_already_added_email(email, token)
 
     Send an email to notify someone has already accepted an invitation.
 
@@ -99,7 +100,7 @@ def send_user_already_added_email(user, email, question):
 
 def send_email_invite_accepted_email(user, email, question):
     '''
-    .. function:: send_email_verification(email, token)
+    .. function:: send_email_invite_accepted_email(email, token)
 
     Send an email to notify someone has accepted an invitation.
 
@@ -189,7 +190,7 @@ def send_welcome_to_question_email(user, question):
 
 def send_moved_on_email(user, question):
     '''
-    .. function:: send_email_verification(email, token)
+    .. function:: send_moved_on_email(email, token)
 
     Send an email to notify that a question has moved on to a new stage.
 
@@ -214,7 +215,33 @@ def send_moved_on_email(user, question):
                                        app.config['SITE_DOMAIN'],
                                        question.id))
 
-def send_email_verification(user_id, email, token):
+
+def send_password_reset_email(email, token):
+   '''
+   .. function:: send_password_reset_email(email, token)
+
+   Send an email containing a link to allow someone to reset their password.
+
+   :param email: receiver email address
+   :type email: string
+   :param token: password reset token
+   :type token: string
+   :rtype: long
+   '''
+   body_template = \
+   """
+   Click on the link below to enter a new password.
+
+   Reset Password: %s%s
+   """
+   return send_email("Vilfredo - Password Reset Request",
+                     app.config['ADMINS'][0],
+                     email,
+                     body_template % (app.config['PROTOCOL'],
+                                      app.config['SITE_DOMAIN']+'/resetpwd/'+token))
+
+
+def send_email_verification(user_id, email, token, timeout):
     '''
     .. function:: send_email_verification(email, token)
 
@@ -232,37 +259,20 @@ def send_email_verification(user_id, email, token):
     
     Click on the link below to activate your account.
     
+    This activation link will expire in %s days at %s after which you will have to register again.
+    
     Activate Account: %s%s
     """
+    format = "%a %b %d %Y %H:%M:%S"
+    expires = datetime.fromtimestamp(timeout)
     return send_email("Vilfredo - Activate Your Account",
                       app.config['ADMINS'][0],
                       email,
-                      body_template % (app.config['PROTOCOL'],
+                      body_template % (app.config['EMAIL_VERIFY_LIFETIME'].days,
+                                       expires.strftime(format),
+                                       app.config['PROTOCOL'],
                                        app.config['SITE_DOMAIN']+'/activate'+'?u='+str(user_id)+'&t='+token))
 
-def send_password_reset_email(email, token):
-    '''
-    .. function:: send_password_reset_email(email, token)
-
-    Send an email containing a link to allow someone to reset their password.
-
-    :param email: receiver email address
-    :type email: string
-    :param token: password reset token
-    :type token: string
-    :rtype: long
-    '''
-    body_template = \
-    """
-    Click on the link below to enter a new password.
-    
-    Reset Password: %s%s
-    """
-    return send_email("Vilfredo - Password Reset Request",
-                      app.config['ADMINS'][0],
-                      email,
-                      body_template % (app.config['PROTOCOL'],
-                                       app.config['SITE_DOMAIN']+'/resetpwd/'+token))
 
 def send_question_email_invite_email(sender, recipient_email, question, token):
     '''
@@ -288,7 +298,7 @@ def send_question_email_invite_email(sender, recipient_email, question, token):
     %s invites you to participate in the question "%s" on Vilfredo.
     
     If you wish to participate please click on the link below and follow the instructions.
-    
+        
     Click to participate: %s%s
     """
     return send_email("Vilfredo - Invitation to participate",

@@ -218,15 +218,6 @@ def activate():
         resp.set_cookie('vgastatus', 'error')
         return resp
 
-    elif models.get_timestamp() > verify.timeout:
-        app.logger.debug("Account Activation: Token expired...\n")
-        resp.set_cookie('vgamessage', 'Sorry, this token has expired. Please register again.')
-        resp.set_cookie('vgastatus', 'error')
-        # Delete validation entry
-        db_session.delete(verify)
-        db_session.commit()
-        return resp
-
     user =  models.User.query.get(verify.user_id)
     if not user:
         app.logger.debug("Account Activation: Unknown user...\n")
@@ -236,18 +227,28 @@ def activate():
         db_session.delete(verify)
         db_session.commit()
         return resp
+    elif models.get_timestamp() > verify.timeout:
+        app.logger.debug("Account Activation: Token expired...\n")
+        resp.set_cookie('vgamessage', 'Sorry that activation link has expired. Please register again.')
+        resp.set_cookie('vgastatus', 'error')
+        # Delete validation entry
+        db_session.delete(verify)
+        # Delete registered user details
+        db_session.delete(user)
+        db_session.commit()
+        return resp
+    else:
+        # app.logger.debug("Account Activation: Success! User %s %s activated!\n" % str(user.id), user.username)
+        # Delete validation entry
+        db_session.delete(verify)
+        db_session.commit()
+        # Log user in
+        auth_token = user.get_auth_token()
+        resp.set_cookie('vgaclient', auth_token)
+        resp.set_cookie('vgastatus', 'success')
+        resp.set_cookie('vgamessage', 'Hey %s! Your account is now active. Welcome to Vilfredo!' % user.username)
 
-    # app.logger.debug("Account Activation: Success! User %s %s activated!\n" % str(user.id), user.username)
-    # Delete validation entry
-    db_session.delete(verify)
-    db_session.commit()
-    # Log user in
-    auth_token = user.get_auth_token()
-    resp.set_cookie('vgaclient', auth_token)
-    resp.set_cookie('vgastatus', 'success')
-    resp.set_cookie('vgamessage', 'Hey %s! Your account is now active. Welcome to Vilfredo!' % user.username)
-
-    return resp
+        return resp
 
 @app.route('/privacy')
 def pivacy():

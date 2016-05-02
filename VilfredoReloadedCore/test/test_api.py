@@ -1418,9 +1418,7 @@ Sometimes it is possible to impose intrinsic limits, like the one said above. Fo
                 'jack',
                 'jack123')
             self.assertEqual(rv.status_code, 201)
-        
-        
-        
+
         #
         # Update Endorsements
         #

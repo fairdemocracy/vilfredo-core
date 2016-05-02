@@ -1523,22 +1523,33 @@ class VerifyEmail(db.Model):
         app.logger.debug("verify_email called...\n")
 
         verify = VerifyEmail.query.filter_by(user_id=user_id,token=token).first()
+        user =  User.query.get(user_id)
 
         if not verify:
-            app.logger.debug("Token and user_id not listed...\n")
+            app.logger.debug("Token for user_id not listed...\n")
+            return False
+
+        elif not user:
+            app.logger.debug("Unknown user...\n")
+            db_session.delete(verify)
+            db_session.commit()
             return False
 
         elif get_timestamp() > verify.timeout:
             app.logger.debug("Token expired...\n")
+            db_session.delete(verify)
+            if (user):
+                db_session.delete(user)
+            db_session.commit()
             return False
 
-        user =  User.query.get(verify.user_id)
-        if not user:
-            app.logger.debug("Unknown user...\n")
-            return False
-    
-        auth_token = user.get_auth_token()
-        return auth_token
+        else:
+            # User email now verified. Delete entry.
+            db_session.delete(verify)
+            db_session.commit()
+
+            auth_token = user.get_auth_token()
+            return auth_token
 
 
 class FinishedWriting(db.Model):

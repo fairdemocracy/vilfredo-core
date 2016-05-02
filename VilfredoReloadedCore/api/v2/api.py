@@ -92,7 +92,7 @@ def load_token(token):
     #on the users computer it also has a exipry date, but could be changed by
     #the user, so this feature allows us to enforce the exipry date of the token
     #server side and not rely on the users cookie to exipre.
-    max_age = app.config["REMEMBER_COOKIE_DURATION"].total_seconds()
+    max_age = int(app.config["REMEMBER_COOKIE_DURATION"].total_seconds())
 
     #Decrypt the Security Token, data = [username, hashpass]
     #from . import login_serializer
@@ -686,6 +686,11 @@ def api_request_password_reset():
         return jsonify(message=message), 403
 
     email = user.email
+    email_verification_pending = models.VerifyEmail.query.filter(models.VerifyEmail.email == email).first()
+    if email_verification_pending:
+        message = "The user account associated with your details has not been activated yet. Please use the activation link previously sent to your registred address or register again."
+        return jsonify(message=message), 403
+
     pwd_reset = db_session.query(models.PWDReset)\
             .filter(models.PWDReset.email == email)\
             .first()
@@ -888,24 +893,63 @@ def api_create_user():
             (MIN_LEN_PASSWORD, MAX_LEN_PASSWORD)
         return jsonify(message=message), 400
 
-    elif models.User.username_available(request.json['username'])\
-            is not True:
-        message = "Username not available"
-        return jsonify(message=message), 400
-        # return jsonify(message = "Username not available"), 400
-        # return make_response(jsonify({'error': 'Username not available'}), 400) winter
+    user_email = request.json['email']
+    email_verification_pending = models.VerifyEmail.query.filter(models.VerifyEmail.email == user_email).first()
+    if email_verification_pending:
+        if email_verification_pending.timeout > models.get_timestamp():
+            # If valid activation pending send another email
+            ret_code = emails.send_email_verification(email_verification_pending.user_id, user_email, email_verification_pending.token, email_verification_pending.timeout)
+            app.logger.debug("api_create_user: Ret Code from send_email_verification = %s", ret_code)
+            db_session.commit()
+            message = "There is still an activations pending on that email address. A second activation email has been sent to your address."
+            return jsonify(message=message), 201
+        else:
+            # Else delete token and previous user details - start again with the new data
+            unvalidated_user = models.User.query.get(email_verification_pending.user_id)
+            if unvalidated_user:
+                app.logger.debug('Deleteing expired unvalidated user account for %s', unvalidated_user.username)
+                db_session.delete(unvalidated_user)
+                db_session.delete(email_verification_pending)
+                db_session.commit()
 
-    elif models.User.email_available(request.json['email']) is not True:
+    # See if that name is being blocked by an expired activation token - if so delete token and unvalidated user
+    username = request.json['username']
+    user = models.User.query.filter_by(username=username).first()
+    if user:
+        # Userame available if user is connected to an expired validation token
+        email_verification_pending = models.VerifyEmail.query.filter(models.VerifyEmail.email == user.email).first()
+        if email_verification_pending:
+            if email_verification_pending.timeout < models.get_timestamp():
+                # Delete unvalidated user and expired token to free username
+                app.logger.debug('Deleteing expired unvalidated user account for %s', user.username)
+                db_session.delete(user)
+                db_session.delete(email_verification_pending)
+                db_session.commit()
+            else:
+                # Username not available while token valid
+                app.logger.debug('username blocked by active token')
+                message = "Sorry, that username is not available."
+                return jsonify(message=message), 400
+        else:
+            # Username not available - held by active user
+            app.logger.debug('username used by validated user')
+            message = "Sorry, that username is not available."
+            return jsonify(message=message), 400
+
+    # Check if email registered to active user
+    if models.User.email_available(request.json['email']) is not True:
         message = "Someone has already registered with that email."
         return jsonify(message=message), 400
 
+
+    # OK! That's a bingo! Proceed to create new user...
     user = models.User(request.json['username'],
                        request.json['email'],
                        request.json['password'])
     db_session.add(user)
     db_session.commit()
 
-    verify_new_users_email_adress = True
+    verify_new_users_email_address = True
     response = {}
     email_sent = False
 
@@ -917,17 +961,17 @@ def api_create_user():
         if question_id:
             app.logger.debug('User %s accepted invite to question %s...', user.username, question_id)
             # No need to verify email address
-            verify_new_users_email_adress = False
+            verify_new_users_email_address = False
             # Create auth token to log the user in
             auth_token = user.get_auth_token()
 
             # Check if question still exists - eg hasn't been deleted
             question = models.Question.query.get(question_id)
             if question:
-                app.logger.debug('Quetion Found: send %s a welcome_to_question_email to %s...', user.username, user.email)
+                app.logger.debug('Question Found: send %s a welcome_to_question_email to %s...', user.username, user.email)
                 emails.send_welcome_to_question_email(user, question)
             else:
-                app.logger.debug('Quetion Not Found: send %s a welcome_to_notfound_question_email to %s...', user.username, user.email)
+                app.logger.debug('Question Not Found: send %s a welcome_to_notfound_question_email to %s...', user.username, user.email)
                 emails.send_welcome_to_notfound_question_email(user, question_id)
 
             response = {'url': url_for('api_get_users', user_id=user.id), 
@@ -939,19 +983,20 @@ def api_create_user():
 
     else:
         response = {'url': url_for('api_get_users', user_id=user.id), 'activation_email_sent': False}
-    
+
     # Send verification email unless deactivate
-    if verify_new_users_email_adress and os.environ.get('EMAIL_VALIDATION_OFF', '0') == '0':
+    if verify_new_users_email_address and os.environ.get('EMAIL_VALIDATION_OFF', '0') == '0':
         email = request.json['email']
         token = uuid.uuid4().get_hex()
-        timeout = models.get_timestamp() + app.config['EMAIL_VERIFY_LIFETIME']
+        timeout = models.get_timestamp() + int(app.config["EMAIL_VERIFY_LIFETIME"].total_seconds())
         verify_email = models.VerifyEmail(user, email, token, timeout)
-        ret_code = emails.send_email_verification(user.id, email, token)
+        ret_code = emails.send_email_verification(user.id, email, token, timeout)
         app.logger.debug("api_create_user: Ret Code from send_email_verification = %s", ret_code)
         verify_email.email_sent = 1
         db_session.add(verify_email)
         db_session.commit()
         response['activation_email_sent'] = True
+        response['message'] = 'An activation email has been sent to your email address. Please check your spam folder.'
 
     return jsonify(response), 201
 
@@ -1298,7 +1343,7 @@ def api_get_question_proposals(question_id=None, proposal_id=None):
 
     if not proposal_id is None:
         proposal_id = int(proposal_id)
-        proposal = question.proposals.filter_by(id=proposal_id).one()
+        proposal = question.proposals.filter_by(id=proposal_id).first()
         if proposal is None:
             return jsonify(message="Proposal not found"), 404
 
@@ -1347,7 +1392,7 @@ def api_get_question_proposals(question_id=None, proposal_id=None):
         elif inherited_only:
             query = query.filter(models.Proposal.generation_created < question.generation)
 
-        proposals = query.paginate(page, RESULTS_PER_PAGE, False) 
+        proposals = query.paginate(page, RESULTS_PER_PAGE, False)
 
         items = len(proposals.items)
         pages = proposals.pages
