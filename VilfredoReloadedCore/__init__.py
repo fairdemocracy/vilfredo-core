@@ -52,7 +52,7 @@ Module documentation
 import pkg_resources
 pkg_resources.declare_namespace(__name__)
 
-import os
+import os, sys
 
 # The __init__.py must contain the app
 # http://flask.pocoo.org/docs/patterns/packages/
@@ -98,15 +98,16 @@ CDN(app)
 
 if not os.path.exists(app.config['WORK_FILE_DIRECTORY']):
     try:
+        app.logger.info('Creating work directory %s', app.config['WORK_FILE_DIRECTORY'])
         os.makedirs(app.config['WORK_FILE_DIRECTORY'])
     except IOError:
-        raise SystemExit('Failed to create work directory %s', app.config['WORK_FILE_DIRECTORY'])
+        raise sys.exit('Failed to create work directory %s. Please create it manually and restart the app.', app.config['WORK_FILE_DIRECTORY'])
 
 if not os.path.exists(app.config['PROFILE_LOG_PATH']):
     try:
         os.makedirs(app.config['PROFILE_LOG_PATH'])
     except IOError:
-        raise SystemExit('Failed to create profile log directory %s', app.config['PROFILE_LOG_PATH'])
+        raise sys.exit('Failed to create profile log directory %s', app.config['PROFILE_LOG_PATH'])
 
 
 if app.config['PROFILE']:
@@ -118,7 +119,7 @@ if app.config['PROFILE']:
           profile_log = open(log_file_path, "a")
           app.wsgi_app = ProfilerMiddleware(app.wsgi_app, sort_by=('time', 'calls'), stream=profile_log, restrictions=[30])
       except IOError:
-          raise SystemExit('Failed to create profile log file %s', app.config['PROFILE_LOG'])
+          raise sys.exit('Failed to create profile log file %s', app.config['PROFILE_LOG'])
     else:
       app.wsgi_app = ProfilerMiddleware(app.wsgi_app, sort_by=('time', 'calls'), restrictions=[30])
 
