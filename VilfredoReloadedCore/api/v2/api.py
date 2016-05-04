@@ -729,7 +729,7 @@ def api_request_password_reset():
         # email reset token to user
         ret_code = emails.send_password_reset_email(email, pwd_reset_token)
         app.logger.debug("api_request_password_reset: Ret Code from send_password_reset_email = %s", ret_code)
-        message = 'A password reset token has been sent to your address. Please check your spam folder.'
+        message = 'A new password reset token has been sent to your address. Please check your spam folder.'
         return jsonify(message=message), 201
 
 
