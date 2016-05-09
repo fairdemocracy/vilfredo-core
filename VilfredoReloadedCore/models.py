@@ -26,6 +26,8 @@ The database Bases
 
 from sqlalchemy import and_, or_, not_, event, distinct, func
 
+from sqlalchemy.orm.exc import NoResultFound
+
 from database import db_session, db
 
 import datetime, math, time, pytz
