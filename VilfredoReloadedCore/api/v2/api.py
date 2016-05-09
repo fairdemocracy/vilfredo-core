@@ -2153,7 +2153,7 @@ def api_add_proposal_endorsement(question_id, proposal_id):
 
         # Fetch current threshold coordinates for this generation
         threshold = question.thresholds\
-            .filter(models.Threshold.generation == question.generation).one()
+            .filter(models.Threshold.generation == question.generation).first()
 
         if not threshold:
             app.logger.debug('No threshold found for question! Database out of date?')
