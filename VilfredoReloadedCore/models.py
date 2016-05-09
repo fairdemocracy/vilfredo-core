@@ -1215,14 +1215,14 @@ class User(db.Model, UserMixin):
             :rtype: set
             '''
             generation = generation or question.generation
-
+            thresholds = question.get_thresholds(generation=generation)
             endorsements = self.endorsements.join(User.endorsements).\
                 join(Endorsement.proposal).filter(and_(
                     Endorsement.user_id == self.id,
                     Proposal.question_id == question.id,
                     Endorsement.generation == generation,
-                    Endorsement.mapy < question.mapy,
-                    Endorsement.mapx >= question.mapx)
+                    Endorsement.mapy < thresholds.mapy,
+                    Endorsement.mapx >= thresholds.mapx)
                 ).all()
             proposal_ids = set()
             for endorsement in endorsements:
@@ -1277,14 +1277,14 @@ class User(db.Model, UserMixin):
             :rtype: set
             '''
             generation = generation or question.generation
-
+            thresholds = question.get_thresholds(generation=generation)
             endorsements = self.endorsements.join(User.endorsements).\
                 join(Endorsement.proposal).filter(and_(
                     Endorsement.user_id == self.id,
                     Proposal.question_id == question.id,
                     Endorsement.generation == generation,
-                    Endorsement.mapy < question.mapy,
-                    Endorsement.mapx >= question.mapx)
+                    Endorsement.mapy < thresholds.mapy,
+                    Endorsement.mapx >= thresholds.mapx)
                 ).all()
 
             proposal_ids = set()
@@ -1931,10 +1931,9 @@ class Question(db.Model):
         :rtype: dict
         '''
         # Fetch current threshold coordinates for this generation
-        from sqlalchemy.orm.exc import NoResultFound
         try:
             threshold = self.thresholds\
-                .filter(Threshold.generation == self.generation).first()
+                .filter(Threshold.generation == self.generation).one()
         except NoResultFound, e:
             print "No threshold found for question " + str(self.id) + ' gen ' + str(self.generation)
 
@@ -8212,13 +8211,13 @@ class Proposal(db.Model):
             :rtype: boolean
             '''
             generation = generation or self.question.generation
-
+            thresholds = self.question.get_thresholds(generation=generation)
             return self.endorsements.filter(and_(
                 Endorsement.user_id == user.id,
                 Endorsement.proposal_id == self.id,
                 Endorsement.generation == generation,
-                Endorsement.mapy < question.mapy,
-                Endorsement.mapx >= question.mapx)
+                Endorsement.mapy < thresholds.mapy,
+                Endorsement.mapx >= thresholds.mapx)
             ).count() == 1
 
     def is_endorsed_by(self, user, generation=None):
@@ -8339,12 +8338,13 @@ class Proposal(db.Model):
         :rtype: set
         '''
         generation = generation or self.question.generation
+        thresholds = self.question.get_thresholds(generation=generation)
         current_endorsements = list()
         current_endorsements = self.endorsements.filter(and_(
             Endorsement.proposal_id == self.id,
             Endorsement.generation == generation,
-            Endorsement.mapy < question.mapy,
-            Endorsement.mapx >= question.mapx)
+            Endorsement.mapy < thresholds.mapy,
+            Endorsement.mapx >= thresholds.mapx)
         ).all()
         endorsers = list()
         for e in current_endorsements:
