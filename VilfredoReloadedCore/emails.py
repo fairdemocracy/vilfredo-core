@@ -50,11 +50,11 @@ def send_added_to_question_email(inviter, receiver, question):
     Send an email to notify someone that they have been added to a question.
 
     :param inviter: participant granting access to a question
-    :type user: User
+    :type question: User
     :param receiver: invited participant
-    :type user: User
+    :type receiver: User
     :param question: question
-    :type toquestionken: Question
+    :type question: Question
     :rtype: long
     '''
     body_template = \
@@ -80,7 +80,7 @@ def send_user_already_added_email(user, email, question):
     :param user: question participant
     :type user: User
     :param question: question
-    :type toquestionken: Question
+    :type question: Question
     :rtype: long
     '''
     body_template = \
@@ -107,7 +107,7 @@ def send_email_invite_accepted_email(user, email, question):
     :param user: question participant
     :type user: User
     :param question: question
-    :type toquestionken: Question
+    :type question: Question
     :rtype: long
     '''
     app.logger.debug('send_email_invite_accepted_email called...')
@@ -134,8 +134,8 @@ def send_welcome_to_notfound_question_email(user, question_id):
 
     :param user: question participant
     :type user: User
-    :param question: question
-    :type toquestionken: Question
+    :param question_id: question id
+    :type question_id: int
     :rtype: long
     '''
     app.logger.debug('send_welcome_to_notfound_question_email called...')
@@ -165,7 +165,7 @@ def send_welcome_to_question_email(user, question):
     :param user: question participant
     :type user: User
     :param question: question
-    :type toquestionken: Question
+    :type question: Question
     :rtype: long
     '''
     app.logger.debug('send_welcome_to_question_email called...')
@@ -197,7 +197,7 @@ def send_moved_on_email(user, question):
     :param user: question participant
     :type user: User
     :param question: question
-    :type toquestionken: Question
+    :type question: Question
     :rtype: long
     '''
     body_template = \
@@ -308,4 +308,174 @@ def send_question_email_invite_email(sender, recipient_email, question, token):
                                        question.title,
                                        app.config['PROTOCOL'],
                                        app.config['SITE_DOMAIN']+'/invitation'+'?eit='+token))
+
+
+def send_new_question_comment_email(question, proposal, comment, proposal_author):
+    '''
+    .. function:: send_new_question_comment_email(question, proposal, comment, proposal_author)
+
+    Notify proposal author of new question
+
+    :param question: question
+    :type question: Question
+    :param proposal: proposal
+    :type proposal: Proposal
+    :param comment: comment
+    :type comment: Comment
+    :param proposal_author: Proposal author
+    :type proposal_author: User
+    :rtype: long
+    '''
+    body_template = \
+    """
+    Hello %s!
+    
+    In the question "%s" a user has asked a question about your proposal "%s". 
+    
+    Question:
+    
+    %s
+    
+    Please try and answer this question as clearly as possible. This will encourage the user and others who support the question to inrease their support for your proposal.
+    
+    %s%s/question/%s
+    """
+    return send_email("Vilfredo - Your proposal %s has a new question!" % (proposal.title),
+                      app.config['ADMINS'][0],
+                      proposal_author.email,
+                      body_template % (proposal_author.username,
+                                       question.title,
+                                       proposal.title,
+                                       comment.comment,
+                                       app.config['PROTOCOL'],
+                                       app.config['SITE_DOMAIN'],
+                                       question.id))
+    
+def send_new_question_answer_email_to_question_author(question, proposal, question_comment, answer_comment, question_comment_author):
+    '''
+    .. function:: send_new_question_comment_email(question,
+                                                  proposal,
+                                                  question_comment,
+                                                  question_comment,
+                                                  question_comment_author)
+
+    Notify question comment author of new answer
+
+    :param question: question
+    :type question: Question
+    :param proposal: proposal
+    :type proposal: Proposal
+    :param question_comment: comment
+    :type question_comment: Comment
+    :param answer_comment: comment
+    :type answer_comment: Comment
+    :param question_comment_author: Question comment author
+    :type question_comment_author: User
+    :rtype: long
+    '''
+    body_template = \
+    """
+    Hello %s!
+    
+    In the question "%s" the author of proposal "%s" has answered your question:
+    
+    %s
+    
+    Answer:
+    
+    %s
+    
+    If this answers your question satisfactorily and clarifies proposal please consider updating your vote for this proposal.
+    
+    %s%s/question/%s
+    """
+    return send_email("Vilfredo - Your question has been answered",
+                      app.config['ADMINS'][0],
+                      question_comment_author.email,
+                      body_template % (question_comment_author.username,
+                                       question.title,
+                                       proposal.title,
+                                       question_comment.comment,
+                                       answer_comment.comment,
+                                       app.config['PROTOCOL'],
+                                       app.config['SITE_DOMAIN'],
+                                       question.id))
+
+def send_new_question_answer_email(question, proposal, question_comment, answer_comment, user):
+    '''
+    .. function:: send_new_question_comment_email(question, comment, user)
+
+    Notify supporter of question comment of answer
+
+    :param question: question
+    :type question: Question
+    :param proposal: proposal
+    :type proposal: Proposal
+    :param comment: comment
+    :type comment: Comment
+    :param user: Comment author
+    :type user: User
+    :rtype: long
+    '''
+    body_template = \
+    """
+    Hello %s!
+    
+    In the question "%s" the author of proposal "%s" has answered a question you support:
+    
+    %s
+    
+    Answer:
+    
+    %s
+    
+    If this answers your question satisfactorily and clarifies proposal please consider updating your vote for this proposal.
+    
+    %s%s/question/%s
+    """
+    return send_email("Vilfredo - A question you support has been answered",
+                      app.config['ADMINS'][0],
+                      user.email,
+                      body_template % (user.username,
+                                       question.title,
+                                       proposal.title,
+                                       question_comment.comment,
+                                       answer_comment.comment,
+                                       app.config['PROTOCOL'],
+                                       app.config['SITE_DOMAIN'],
+                                       question.id))
+
+
+def send_user_invite_accepted_email(sender, recipient, question):
+    '''
+    .. function:: send_user_invite_accepted_email(sender, recipient, question)
+
+    Send an email to notify someone has accepted an invitation.
+
+    :param sender: question participant
+    :type sender: User
+    :param recipient: question participant
+    :type recipient: User
+    :param question: question
+    :type question: Question
+    :rtype: long
+    '''
+    app.logger.debug('send_email_invite_accepted_email called...')
+    body_template = \
+    """
+    Hello %s!
+    
+    The invitation you sent to user %s for question "%s" has been accepted!
+    
+    %s%s/question/%s
+    """
+    return send_email("Vilfredo - Invitation Accepted",
+                      app.config['ADMINS'][0],
+                      sender.email,
+                      body_template % (sender.username,
+                                       recipient.username,
+                                       question.title,
+                                       app.config['PROTOCOL'],
+                                       app.config['SITE_DOMAIN'],
+                                       question.id))
 

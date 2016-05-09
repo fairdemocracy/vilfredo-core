@@ -1942,15 +1942,15 @@ def api_add_proposal_comment(question_id, proposal_id):
     comment_id = None
     new_comment = None
 
-    # Fetch the comment which matches comment text or create new one
+    # Fetch the comment which matches comment text or create new one ttt
     if (comment):
         existing_comment = models.Comment.fetch_if_exists(proposal, comment, comment_type)
-        if (existing_comment):
+        if existing_comment:
             message = {"message": "Comment already exists for this proposal"}
             return jsonify(message), 400
         else:
             new_comment = models.Comment(user, proposal, comment, comment_type, reply_to)
-            if (new_comment is False):
+            if not new_comment:
                 return jsonify(message="Could not create comment"), 500
             else:
                 db_session.add(new_comment)
@@ -1960,6 +1960,36 @@ def api_add_proposal_comment(question_id, proposal_id):
                 response = new_comment.get_public()
                 response['question_count'] = str(proposal.get_question_count())
                 response['comment_count'] = proposal.get_comment_count()
+
+                # Add notifiation emails ttt
+                app.logger.info('Add notifiation emails...')
+                if comment_type == 'question':
+                    # Notifiy author
+                    app.logger.info('Notifying proposal author ID %s of new question', proposal.author.id)
+                    emails.send_new_question_comment_email(question, proposal, new_comment, proposal.author)
+                elif comment_type == 'answer':
+                    # Notifiy question comment supporters
+                    question_comment = models.Comment.query.get(new_comment.reply_to)
+                    if not question_comment:
+                        app.logger.info('Answer to non-existant question?')
+                    else:
+                        supporters = question_comment.supporters.all()
+                        for user in supporters:
+                            if user.id == question_comment.user_id:
+                                app.logger.info('Notifying proposal question author ID %s of new answer', user.id)
+                                emails.send_new_question_answer_email_to_question_author(question,
+                                                                                         proposal,
+                                                                                         question_comment,
+                                                                                         new_comment,
+                                                                                         user)
+                            else:
+                                app.logger.debug('Notifying proposal question supporter ID %s of new answer', user.id)
+                                emails.send_new_question_answer_email(question,
+                                                                      proposal,
+                                                                      question_comment,
+                                                                      new_comment,
+                                                                      user)
+
                 return jsonify(comment=response), 201
 
 
@@ -2873,7 +2903,7 @@ def api_finished_writing(question_id):
     if finished_writing:
         return jsonify(message="Finished Writing status already set",
                        writing_status=1), 200
-    
+
     finished_writing = models.FinishedWriting(user=user,
                                               question=question)
 
@@ -3422,6 +3452,11 @@ def api_accept_new_invite(user_id, invite_id):
     if not new_invitation:
         return jsonify(message = "Invitation not found"), 404
 
+    question = models.Question.query.filter_by(id=new_invitation.question_id).first()
+
+    if not question:
+        return jsonify(message = "Question not found"), 404
+
     sender = models.User.query.get(new_invitation.sender_id)
     if not sender:
         return jsonify(message = "Sender not found"), 404
@@ -3429,7 +3464,11 @@ def api_accept_new_invite(user_id, invite_id):
     user.invites_received.append(models.Invite(sender, user, new_invitation.permissions, new_invitation.question_id))
     user.new_invites.remove(new_invitation)
     db_session.commit()
-    
+
+    # Notify sender of acceptance
+    app.logger.debug('api_accept_new_invite: Notify sender of acceptance')
+    emails.send_user_invite_accepted_email(sender, user, question)
+
     return jsonify(message = "Invitation accepted"), 200
 
 # Get new invitations
