@@ -24,7 +24,9 @@
 The database Bases
 '''
 
-from sqlalchemy import and_, or_, not_, event, distinct, func
+from sqlalchemy import and_, or_, not_, event, distinct, func, text
+
+from sqlalchemy.exc import SQLAlchemyError
 
 from sqlalchemy.orm.exc import NoResultFound
 
@@ -426,6 +428,39 @@ def get_ids_as_string_from_proposals(proposals): # fix?
     '''
     proposal_ids = get_ids_from_proposals(proposals)
     return '(' + ', '.join(str(id) for id in proposal_ids) + ')'
+
+
+
+def alter_question_permissions(question_ids, old_permission, new_permission):
+    '''
+    .. function:: alter_question_permissions(question_ids, old_permission, new_permission)
+
+    Updates permissions of all paticipants with permissions == old_permission to new_permission.
+
+    :param question_ids: List of question IDs
+    :type question_ids: List
+    :param old_permission: current permissions
+    :type old_permission: int
+    :param new_permission: new permissions
+    :type new_permission: int
+    :rtype: Boolean
+    '''         
+    try:
+        if type(question_ids) is list and \
+                all(isinstance(item, int) for item in question_ids) and \
+                type(old_permission) is int and type(new_permission) is int:
+            stmt = text('UPDATE invite SET invite.permissions = :new_perm WHERE invite.question_id IN :qid_array AND invite.permissions = :old_perm')
+            db_session.execute(stmt, {"new_perm": new_permission, "qid_array": question_ids, "old_perm": old_permission})
+            return True
+        else:
+            app.logger.debug("alter_permissions(): Incorrect parameters passed")
+            return False
+    except NameError:
+        app.logger.debug("alter_permissions(): Undefined parameters passed")
+        return False
+    except SQLAlchemyError:
+        app.logger.debug("alter_permissions(): Database error")
+        return False
 
 
 class Update(db.Model):
@@ -1811,7 +1846,6 @@ class Invite(db.Model):
     receiver_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     question_id = db.Column(db.Integer, db.ForeignKey('question.id'))
     permissions = db.Column(db.Integer, default=1)
-
     receiver = db.relationship("User",
                                primaryjoin="Invite.receiver_id==User.id",
                                backref="invitations",
@@ -1913,16 +1947,56 @@ class Question(db.Model):
                                                        self.author.username,
                                                        self.generation,
                                                        self.phase)
-
+    
+    permission_types = {
+        'READ' : 1,
+        'VOTE' : 2,
+        'PROPOSE' : 4,
+        'VOTE_READ' : 3,
+        'PROPOSE_READ' : 5,
+        'VOTE_PROPOSE_READ' : 7,
+        'COMMENT' : 8,
+        'INVITE' : 16,
+        'MODERATE' : 32,
+        'READ_COMMENT' : 9,
+        'VOTE_READ_COMMENT' : 11,
+        'PROPOSE_READ_COMMENT' : 13,
+        'VOTE_PROPOSE_READ_COMMENT' : 15
+    }
+    
     # User question permissions
     READ = 1
     VOTE = 2
     PROPOSE = 4
-    INVITE = 8
     # Combined
     VOTE_READ = 3
     PROPOSE_READ = 5
     VOTE_PROPOSE_READ = 7
+    #
+    # Additional question permissions
+    COMMENT = 8
+    INVITE = 16
+    MODERATE = 32
+    # Additional Combined
+    READ_COMMENT = 9
+    VOTE_READ_COMMENT = 11
+    PROPOSE_READ_COMMENT = 13
+    VOTE_PROPOSE_READ_COMMENT = 15
+
+    def alter_permissions(self, old_permission, new_permission):
+        '''
+        .. function:: alter_permissions(old_permission, new_permission)
+
+        Updates permissions of all paticipants with permissions == old_permission to new_permission.
+
+        :param old_permission: current permissions.
+        :type old_permission: int
+        :param new_permission: new permissions.
+        :type new_permission: int
+        :rtype: None
+        '''         
+        stmt = text('UPDATE invite SET invite.permissions = :new_perm WHERE invite.question_id = :qid AND invite.permissions = :old_perm')
+        db_session.execute(stmt, {"new_perm": new_permission, "qid": self.id, "old_perm": old_permission})
 
     def get_public(self, user=None):
         '''

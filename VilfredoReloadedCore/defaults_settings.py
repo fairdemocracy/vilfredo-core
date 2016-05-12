@@ -123,8 +123,9 @@ SEND_EMAIL_NOTIFICATIONS = True
 ALGORITHM_VERSION = 2
 
 QUESTION_PERMISSION_DENIED_MESSAGE = "You have not been invited to participate in this question"
-QUESTION_VOTE_PERMISSION_DENIED_MESSAGE = "You have not been invited to vote in this question"
-QUESTION_PROPOSE_PERMISSION_DENIED_MESSAGE = "You have not been invited to write in this question"
+QUESTION_VOTE_PERMISSION_DENIED_MESSAGE = "You do not have permission to vote in this question"
+QUESTION_PROPOSE_PERMISSION_DENIED_MESSAGE = "You do not have permission to write proposals in this question"
+QUESTION_COMMENT_PERMISSION_DENIED_MESSAGE = "You do not have permission to write proposal comments in this question"
 
 # API
 RESULTS_PER_PAGE = 50

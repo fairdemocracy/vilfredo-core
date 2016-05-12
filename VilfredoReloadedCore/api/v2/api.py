@@ -1182,7 +1182,7 @@ def api_create_question():
         return jsonify(message="Invalid or missing parameter voting_type"), 400
     
     elif not 'permissions' in request.json or 'permissions' in request.json and (not isinstance( request.json['permissions'], int )\
-         or not request.json['permissions'] in (1,3,5,7)):
+         or not request.json['permissions'] in models.Question.permission_types.values()):
         return jsonify(message="Invalid or missing parameter permissions"), 400
 
 
@@ -1478,6 +1478,15 @@ def api_support_proposal_comment(question_id, proposal_id, comment_id):
         app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
         return jsonify(message = "You do not have permission to view this question"), 404
 
+    # Check if user has permission to write comments - currently also prevents supporting
+    # elif not models.Question.COMMENT & perm:
+    elif not perm in [models.Question.PROPOSE_READ,
+                      models.Question.VOTE_READ,
+                      models.Question.VOTE_PROPOSE_READ,
+                      models.Question.READ_COMMENT]:
+        app.logger.debug("ACCESS ERROR: User %s with permission %s tried to support comments on question %s", user.id, perm, question.id)
+        return jsonify(message = app.config['QUESTION_COMMENT_PERMISSION_DENIED_MESSAGE']), 400
+
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
         return jsonify(message = "Proposal not found"), 404
@@ -1560,6 +1569,15 @@ def api_unsupport_proposal_comment(question_id, proposal_id, comment_id):
     if not perm:
         app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
         return jsonify(message = "You do not have permission to view this question"), 404
+
+    # Check if user has permission to write comments - currently also prevents supporting
+    #elif not models.Question.COMMENT & perm:
+    elif not perm in [models.Question.PROPOSE_READ,
+                      models.Question.VOTE_READ,
+                      models.Question.VOTE_PROPOSE_READ,
+                      models.Question.READ_COMMENT]:
+        app.logger.debug("ACCESS ERROR: User %s with permission %s tried to support comments on question %s", user.id, perm, question.id)
+        return jsonify(message = app.config['QUESTION_COMMENT_PERMISSION_DENIED_MESSAGE']), 400
 
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
@@ -1894,6 +1912,15 @@ def api_add_proposal_comment(question_id, proposal_id):
         app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
         return jsonify(message = "You do not have permission to view this question"), 404
 
+    # Check if user has permission to write comments
+    #elif not models.Question.COMMENT & perm:
+    elif not perm in [models.Question.PROPOSE_READ,
+                      models.Question.VOTE_READ,
+                      models.Question.VOTE_PROPOSE_READ,
+                      models.Question.READ_COMMENT]:
+        app.logger.debug("ACCESS ERROR: User %s with permission %s tried to write comments on question %s", user.id, perm, question.id)
+        return jsonify(message = app.config['QUESTION_COMMENT_PERMISSION_DENIED_MESSAGE']), 400
+
     # Consider allowing comments during writing
     elif question.phase != 'voting':
         message = {"message": "Adding comments is only allowed during the voting phase"}
@@ -2055,6 +2082,15 @@ def api_delete_proposal_comment(question_id, proposal_id, comment_id):
     if not perm:
         app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
         return jsonify(message = "You do not have permission to view this question"), 404
+
+    # Check if user has permission to write comments
+    #elif not models.Question.COMMENT & perm:
+    elif not perm in [models.Question.PROPOSE_READ,
+                      models.Question.VOTE_READ,
+                      models.Question.VOTE_PROPOSE_READ,
+                      models.Question.READ_COMMENT]:
+        app.logger.debug("ACCESS ERROR: User %s with permission %s tried to write comments on question %s", user.id, perm, question.id)
+        return jsonify(message = app.config['QUESTION_COMMENT_PERMISSION_DENIED_MESSAGE']), 400
 
     proposal = models.Proposal.query.get(int(proposal_id))
     if proposal is None:
@@ -3078,7 +3114,7 @@ def api_edit_question(question_id):
         return jsonify(message="Invalid or missing parameter voting_type"), 400
 
     elif not 'permissions' in request.json or 'permissions' in request.json and (not isinstance( request.json['permissions'], int )\
-         or not request.json['permissions'] in (1,3,5,7)):
+         or not request.json['permissions'] in models.Question.permission_types.values()):
         return jsonify(message="Invalid or missing parameter permissions"), 400
 
     # Check link count in blurb
