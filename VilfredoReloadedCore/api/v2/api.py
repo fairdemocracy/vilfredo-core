@@ -4148,9 +4148,9 @@ def api_question_participation_table(question_id=None):
         app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
         return jsonify(message = "You do not have permission to view this question"), 404
     
-    # Check user is question author
-    if question.user_id != user.id:
-        return jsonify({"message": "Only the question author can make this request"}), 401
+    # Check user is question author or moderator
+    if not perm == models.Question.permission_types['MODERATE'] and not question.user_id == user.id:
+        return jsonify({"message": "Only the question author or moderator can make this request"}), 401
 
     participants = question.get_participants()
     app.logger.debug("participants==> %s", participants)
