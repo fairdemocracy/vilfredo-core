@@ -1173,18 +1173,6 @@ def api_create_question():
         response = {'message': "Question text must not be empty and no longer than " + str(MAX_LEN_QUESTION_BLURB) + " characters"}
         return jsonify(response), 400
         
-    elif not 'question_type' in request.json or 'question_type' in request.json and (not isinstance( request.json['question_type'], int )\
-         or not request.json['question_type'] in (1,2)):
-        return jsonify(message="Invalid or missing parameter question_type"), 400
-    
-    elif not 'voting_type' in request.json or 'voting_type' in request.json and (not isinstance( request.json['voting_type'], int )\
-         or not request.json['voting_type'] in (1,2)):
-        return jsonify(message="Invalid or missing parameter voting_type"), 400
-    
-    elif not 'permissions' in request.json or 'permissions' in request.json and (not isinstance( request.json['permissions'], int )\
-         or not request.json['permissions'] in models.Question.permission_types.values()):
-        return jsonify(message="Invalid or missing parameter permissions"), 400
-
 
     # Check link count in blurb
     blurb = request.json.get('blurb')
