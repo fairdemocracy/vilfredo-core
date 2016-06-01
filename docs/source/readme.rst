@@ -112,6 +112,7 @@ command will download and install the requirements.
 
 .. code:: sh
 
+    pip install --upgrade setuptools
     python setup.py develop
 
 You can start developing following the issues for your milestone.
