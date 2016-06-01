@@ -25,13 +25,9 @@ The Views
 '''
 
 from flask import session, request, make_response
-
-from . import app, models
-
+from VilfredoReloadedCore import app, models, utils
 from VilfredoReloadedCore.api.v2 import api
-
 from database import db_session
-
 from flask import render_template, url_for, redirect
 
 
@@ -71,6 +67,7 @@ def index():
     '''
     return render_template("index.html")
 
+
 @app.route('/question/<int:question_id>')
 def display_question(question_id):
     '''
@@ -91,6 +88,13 @@ def display_question(question_id):
     '''
     auth = request.cookies.get('vgaclient')
     if not auth:
+        return redirect(redirect_url())
+    # else check user permissions
+    user = api.load_token(auth)
+    if not user:
+        return redirect(redirect_url())
+    perm = utils.get_user_permissions(question_id, user.id)
+    if not perm:
         return redirect(redirect_url())
     else:
         return render_template("question.html")
