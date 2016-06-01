@@ -127,6 +127,8 @@ QUESTION_VOTE_PERMISSION_DENIED_MESSAGE = "You do not have permission to vote in
 QUESTION_PROPOSE_PERMISSION_DENIED_MESSAGE = "You do not have permission to write proposals in this question"
 QUESTION_COMMENT_PERMISSION_DENIED_MESSAGE = "You do not have permission to write proposal comments in this question"
 
+ANONYMIZE_CONTENT = "Hidden"
+
 # API
 RESULTS_PER_PAGE = 50
 MAX_LEN_EMAIL = 120
