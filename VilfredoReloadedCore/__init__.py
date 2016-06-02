@@ -99,10 +99,10 @@ mail = Mail(app)
 CDN(app)
 
 
-# Load Moderator Blueprint if available
+# Load moderator blueprint if available
 try:
-    from mod_moderate.views import moderator_blueprint
-except:
+    from mod_moderate.views import moderator
+except ImportError:
     pass
 
 

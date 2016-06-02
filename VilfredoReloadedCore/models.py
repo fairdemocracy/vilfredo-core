@@ -40,7 +40,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from flask.ext.login import UserMixin
 
-from . import app, emails
+from . import app, emails, utils
 
 from HTMLParser import HTMLParser
 
@@ -2165,7 +2165,7 @@ class Question(db.Model):
             finished_writing_count = len(users_finished_writing)
 
         anonymized = {'id': self.id,
-                'url': url_for('api_get_questions', question_id=self.id),
+                'url': url_for('api_get_questions', question_id=self.id), 
                 'title': app.config['ANONYMIZE_CONTENT'], 
                 'blurb': app.config['ANONYMIZE_CONTENT'],
                 'generation': self.generation,
@@ -2209,11 +2209,13 @@ class Question(db.Model):
                 anonymized['my_permissions'] = permissions
                 anonymized['can_vote'] = bool(Question.VOTE & permissions)
                 anonymized['can_propose'] = bool(Question.PROPOSE & permissions)
-
+                    
                 if permissions == Question.permission_types['MODERATE']:
                     anonymized['is_moderator'] = True
+                    anonymized['link'] = utils.make_site_link(url_for('moderator.display_moderate_question', question_id=self.id))
                 else:
                     anonymized['is_moderator'] = False
+                    anonymized['link'] = utils.make_site_link(url_for('display_question', question_id=self.id))
                     
                 # Add participant permissions if user is question author or moderator
                 if user.id == self.author.id or permissions == Question.permission_types['MODERATE']:
@@ -2312,10 +2314,12 @@ class Question(db.Model):
 
                 if permissions == Question.permission_types['MODERATE']:
                     public['is_moderator'] = True
+                    public['link'] = utils.make_site_link(url_for('moderator.display_moderate_question', question_id=self.id))
                 else:
                     public['is_moderator'] = False
-                    
-                # Add participant permissions if user is question author or moderator
+                    public['link'] = utils.make_site_link(url_for('display_question', question_id=self.id))
+                
+                # Add participant permissions if user is question author or moderator ggg
                 if user.id == self.author.id or permissions == Question.permission_types['MODERATE']:
                     user_permissions = self.get_participant_permissions()
                     if user_permissions:
@@ -2375,7 +2379,8 @@ class Question(db.Model):
         :rtype: list
         '''
         participants = list()
-        invitations = self.invites.all()
+        # Fetch all paticipants exluding moderators
+        invitations = self.invites.filter(Invite.permissions!=32).all()
         if not invitations is None:
             for invitation in invitations:
                 user = User.query.get(invitation.receiver.id)

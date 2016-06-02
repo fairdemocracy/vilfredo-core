@@ -18,11 +18,14 @@
 # along with VilfredoReloadedCore.  If not, see <http://www.gnu.org/licenses/>.
 #
 ###############################################################################
-from VilfredoReloadedCore import app, models
+from VilfredoReloadedCore import app
 from sqlalchemy import and_, or_, not_, event, distinct, func, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm.exc import NoResultFound
 from database import db_session, db
+
+def make_site_link(url):
+    return app.config['PROTOCOL']+app.config['SITE_DOMAIN']+url
 
 def get_user_permissions(question_id, user_id):
     '''
