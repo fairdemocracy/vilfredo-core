@@ -94,7 +94,17 @@ import VilfredoReloadedCore.api.v2.api
 
 mail = Mail(app)
 
+
+# Activate CDN support
 CDN(app)
+
+
+# Load Moderator Blueprint if available
+try:
+    from mod_moderate.views import moderator_blueprint
+except:
+    pass
+
 
 if not os.path.exists(app.config['WORK_FILE_DIRECTORY']):
     try:

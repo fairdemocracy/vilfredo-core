@@ -21,7 +21,7 @@
 
 
 '''
-The database Bases
+Models
 '''
 
 from sqlalchemy import and_, or_, not_, event, distinct, func, text
@@ -158,7 +158,48 @@ def hash_string(str):
     m.update(str)
     return m.hexdigest()
 
+
 def make_new_map_filename_hashed(question,
+                                 generation=None,
+                                 algorithm=None):
+    '''
+        .. function:: make_new_map_filename_hashed(
+            question[,
+            generation=None,
+            algorithm=None])
+
+        Create the hash filname for the voting map.
+        Uses current_voting_map() to distinguish changes between not understanding, opposing and endorsing.
+
+        :param question: question
+        :type question: Question
+        :param generation: generation of the voting map
+        :type generation: int
+        :param algorithm: algorithm version number
+        :type algorithm: int
+        :rtype: String
+        '''
+    algorithm = algorithm or app.config['ALGORITHM_VERSION']
+    generation = generation or question.generation
+    thresholds = question.get_thresholds(generation=generation)
+    import hashlib, json, pickle
+    from flask import jsonify
+    m = hashlib.md5()
+    # Need to generate seperate cache filenames for different threshold settings
+    m.update(str(question.id) + str(generation) + str(thresholds.mapx) + str(thresholds.mapy))
+    m.update(str(app.config['ANONYMIZE_GRAPH']))
+    m.update(str(algorithm))
+    voting_map = question.current_voting_map()
+    # app.logger.debug('******************* make_new_map_filename_hashed  START *********************************')
+    # app.logger.debug('*** voting_map ==> %s', voting_map)
+    m.update(json.dumps(voting_map))
+    hashed = m.hexdigest()
+    # app.logger.debug('***')
+    # app.logger.debug('*** hashed ==> %s', hashed)
+    # app.logger.debug('******************* make_new_map_filename_hashed  END *********************************')
+    return hashed
+
+def make_new_map_filename_hashed_old(question,
                                  generation=None,
                                  algorithm=None):
     '''
@@ -398,8 +439,8 @@ user_comments = db.Table(
 
 
 #
-# Useful Functions
-#
+# Useful Functions - move to utils!
+#   
 def get_ids_from_proposals(proposals): #
     '''
     .. function:: get_ids_from_proposals(proposals)
@@ -429,38 +470,6 @@ def get_ids_as_string_from_proposals(proposals): # fix?
     proposal_ids = get_ids_from_proposals(proposals)
     return '(' + ', '.join(str(id) for id in proposal_ids) + ')'
 
-
-
-def alter_question_permissions(question_ids, old_permission, new_permission):
-    '''
-    .. function:: alter_question_permissions(question_ids, old_permission, new_permission)
-
-    Updates permissions of all paticipants with permissions == old_permission to new_permission.
-
-    :param question_ids: List of question IDs
-    :type question_ids: List
-    :param old_permission: current permissions
-    :type old_permission: int
-    :param new_permission: new permissions
-    :type new_permission: int
-    :rtype: Boolean
-    '''         
-    try:
-        if type(question_ids) is list and \
-                all(isinstance(item, int) for item in question_ids) and \
-                type(old_permission) is int and type(new_permission) is int:
-            stmt = text('UPDATE invite SET invite.permissions = :new_perm WHERE invite.question_id IN :qid_array AND invite.permissions = :old_perm')
-            db_session.execute(stmt, {"new_perm": new_permission, "qid_array": question_ids, "old_perm": old_permission})
-            return True
-        else:
-            app.logger.debug("alter_permissions(): Incorrect parameters passed")
-            return False
-    except NameError:
-        app.logger.debug("alter_permissions(): Undefined parameters passed")
-        return False
-    except SQLAlchemyError:
-        app.logger.debug("alter_permissions(): Database error")
-        return False
 
 
 class Update(db.Model):
@@ -569,6 +578,7 @@ class User(db.Model, UserMixin):
         primaryjoin="user_comments.c.user_id == User.id",
         backref=db.backref('supporters', lazy='dynamic'),
         lazy='dynamic')
+
 
     def get_public(self):
         '''
@@ -1008,6 +1018,12 @@ class User(db.Model, UserMixin):
         else:
             return False
 
+    def finished_voting(self, question, generation=None):
+        generation = generation or question.generation
+        votes = self.get_endorsement_count(question, generation)
+        proposals = question.get_proposal_count(generation)
+        return votes == proposals
+    
     def get_endorsement_count(self, question, generation=None):
         '''
         .. function:: get_endorsement_count(question[, generation=None])
@@ -1300,40 +1316,40 @@ class User(db.Model, UserMixin):
                 proposal_ids.add(endorsement.proposal_id)
             return proposal_ids
 
-        def get_endorsed_proposal_ids_new(self, question, generation=None, all_proposal_ids=None):
-            '''
-            .. function:: get_endorsed_proposal_ids(question[, generation=None])
+    def get_endorsed_proposal_ids_new(self, question, generation=None, all_proposal_ids=None):
+        '''
+        .. function:: get_endorsed_proposal_ids(question[, generation=None])
 
-            Fetch a set of the IDs of the proposals endorsed by the
-            user for this generation of this question.
+        Fetch a set of the IDs of the proposals endorsed by the
+        user for this generation of this question.
 
-            :param question: associated question
-            :type question: Question
-            :param generation: question generation
-            :type generation: int or None
-            :rtype: set
-            '''
-            generation = generation or question.generation
-            thresholds = question.get_thresholds(generation=generation)
-            endorsements = self.endorsements.join(User.endorsements).\
-                join(Endorsement.proposal).filter(and_(
-                    Endorsement.user_id == self.id,
-                    Proposal.question_id == question.id,
-                    Endorsement.generation == generation,
-                    Endorsement.mapy < thresholds.mapy,
-                    Endorsement.mapx >= thresholds.mapx)
-                ).all()
+        :param question: associated question
+        :type question: Question
+        :param generation: question generation
+        :type generation: int or None
+        :rtype: set
+        '''
+        generation = generation or question.generation
+        thresholds = question.get_thresholds(generation=generation)
+        endorsements = self.endorsements.join(User.endorsements).\
+            join(Endorsement.proposal).filter(and_(
+                Endorsement.user_id == self.id,
+                Proposal.question_id == question.id,
+                Endorsement.generation == generation,
+                Endorsement.mapy < thresholds.mapy,
+                Endorsement.mapx >= thresholds.mapx)
+            ).all()
 
-            proposal_ids = set()
-            if all_proposal_ids:
-                for endorsement in endorsements:
-                    if endorsement.proposal_id in all_proposal_ids:
-                        proposal_ids.add(endorsement.proposal_id)
-                return proposal_ids
-            else:
-                for endorsement in endorsements:
+        proposal_ids = set()
+        if all_proposal_ids:
+            for endorsement in endorsements:
+                if endorsement.proposal_id in all_proposal_ids:
                     proposal_ids.add(endorsement.proposal_id)
-                return proposal_ids
+            return proposal_ids
+        else:
+            for endorsement in endorsements:
+                proposal_ids.add(endorsement.proposal_id)
+            return proposal_ids
 
     def get_all_endorsememnts(self, question, generation=None):
         '''
@@ -1701,12 +1717,13 @@ class EmailInvite(db.Model):
                 'sender_url': url_for('api_get_users',
                                       user_id=self.sender_id)}
 
-    def __init__(self, sender, receiver_email, permissions, question_id, token):
+    def __init__(self, sender, receiver_email, permissions, question_id, token, perm={}):
         self.sender_id = sender.id
         self.question_id = question_id
         self.permissions = permissions
         self.receiver_email = receiver_email
         self.token = token
+
 
     @staticmethod
     def check_token(token):
@@ -1807,7 +1824,8 @@ class UserInvite(db.Model):
                                lazy='static', single_parent=True)
 
 
-    def __init__(self, sender, receiver, permissions, question_id):
+
+    def __init__(self, sender, receiver, permissions, question_id, perm={}):
         self.sender_id = sender.id
         self.question_id = question_id
         self.permissions = permissions
@@ -1817,11 +1835,34 @@ class UserInvite(db.Model):
         else:
             self.receiver_id = receiver.id
 
+
 class Invite(db.Model):
     '''
     Stores users invitaions to participate in questions
     '''
     __tablename__ = 'invite'
+
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    receiver_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    question_id = db.Column(db.Integer, db.ForeignKey('question.id'))
+    permissions = db.Column(db.Integer, default=1)
+
+    receiver = db.relationship("User",
+                               primaryjoin="Invite.receiver_id==User.id",
+                               backref="invitations",
+                               lazy='static', single_parent=True)
+
+    def __init__(self, sender, receiver, permissions, question_id, perm={}):
+        self.sender_id = sender.id
+        self.question_id = question_id
+        self.permissions = permissions
+
+        if isinstance(receiver, (int, long)):
+            self.receiver_id = receiver
+        else:
+            self.receiver_id = receiver.id
+
 
     def get_public(self):
         '''
@@ -1840,26 +1881,7 @@ class Invite(db.Model):
                                       user_id=self.sender_id),
                 'receiver_id': url_for('api_get_users',
                                        user_id=self.receiver_id)}
-
-    id = db.Column(db.Integer, primary_key=True)
-    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    receiver_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    question_id = db.Column(db.Integer, db.ForeignKey('question.id'))
-    permissions = db.Column(db.Integer, default=1)
-    receiver = db.relationship("User",
-                               primaryjoin="Invite.receiver_id==User.id",
-                               backref="invitations",
-                               lazy='static', single_parent=True)
-
-    def __init__(self, sender, receiver, permissions, question_id):
-        self.sender_id = sender.id
-        self.question_id = question_id
-        self.permissions = permissions
-
-        if isinstance(receiver, (int, long)):
-            self.receiver_id = receiver
-        else:
-            self.receiver_id = receiver.id
+    
 
 
 class PWDReset(db.Model):
@@ -1947,159 +1969,7 @@ class Question(db.Model):
                                                        self.author.username,
                                                        self.generation,
                                                        self.phase)
-    
-    permission_types = {
-        'READ' : 1,
-        'VOTE' : 2,
-        'PROPOSE' : 4,
-        'VOTE_READ' : 3,
-        'PROPOSE_READ' : 5,
-        'VOTE_PROPOSE_READ' : 7,
-        'COMMENT' : 8,
-        'INVITE' : 16,
-        'MODERATE' : 32,
-        'READ_COMMENT' : 9,
-        'VOTE_READ_COMMENT' : 11,
-        'PROPOSE_READ_COMMENT' : 13,
-        'VOTE_PROPOSE_READ_COMMENT' : 15
-    }
-    
-    # User question permissions
-    READ = 1
-    VOTE = 2
-    PROPOSE = 4
-    # Combined
-    VOTE_READ = 3
-    PROPOSE_READ = 5
-    VOTE_PROPOSE_READ = 7
-    #
-    # Additional question permissions
-    COMMENT = 8
-    INVITE = 16
-    MODERATE = 32
-    # Additional Combined
-    READ_COMMENT = 9
-    VOTE_READ_COMMENT = 11
-    PROPOSE_READ_COMMENT = 13
-    VOTE_PROPOSE_READ_COMMENT = 15
 
-    def alter_permissions(self, old_permission, new_permission):
-        '''
-        .. function:: alter_permissions(old_permission, new_permission)
-
-        Updates permissions of all paticipants with permissions == old_permission to new_permission.
-
-        :param old_permission: current permissions.
-        :type old_permission: int
-        :param new_permission: new permissions.
-        :type new_permission: int
-        :rtype: None
-        '''         
-        stmt = text('UPDATE invite SET invite.permissions = :new_perm WHERE invite.question_id = :qid AND invite.permissions = :old_perm')
-        db_session.execute(stmt, {"new_perm": new_permission, "qid": self.id, "old_perm": old_permission})
-
-    def get_public(self, user=None):
-        '''
-        .. function:: get_public()
-
-        Return public propoerties as string values for REST responses.
-
-        :rtype: dict
-        '''
-        # Fetch current threshold coordinates for this generation
-        try:
-            threshold = self.thresholds\
-                .filter(Threshold.generation == self.generation).one()
-        except NoResultFound, e:
-            print "No threshold found for question " + str(self.id) + ' gen ' + str(self.generation)
-
-
-        inherited_proposal_count = self.get_inherited_proposal_count()
-        consensus_found = self.consensus_found(generation=self.generation-1)
-        completed_voter_count = self.get_completed_voter_count(generation=self.generation)
-        voters_voting_count = self.get_voters_voting_count()
-
-        finished_writing_count = None
-        users_finished_writing = list()
-        if (self.phase == 'writing'):
-            finished_writing = db_session.query(FinishedWriting.user_id)\
-                    .filter(and_(FinishedWriting.question_id == self.id,
-                                 FinishedWriting.generation == self.generation))\
-                    .all()
-            for row in finished_writing:
-                users_finished_writing.append(row.user_id)
-            finished_writing_count = len(users_finished_writing)
-
-        public = {'id': self.id,
-                'url': url_for('api_get_questions', question_id=self.id),
-                'title': self.title,
-                'blurb': self.blurb,
-                'generation': self.generation,
-                'created': datetime.datetime.fromtimestamp(self.created, tz=pytz.utc).strftime("%Y-%m-%dT%H:%M:%S Z"),
-                "last_move_on": str(self.last_move_on),
-                "minimum_time": str(self.minimum_time),
-                "maximum_time": str(self.maximum_time),
-                'phase': self.phase,
-                'question_type': self.question_type_id,
-                'voting_type': self.voting_type_id,
-                'question_type_name': self.question_type.name,
-                'author': self.author.username,
-                'avatar_url': app.config['PROTOCOL'] + os.path.join(app.config['SITE_DOMAIN'], self.author.get_avatar()),
-                'author_id': self.author.id,
-                'proposal_count': self.get_proposal_count(),
-                'new_proposal_count': self.get_new_proposal_count(),
-                'new_proposer_count': self.get_new_proposer_count(),
-                'participant_count': self.invites.count(),
-                'consensus_found': consensus_found,
-                'inherited_proposal_count' : inherited_proposal_count,
-                'author_url': url_for('api_get_users', user_id=self.user_id),
-                'mapx': threshold.mapx,
-                'mapy': threshold.mapy,
-                'completed_voter_count': completed_voter_count,
-                'finished_writing_count': finished_writing_count,
-                'voters_voting_count': voters_voting_count}
-
-        # Add user permissions
-        permissions = None
-        if user:
-            permissions = self.get_permissions(user)
-            public['my_permissions'] = permissions
-
-            # Add participant permissions if user is question author
-
-            if user.id == self.author.id:
-                user_permissions = self.get_participant_permissions()
-                if user_permissions:
-                    public['user_permissions'] = user_permissions
-                else:
-                    public['user_permissions'] = list()
-
-        if permissions:
-            public['can_vote'] = bool(Question.VOTE & permissions)
-            public['can_propose'] = bool(Question.PROPOSE & permissions)
-        else:
-            public['can_vote'] = False
-            public['can_propose'] = False
-
-        if user:
-            if user.id in users_finished_writing:
-                public['finished_writing'] = 1
-            else:
-                public['finished_writing'] = 0
-
-            '''
-            finished_writing = db_session.query(FinishedWriting)\
-                .filter(and_(FinishedWriting.user_id == user.id,
-                             FinishedWriting.question_id == self.id,
-                             FinishedWriting.generation == self.generation))\
-                .first()
-            if finished_writing:
-                public['finished_writing'] = 1
-            else:
-                public['finished_writing'] = 0
-            '''
-
-        return public
 
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(120), nullable=False)
@@ -2108,8 +1978,10 @@ class Question(db.Model):
     room = db.Column(db.String(30))
     phase = db.Column(db.Enum('writing', 'voting', 'archived', 'consensus', 'results', name="question_phase_enum"),
                       default='writing')
-    question_type_id = db.Column(db.Integer, db.ForeignKey('question_types.id', name='fk_quesion_question_types'), default=1, nullable=False)
-    voting_type_id = db.Column(db.Integer, db.ForeignKey('voting_types.id', name='fk_quesion_voting_types'), default=1, nullable=False)
+    question_type_id = db.Column(db.Integer, db.ForeignKey('question_types.id', name='fk_quesion_question_types'),
+                                 default=1, nullable=False)
+    voting_type_id = db.Column(db.Integer, db.ForeignKey('voting_types.id', name='fk_quesion_voting_types'),
+                               default=1, nullable=False)
 
     # created = db.Column(db.DateTime)
     # last_move_on = db.Column(db.DateTime)
@@ -2177,6 +2049,285 @@ class Question(db.Model):
         self.maximum_time = maximum_time
         self.question_type_id = question_type
         self.voting_type_id = voting_type
+    
+    
+    permission_types = {
+        'READ' : 1,
+        'VOTE' : 2,
+        'PROPOSE' : 4,
+        'VOTE_READ' : 3,
+        'PROPOSE_READ' : 5,
+        'VOTE_PROPOSE_READ' : 7,
+        'COMMENT' : 8,
+        'INVITE' : 16,
+        'READ_COMMENT' : 9,
+        'VOTE_READ_COMMENT' : 11,
+        'PROPOSE_READ_COMMENT' : 13,
+        'VOTE_PROPOSE_READ_COMMENT' : 15,
+        'MODERATE' : 32
+    }
+    
+    # User question permissions
+    READ = 1
+    VOTE = 2
+    PROPOSE = 4
+    # Combined
+    VOTE_READ = 3
+    PROPOSE_READ = 5
+    VOTE_PROPOSE_READ = 7
+    #
+    # Additional question permissions
+    COMMENT = 8
+    INVITE = 16
+    MODERATE = 32
+    # Additional Combined
+    READ_COMMENT = 9
+    VOTE_READ_COMMENT = 11
+    PROPOSE_READ_COMMENT = 13
+    VOTE_PROPOSE_READ_COMMENT = 15
+    
+    def set_thresholds(self, user, mapx, mapy, generation=None):
+        '''
+        .. function:: set_thresholds(mapx, mapy, generation=None)
+
+        Updates question thresholds to change the pareto front - Moderator only
+
+        :param mapx: 
+        :type mapx: int
+        :param mapy: 
+        :type mapy: int
+        :param generation: 
+        :type generation: int
+        :rtype: None
+        '''
+        # Check user is moderator - or author for now
+        perm = self.get_permissions(user)
+        if not perm or (perm != Question.permission_types['MODERATE'] and user.id != self.user_id):
+            return False
+
+        generation = generation or self.generation
+        thresholds = self.thresholds.filter_by(generation=generation).first()
+        if not thresholds:
+            app.logger.debug('No threshold settings found for quetion %s generation %s', self.id, generation)
+            return False
+        else:
+            thresholds.mapx = mapx
+            thresholds.mapy = mapy
+            db_session.commit()
+            return True
+    
+    def alter_permissions(self, old_permission, new_permission):
+        '''
+        .. function:: alter_permissions(old_permission, new_permission)
+
+        Updates permissions of all paticipants with permissions == old_permission to new_permission.
+
+        :param old_permission: current permissions.
+        :type old_permission: int
+        :param new_permission: new permissions.
+        :type new_permission: int
+        :rtype: None
+        '''         
+        stmt = text('UPDATE invite SET invite.permissions = :new_perm WHERE invite.question_id = :qid AND invite.permissions = :old_perm')
+        db_session.execute(stmt, {"new_perm": new_permission, "qid": self.id, "old_perm": old_permission})
+
+
+    def get_anonymized(self, user=None):
+        '''
+        .. function:: get_anonymized()
+
+        Anonymize content
+
+        :rtype: dict
+        '''
+        # Fetch current threshold coordinates for this generation
+        try:
+            threshold = self.thresholds\
+                .filter(Threshold.generation == self.generation).one()
+        except NoResultFound, e:
+            print "No threshold found for question " + str(self.id) + ' gen ' + str(self.generation)
+
+
+        inherited_proposal_count = self.get_inherited_proposal_count()
+        consensus_found = self.consensus_found(generation=self.generation-1)
+        completed_voter_count = self.get_completed_voter_count(generation=self.generation)
+        voters_voting_count = self.get_voters_voting_count()
+
+        finished_writing_count = None
+        users_finished_writing = list()
+        if (self.phase == 'writing'):
+            finished_writing = db_session.query(FinishedWriting.user_id)\
+                    .filter(and_(FinishedWriting.question_id == self.id,
+                                 FinishedWriting.generation == self.generation))\
+                    .all()
+            for row in finished_writing:
+                users_finished_writing.append(row.user_id)
+            finished_writing_count = len(users_finished_writing)
+
+        anonymized = {'id': self.id,
+                'url': url_for('api_get_questions', question_id=self.id),
+                'title': app.config['ANONYMIZE_CONTENT'], 
+                'blurb': app.config['ANONYMIZE_CONTENT'],
+                'generation': self.generation,
+                'created': datetime.datetime.fromtimestamp(self.created, tz=pytz.utc).strftime("%Y-%m-%dT%H:%M:%S Z"),
+                "last_move_on": str(self.last_move_on),
+                "minimum_time": str(self.minimum_time),
+                "maximum_time": str(self.maximum_time),
+                'phase': self.phase,
+                'question_type': self.question_type_id,
+                'voting_type': self.voting_type_id,
+                'question_type_name': self.question_type.name,
+                'author': app.config['ANONYMIZE_CONTENT'],
+                'proposal_count': self.get_proposal_count(),
+                'inherited_proposal_count' : inherited_proposal_count,
+                'new_proposal_count': self.get_new_proposal_count(),
+                'new_proposer_count': self.get_new_proposer_count(),
+                'participant_count': self.invites.count(),
+                'consensus_found': consensus_found,
+                'mapx': threshold.mapx,
+                'mapy': threshold.mapy,
+                'current_user': user.username,
+                'completed_voter_count': completed_voter_count,
+                'finished_writing_count': finished_writing_count,
+                'voters_voting_count': voters_voting_count}
+
+        
+        # Add user permissions
+        permissions = None
+        if user:
+            if user.id in users_finished_writing:
+                anonymized['finished_writing'] = 1
+            else:
+                anonymized['finished_writing'] = 0
+            if self.user_id == user.id:
+                anonymized['is_author'] = True
+            else:
+                anonymized['is_author'] = False
+
+            permissions = self.get_permissions(user)
+            if permissions:
+                anonymized['my_permissions'] = permissions
+                anonymized['can_vote'] = bool(Question.VOTE & permissions)
+                anonymized['can_propose'] = bool(Question.PROPOSE & permissions)
+
+                if permissions == Question.permission_types['MODERATE']:
+                    anonymized['is_moderator'] = True
+                else:
+                    anonymized['is_moderator'] = False
+                    
+                # Add participant permissions if user is question author or moderator
+                if user.id == self.author.id or permissions == Question.permission_types['MODERATE']:
+                    user_permissions = self.get_participant_permissions()
+                    if user_permissions:
+                        anonymized['user_permissions'] = user_permissions
+                    else:
+                        anonymized['user_permissions'] = list()
+            else:
+                anonymized['can_vote'] = False
+                anonymized['can_propose'] = False
+                anonymized['is_moderator'] = False
+        
+        return anonymized
+    
+    
+    def get_public(self, user=None):
+        '''
+        .. function:: get_public()
+
+        Return public propoerties as string values for REST responses.
+
+        :rtype: dict
+        '''
+        # Fetch current threshold coordinates for this generation fff
+        try:
+            threshold = self.thresholds\
+                .filter(Threshold.generation == self.generation).one()
+        except NoResultFound, e:
+            print "No threshold found for question " + str(self.id) + ' gen ' + str(self.generation)
+
+
+        inherited_proposal_count = self.get_inherited_proposal_count()
+        consensus_found = self.consensus_found(generation=self.generation-1)
+        completed_voter_count = self.get_completed_voter_count(generation=self.generation)
+        voters_voting_count = self.get_voters_voting_count()
+
+        finished_writing_count = None
+        users_finished_writing = list()
+        if (self.phase == 'writing'):
+            finished_writing = db_session.query(FinishedWriting.user_id)\
+                    .filter(and_(FinishedWriting.question_id == self.id,
+                                 FinishedWriting.generation == self.generation))\
+                    .all()
+            for row in finished_writing:
+                users_finished_writing.append(row.user_id)
+            finished_writing_count = len(users_finished_writing)
+
+        public = {'id': self.id,
+                'url': url_for('api_get_questions', question_id=self.id),
+                'title': self.title,
+                'blurb': self.blurb,
+                'generation': self.generation,
+                'created': datetime.datetime.fromtimestamp(self.created, tz=pytz.utc).strftime("%Y-%m-%dT%H:%M:%S Z"),
+                "last_move_on": str(self.last_move_on),
+                "minimum_time": str(self.minimum_time),
+                "maximum_time": str(self.maximum_time),
+                'phase': self.phase,
+                'question_type': self.question_type_id,
+                'voting_type': self.voting_type_id,
+                'question_type_name': self.question_type.name,
+                'author': self.author.username,
+                'author_url': url_for('api_get_users', user_id=self.user_id),
+                'avatar_url': app.config['PROTOCOL'] + os.path.join(app.config['SITE_DOMAIN'], self.author.get_avatar()),
+                'author_id': self.author.id,
+                'proposal_count': self.get_proposal_count(),
+                'inherited_proposal_count' : inherited_proposal_count,
+                'new_proposal_count': self.get_new_proposal_count(),
+                'new_proposer_count': self.get_new_proposer_count(),
+                'participant_count': self.invites.count(),
+                'consensus_found': consensus_found,
+                'mapx': threshold.mapx,
+                'mapy': threshold.mapy,
+                'current_user': user.username,
+                'completed_voter_count': completed_voter_count,
+                'finished_writing_count': finished_writing_count,
+                'voters_voting_count': voters_voting_count}
+
+        # Add user permissions
+        permissions = None
+        if user:
+            if user.id in users_finished_writing:
+                public['finished_writing'] = 1
+            else:
+                public['finished_writing'] = 0
+            if self.user_id == user.id:
+                public['is_author'] = True
+            else:
+                public['is_author'] = False
+
+            permissions = self.get_permissions(user)
+            if permissions:
+                public['my_permissions'] = permissions
+                public['can_vote'] = bool(Question.VOTE & permissions)
+                public['can_propose'] = bool(Question.PROPOSE & permissions)
+
+                if permissions == Question.permission_types['MODERATE']:
+                    public['is_moderator'] = True
+                else:
+                    public['is_moderator'] = False
+                    
+                # Add participant permissions if user is question author or moderator
+                if user.id == self.author.id or permissions == Question.permission_types['MODERATE']:
+                    user_permissions = self.get_participant_permissions()
+                    if user_permissions:
+                        public['user_permissions'] = user_permissions
+                    else:
+                        public['user_permissions'] = list()
+            else:
+                public['can_vote'] = False
+                public['can_propose'] = False
+                public['is_moderator'] = False
+
+        return public
 
 
     def get_thresholds(self, generation=None):
@@ -2576,6 +2727,62 @@ class Question(db.Model):
         app.logger.debug('auto_move_on question now generation %s', self.generation)
         return self.phase
 
+    def move_on(self, user):
+        '''
+        .. function:: author_move_on(user_id)
+
+        Moves the question to the the next phase. Called by the author or the moderator.
+
+        :param user: Author or Moderator.
+        :type user: User
+        :rtype: String or Boolean
+        '''
+        app.logger.debug('move_on: current phase = %s', self.phase)
+        # Only the author or the moderator can move a question on
+        perm = utils.get_user_permissions(self.id, user.id)
+        if not perm:
+            app.logger.debug('move_on: no permissions found for user %s', user.id)
+            return False
+
+        if not perm == Question.permission_types['MODERATE'] and not user.id == self.user_id:
+            app.logger.debug('move_on: %s has no autority. Only the author or moderator can move a quesion on', user.id)
+            return False
+
+        # Record timestamp of phase change
+        self.last_move_on = get_timestamp()
+        if self.phase == 'writing':
+            self.phase = 'voting'
+            db_session.commit()
+
+        elif self.phase in {'voting', 'archive'}:
+            algorithm = app.config['ALGORITHM_VERSION']
+            pareto = self.calculate_pareto_front(algorithm=algorithm)
+            self.phase = 'writing'
+            self.generation = self.generation + 1
+            db_session.commit()
+            # Copy pareto to next generation
+            app.logger.debug('author_move_on copying pareto proposals to QH table %s', pareto)
+            for proposal in pareto:
+                self.history.append(QuestionHistory(proposal))
+            # Set default threshold for voting map
+            self.thresholds.append(Threshold(self))
+            db_session.commit()
+
+        app.logger.debug('author_move_on question now generation %s', self.generation)
+
+        try:
+          app.config['SEND_EMAIL_NOTIFICATIONS']
+        except NameError:
+          app.logger.debug("SEND_EMAIL_NOTIFICATIONS not defined! Not sending email notifications!")
+        else:
+          if app.config['SEND_EMAIL_NOTIFICATIONS']:
+              # Send email notifications
+              self.notify_users_moved_on()
+          else:
+              app.logger.debug("SEND_EMAIL_NOTIFICATIONS set to False. Not sending email notifications!")
+
+        return self.phase
+    
     def author_move_on(self, user_id):
         '''
         .. function:: author_move_on(user_id)
@@ -5058,7 +5265,7 @@ class Question(db.Model):
         filename = make_new_map_filename_hashed(self,
                                             generation,
                                             algorithm)
-        # app.logger.debug('Filename: %s hashed: %s', filename, filename_hashed)
+        # app.logger.debug('Filename: %s hashed: %s', filename, filename_hashed) gg
         # filename = filename_hashed
 
         app.logger.debug('Filename Hashed: %s', filename)
@@ -5572,7 +5779,7 @@ class Question(db.Model):
 
         return set(pareto_proposals)
 
-    def create_new_graph(self, generation=None, algorithm=2): # LIVE bang
+    def create_new_graph(self, generation=None, algorithm=2): # ttt
         '''
         .. function:: create_new_graph(
             dom_map)
@@ -5783,7 +5990,7 @@ class Question(db.Model):
         proposal_levels_keys = proposal_levels.keys()
         app.logger.debug("proposal_levels_keys ==> %s", proposal_levels_keys)
 
-        # Begin creation of Graphviz string
+        # Begin creation of Graphviz string ttt
         title = self.string_safe(self.title)
         voting_graph = 'digraph "%s" {\n' % (title)
 
@@ -7855,6 +8062,53 @@ class Proposal(db.Model):
                self.author.username,
                self.question_id)
 
+    
+    # Get anonymized text
+    def get_anonymized(self, user=None):
+        '''
+        .. function:: get_anonymized()
+
+        Conceal system content for extrnal REST responses.
+
+        :rtype: dict
+        '''
+        num_votes = self.get_vote_count()
+        image_url = ''
+        if len(self.image):
+            image_url = app.config['PROTOCOL'] + os.path.join(
+                app.config['SITE_DOMAIN'],
+                self.get_image())
+
+        anonymized = {'id': self.id,
+                'uri': url_for('api_get_question_proposals',
+                               question_id=self.question.id,
+                               proposal_id=self.id),
+                'title': app.config['ANONYMIZE_CONTENT'],
+                'blurb': app.config['ANONYMIZE_CONTENT'],
+                'abstract': self.abstract,
+                'anonymized': True,
+                'generation_created': self.generation_created,
+                'source': str(self.source),
+                'created': str(self.created),
+                'author': app.config['ANONYMIZE_CONTENT'],
+                'image_url': image_url,
+                'question_count': self.get_question_count(),
+                'comment_count': self.get_comment_count(),
+                'vote_count': num_votes,
+                'author_id': self.author.id,
+                'geomedy': self.geomedx,
+                'geomedy': self.geomedy,
+                'author_url': url_for('api_get_users', user_id=self.user_id),
+                'question_url': url_for('api_get_questions',
+                                        question_id=self.question_id)}
+
+        anonymized['endorse_type'] = 'moderating'
+        anonymized['mapx'] = None
+        anonymized['mapy'] = None
+
+        return anonymized
+    
+    
     def get_public(self, user=None):
         '''
         .. function:: get_public()

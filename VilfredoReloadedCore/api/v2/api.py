@@ -1077,14 +1077,30 @@ def api_get_questions(question_id=None):
         if question is None:
             return jsonify(message = "Question not found"), 404
 
-        # Check user permission
+        # Check user permission fff
         perm = question.get_permissions(user)
         if not perm:
             app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
             return jsonify(message = app.config['QUESTION_PERMISSION_DENIED_MESSAGE']), 400
 
-        question_data = question.get_public(user)
-        app.logger.debug("Qustion data ==> %s", question_data);
+        # question_data = question.get_public(user)
+
+        if perm == models.Question.permission_types['MODERATE']:
+            question_data = question.get_anonymized(user)
+        else:
+            question_data = question.get_public(user)
+
+        if perm == models.Question.permission_types['MODERATE']:
+            question_data['is_moderator'] = True
+        else:
+            question_data['is_moderator'] = False
+
+        if question.user_id == user.id:
+            question_data['is_author'] = True
+        else:
+            question_data['is_author'] = False
+
+        app.logger.debug("Question data ==> %s", question_data);
 
         # Test for jsonp request
         if False or 'callback' in request.args:
@@ -1099,7 +1115,7 @@ def api_get_questions(question_id=None):
 
         results = []
         for q in questions:
-            results.append(q.get_public())
+            results.append(q.get_public(user))
 
         # Test for jsonp request
         if False or 'callback' in request.args:
@@ -1172,7 +1188,7 @@ def api_create_question():
         # abort(400)
         response = {'message': "Question text must not be empty and no longer than " + str(MAX_LEN_QUESTION_BLURB) + " characters"}
         return jsonify(response), 400
-        
+
 
     # Check link count in blurb
     blurb = request.json.get('blurb')
@@ -1199,7 +1215,7 @@ def api_create_question():
 
     # Get author permissions - defaults to VOTE_PROPOSE_READ
     author_permissions = int(request.json.get('permissions', models.Question.VOTE_PROPOSE_READ))
-                  
+
     question = models.Question(author=user, 
                                title=title,
                                blurb = blurb,
@@ -1324,10 +1340,10 @@ def api_get_question_proposals(question_id=None, proposal_id=None):
         return jsonify(message="Question not found"), 404
 
     # Check if user has permission to view the question
-        perm = question.get_permissions(user)
-        if not perm:
-            app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
-            return jsonify(message = app.config['QUESTION_PERMISSION_DENIED_MESSAGE']), 400
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = app.config['QUESTION_PERMISSION_DENIED_MESSAGE']), 400
 
     if not proposal_id is None:
         proposal_id = int(proposal_id)
@@ -1335,7 +1351,12 @@ def api_get_question_proposals(question_id=None, proposal_id=None):
         if proposal is None:
             return jsonify(message="Proposal not found"), 404
 
-        result = proposal.get_public()
+        # result = proposal.get_public()
+        
+        if perm == models.Question.permission_types['MODERATE']:
+            result = proposal.get_anonymized()
+        else:
+            result = proposal.get_public()
 
         # Test for jsonp request
         if False or 'callback' in request.args:
@@ -1387,8 +1408,15 @@ def api_get_question_proposals(question_id=None, proposal_id=None):
         total_items = proposals.total
 
         results = []
+
         for p in proposals.items:
-            results.append(p.get_public(user))
+
+            # results.append(p.get_public(user))
+            
+            if perm == models.Question.permission_types['MODERATE']:
+                results.append(p.get_anonymized(user))
+            else:
+                results.append(p.get_public(user))
 
         # Test for jsonp request
         if False or 'callback' in request.args:
@@ -2100,6 +2128,95 @@ def api_delete_proposal_comment(question_id, proposal_id, comment_id):
     proposal.comments.remove(comment)
     db_session.commit()
     return jsonify(message="Comment deleted"), 201
+
+
+
+@app.route(REST_URL_PREFIX + '/questions/<int:question_id>/thresholds', methods=['POST'])
+@requires_auth
+def api_adjust_threshold(question_id):
+    '''
+    .. http:post:: /questions/(int:question_id)/thresholds
+
+        Adjust threashold of a question.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            POST /questions/33 HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 201 OK
+            Content-Type: application/json
+
+            {
+             "message": "Question thresholds updated"
+            }
+
+        :param question_id: question ID
+        :type question_id: int
+        :json title: question title
+        :json blurb: question content
+        :json room: question room
+        :json minimum_time: minimum time before question can be moved on
+        :json maximum_time: maximum time before question is automatically moved on
+        :statuscode 201: no error
+        :statuscode 400: bad request
+    '''
+    app.logger.debug("api_adjust_threshold called...\n")
+
+    user = get_authenticated_user(request)
+    if not user:
+        response = {"message": "User not authenticated"}
+        return jsonify(response), 401
+
+    app.logger.debug("Authenticated User = %s\n", user.id)
+
+    if 'question_id' is None:
+        return jsonify(message="Question ID not set"), 404
+
+    question = models.Question.query.get(int(question_id))
+    if question is None:
+        return jsonify(message="Question does not exist"), 404
+
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
+
+    # Check user is moderator
+    if not perm == models.Question.permission_types['MODERATE'] and user.id != question.user_id:
+        return jsonify({"message": "Only the question author or moderator can make this request"}), 401
+
+    if not 'thresholds' in request.json and not ('coords' in request.json['thresholds'] or 'set_to_defaults' in request.json['thresholds']):
+        message = {"message": "Set Thresholds: No threshold coordinates or set_to_defaults paramters received"}
+        return jsonify(message), 403
+
+    # var params = {coords : {mapx: n_cx, mapy: n_cy}};
+    # var params = {set_to_defaults: true};
+
+    if 'set_to_defaults' in request.json['thresholds']:
+        set_thresholds = {'mapx': 0.5, 'mapy': 0.5}
+    else:
+        set_thresholds = request.json['thresholds']['coords']
+    
+    generation = question.generation
+    mapx = float(set_thresholds['mapx'])
+    mapy = float(set_thresholds['mapy'])
+    
+    if question.set_thresholds(user, mapx, mapy, generation=generation):
+        coords = {"mapx": mapx, "mapy": mapy}
+        response = {"message": "Thresholds set", "coords": coords}
+        return jsonify(response), 201
+    else:
+        message = {"message": "Set Thresholds: Unable to change thresholds"}
+        return jsonify(message), 403
 
 
 # Create Endorsement - or vote on a proposal
@@ -3060,8 +3177,7 @@ def api_edit_question(question_id):
     if user_id != question.user_id:
         message = {"message": "Only the author can edit this question"}
         return jsonify(message), 403
-    
-    # doom
+
     if 'move_to_results' in request.json:
         question.phase = 'results'
         db_session.commit()
@@ -3069,8 +3185,8 @@ def api_edit_question(question_id):
                        phase=question.phase), 200
     
     if 'move_on' in request.json:
-        phase = question.author_move_on(user_id)
-        db_session.commit()
+        # phase = question.author_move_on(user_id)
+        phase = question.move_on(user)
 
         if not phase:
             return jsonify(message="Server Error - Question could not be moved on"), 500
@@ -4066,6 +4182,151 @@ def api_question_results(question_id=None):
                    results=results), 200
 
 
+
+@app.route(REST_URL_PREFIX + '/questions/<int:question_id>/mod_participation_table', methods=['GET'])
+@requires_auth
+def api_mod_question_participation_table(question_id):
+    '''
+    .. http:post:: /questions/(int:question_id)/mod_participation_table
+
+        Participation table.
+
+        **Example request**:
+
+        .. sourcecode:: http
+
+            POST /questions/44/key_players HTTP/1.1
+            Host: example.com
+            Accept: application/json
+
+        **Example response**:
+
+        .. sourcecode:: http
+
+            Status Code: 200 OK
+            Content-Type: application/json
+
+            {
+              "query_generation": "1",
+              "current_generation": "1",
+              "key_players": [
+                {
+                  "3": [
+                    "/api/v1/questions/1/proposals/4",
+                    "/api/v1/questions/1/proposals/3"
+                  ]
+                },
+                {
+                  "4": [
+                    "/api/v1/questions/1/proposals/3"
+                  ]
+                }
+              ],
+              "num_items": "2",
+              "question_id": "1"
+            }
+
+        :param question_id: question id
+        :statuscode 200: no error
+        :statuscode 400: bad request
+    '''
+    app.logger.debug("api_mod_question_participation_table called with %s...\n", question_id)
+
+    user = get_authenticated_user(request)
+    if user is None:
+        return jsonify(message = "User not logged in"), 404
+    
+    if question_id is None:
+        return jsonify({"message": "Parameter question_id not set"}), 404
+
+    question = models.Question.query.get(int(question_id))
+
+    if question is None:
+        app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
+        jsonify(message="Question not found"), 404
+
+    # Check if user has permission to view the question
+    perm = question.get_permissions(user)
+    if not perm:
+        app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
+        return jsonify(message = "You do not have permission to view this question"), 404
+
+    # Check user is moderator
+    if not perm == models.Question.permission_types['MODERATE'] :
+        return jsonify({"message": "Only the question moderator can make this request"}), 401
+
+    participants = question.get_participants()
+    app.logger.debug("participants==> %s", participants)
+    all_proposals = question.get_current_proposals()
+
+    authors = dict()
+    for proposal in all_proposals:
+        if proposal.author.id not in authors:
+            authors[proposal.author.id] = 1
+        else:
+            authors[proposal.author.id] = authors[proposal.author.id] + 1
+    
+    '''
+    participants
+    [{'permissions': '7', 'user_id': '1', 'username': u'john'},
+     {'permissions': '7', 'user_id': '2', 'username': u'susan'},
+     {'permissions': '7', 'user_id': '3', 'username': u'bill'},
+     {'permissions': '7', 'user_id': '4', 'username': u'jack'}]
+     
+     all_proposals
+     [<Proposal(9 'Bill's stuff' by bill, Q:'2')>,
+     <Proposal(10 'dfsdfsdfds' by bill, Q:'2')>]
+     
+     authors
+     {1: 1, 2: 0}
+     
+     {"num_proposals": "2", "current_generation": "1", "question_id": "2", "num_items": "1", 
+     "participation_table": [{"username": "bill", "past_generations": 0, "evaluations": 0}]}
+     
+     {"num_proposals": "2", "current_generation": "1", "question_id": "2", "num_items": "1", 
+     "participation_table": [
+        {"username": "bill", "evaluations": 0, "authored": 2}
+        {"username": "john", "evaluations": 0, "authored": 0}
+        {"username": "jack", "evaluations": 0, "authored": 1}
+     ]}
+    '''
+    finished_writing = db_session.query(models.FinishedWriting.user_id)\
+                .filter(and_(models.FinishedWriting.question_id == question.id,
+                             models.FinishedWriting.generation == question.generation))\
+                .all()
+    app.logger.debug("participation_table: Finished writing = %s", finished_writing)
+
+    finished = list()
+    for row in finished_writing:
+        finished.append(row.user_id)
+
+    participation_table = []
+    for user in participants:
+        participant = dict()
+        participant['username'] = user.username
+        participant['evaluations'] = user.get_endorsement_count(question)
+        
+        if user.id not in authors:
+            participant['proposals_written'] = 0
+        else:
+            participant['proposals_written'] = authors[user.id]
+        
+        if user.id in finished:
+            participant['finished_writing'] = 1
+        else:
+            participant['finished_writing'] = 0
+        
+        app.logger.debug("participant==>%s", participant)
+        participation_table.append(participant)
+        app.logger.debug("participation_table==>%s", participation_table)
+
+    return jsonify(question_id=str(question.id),
+                   current_generation=str(question.generation),
+                   num_proposals=str(len(all_proposals)),
+                   num_items=str(len(participation_table)),
+                   participation_table=participation_table), 200
+
+
 @app.route(REST_URL_PREFIX + '/questions/<int:question_id>/participation_table', methods=['GET'])
 @requires_auth
 def api_question_participation_table(question_id=None):
@@ -4129,13 +4390,13 @@ def api_question_participation_table(question_id=None):
     if question is None:
         app.logger.debug("ERROR: Question %s Not Found!\n", question_id)
         jsonify(message="Question not found"), 404
-    
+
     # Check if user has permission to view the question
     perm = question.get_permissions(user)
     if not perm:
         app.logger.debug("ACCESS ERROR: User %s tried to access question %s", user.id, question.id)
         return jsonify(message = "You do not have permission to view this question"), 404
-    
+
     # Check user is question author or moderator
     if not perm == models.Question.permission_types['MODERATE'] and not question.user_id == user.id:
         return jsonify({"message": "Only the question author or moderator can make this request"}), 401
